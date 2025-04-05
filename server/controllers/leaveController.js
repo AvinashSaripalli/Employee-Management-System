@@ -1,14 +1,35 @@
 const db = require('../db');
+require("dotenv").config(); 
 
-exports.leaveApply=(req, res) => {
-    const { employeeId, leaveType, startDate, endDate, reason, onlyTomorrow, halfDay } = req.body;
+exports.leaveApply = (req, res) => {
+    console.log("Received leave application request:", req.body); // Debug log
+    const { employeeId, leaveType, startDate, endDate, reason, onlyTomorrow, halfDay,companyName } = req.body;
+    
+    // Input validation
+    if (!employeeId || !leaveType || !startDate || !endDate || !reason) {
+        console.log("Missing required fields");
+        return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const sql = `INSERT INTO leaves (employeeId, leave_type, start_date, end_date, reason, only_tomorrow, half_day, status,companyName )
+                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending',?)`;
   
-    const sql = `INSERT INTO leaves (employeeId, leave_type, start_date, end_date, reason, only_tomorrow, half_day, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending')`;
-  
-    db.query(sql, [employeeId, leaveType, startDate, endDate, reason, onlyTomorrow, halfDay], (err, result) => {
-      if (err) return res.status(500).json({ error: "Database error" });
-      res.status(201).json({ message: "Leave applied successfully", leaveId: result.insertId });
+    db.query(sql, 
+        [employeeId, leaveType, startDate, endDate, reason, onlyTomorrow || false, halfDay || false, companyName], 
+        (err, result) => {
+            if (err) {
+                console.error('Database error:', err);
+                return res.status(500).json({ 
+                    error: "Database error",
+                    details: err.message,
+                    sqlMessage: err.sqlMessage 
+                });
+            }
+            console.log("Leave application successful:", result);
+            res.status(201).json({ 
+                message: "Leave applied successfully", 
+                leaveId: result.insertId 
+            });
     });
 };
 

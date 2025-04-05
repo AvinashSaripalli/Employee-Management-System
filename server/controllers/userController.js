@@ -3,66 +3,6 @@ const bcrypt = require("bcryptjs");
 const db = require("../db");
 require("dotenv").config(); 
 
-// exports.registerUsers = async (req, res) => {
-//   const {
-//     firstName, lastName, email, phoneNumber, password, companyName, role, 
-//     designation, department, jobLocation, dateOfBirth, bloodGroup, 
-//     technicalSkills, employeeId, gender, confirmPassword
-//   } = req.body;
-
-//   if (!password) {
-//     return res.status(400).json({ error: "Password is required" });
-//   }
-
-//   const photo = req.file ? `/uploads/${req.file.filename}` : null;
-
-//   try {
-//     // Check if email already exists
-//     const checkEmailQuery = "SELECT email FROM users WHERE email = ?";
-//     db.query(checkEmailQuery, [email], async (err, results) => {
-//       if (err) {
-//         console.error("MySQL error:", err);
-//         return res.status(500).json({ error: "Database error" });
-//       }
-//       if (results.length > 0) {
-//         return res.status(400).json({ error: "Email already exists" });
-//       }
-
-//       try {
-//         // Hash the password safely
-//         const hashedPassword = await bcrypt.hash(password, 10);
-
-//         // Insert user data into database
-//         const insertQuery = `INSERT INTO users 
-//           (firstName, lastName, email, phoneNumber, password, companyName, role, 
-//           designation, department, jobLocation, dateOfBirth, bloodGroup, photo, 
-//           technicalSkills, employeeId, gender, confirmPassword) 
-//           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-//         db.query(
-//           insertQuery, 
-//           [firstName, lastName, email, phoneNumber, hashedPassword, companyName, 
-//           role, designation, department, jobLocation, dateOfBirth, bloodGroup, 
-//           photo, technicalSkills, employeeId, gender, confirmPassword], 
-//           (err, result) => {
-//             if (err) {
-//               console.error("MySQL error:", err);
-//               return res.status(500).json({ error: "Failed to add user" });
-//             }
-//             res.status(201).json({ message: "User added successfully" });
-//           }
-//         );
-//       } catch (hashError) {
-//         console.error("Error hashing password:", hashError);
-//         return res.status(500).json({ error: "Error hashing password" });
-//       }
-//     });
-//   } catch (error) {
-//     console.error("Server error:", error);
-//     res.status(500).json({ error: "Server error" });
-//   }
-// };
-
 exports.registerUsers = async (req, res) => {
   const {
     firstName, lastName, email, phoneNumber, password, companyName, role, 
@@ -70,7 +10,6 @@ exports.registerUsers = async (req, res) => {
     technicalSkills, employeeId, gender, confirmPassword
   } = req.body;
 
-  // Validate required fields
   if (!password) {
     return res.status(400).json({ error: "Password is required" });
   }
@@ -87,7 +26,6 @@ exports.registerUsers = async (req, res) => {
   const photo = `/uploads/${req.file.filename}`;
 
   try {
-    // Check if email already exists
     const checkEmailQuery = "SELECT email FROM users WHERE email = ?";
     db.query(checkEmailQuery, [email], async (err, results) => {
       if (err) {
@@ -99,10 +37,8 @@ exports.registerUsers = async (req, res) => {
       }
 
       try {
-        // Hash the password
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Insert user data, including confirmPassword
         const insertQuery = `INSERT INTO users 
           (firstName, lastName, email, phoneNumber, password, companyName, role, 
            designation, department, jobLocation, dateOfBirth, bloodGroup, photo, 
@@ -293,43 +229,6 @@ exports.loginUser = (req, res) => {
     });
   });
 };
-
-
-
-// exports.getLeavesByEmployeeId = (req, res) => {
-//   const { employeeId } = req.params;
-
-//   const query = 'SELECT leave_type, start_date, end_date, reason, status FROM leaves WHERE employeeId = ?';
-
-//   db.query(query, [employeeId], (err, results) => {
-//       if (err) {
-//           return res.status(500).json({ error: 'Database error' });
-//       }
-//       res.json(results);
-//   });
-// };
-
-exports.getLeavesByEmployeeId = (req, res) => {
-  const { employeeId } = req.params;
-
-  const query = `
-      SELECT 
-          leave_type AS leaveType, 
-          start_date AS startDate, 
-          end_date AS endDate, 
-          reason, 
-          status 
-      FROM leaves 
-      WHERE employeeId = ?`;
-
-  db.query(query, [employeeId], (err, results) => {
-      if (err) {
-          return res.status(500).json({ error: 'Database error' });
-      }
-      res.json(results);
-  });
-};
-
 
 exports.updateUser = (req, res) => {
   const { id, designation, department, jobLocation, technicalSkills, phoneNumber, dateOfBirth,bloodGroup,gender } = req.body;

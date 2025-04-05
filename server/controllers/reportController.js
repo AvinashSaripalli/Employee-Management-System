@@ -1,6 +1,6 @@
 const db = require("../db");
+require("dotenv").config(); 
 
-// GET all reports
 exports.getReports = (req, res) => {
   const sql = "SELECT * FROM reports ORDER BY date DESC";
   db.query(sql, (err, results) => {
@@ -9,7 +9,6 @@ exports.getReports = (req, res) => {
   });
 };
 
-// POST a new report
 exports.createReport = (req, res) => {
   const { employeeId, date, tasks, hoursWorked, status } = req.body;
   const sql = "INSERT INTO reports (employeeId, date, tasks, hoursWorked, status) VALUES (?, ?, ?, ?, ?)";
@@ -19,7 +18,6 @@ exports.createReport = (req, res) => {
   });
 };
 
-// PUT update report
 exports.updateReport = (req, res) => {
   const { id } = req.params;
   const { date, tasks, hoursWorked, status } = req.body;
@@ -30,7 +28,6 @@ exports.updateReport = (req, res) => {
   });
 };
 
-// DELETE report
 exports.deleteReport = (req, res) => {
   const { id } = req.params;
   const sql = "DELETE FROM reports WHERE id=?";

@@ -47,13 +47,14 @@ const ApplyLeave = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-
+  
     const employeeId = localStorage.getItem("userEmployeeId");
+    const companyName = localStorage.getItem("companyName");
     if (!employeeId) {
       alert("Error: Employee ID not found. Please log in again.");
       return;
     }
-
+  
     const leaveData = {
       employeeId,
       leaveType,
@@ -62,14 +63,23 @@ const ApplyLeave = () => {
       reason,
       onlyTomorrow,
       halfDay,
+      companyName
     };
-
+  
     try {
-      const response = await axios.post("http://localhost:5000/api/leaves/apply", leaveData);
+      console.log("Submitting leave data:", leaveData);
+      const response = await axios.post("http://localhost:5000/api/leaves/apply", leaveData, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      console.log("Server response:", response.data);
       alert(response.data.message);
       handleClear();
     } catch (error) {
-      alert("Failed to apply for leave. Please try again.");
+      console.error("Leave application error:", error);
+      console.error("Error details:", error.response?.data);
+      alert(`Failed to apply for leave: ${error.response?.data?.error || error.message}`);
     }
   };
 
