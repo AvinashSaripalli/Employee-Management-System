@@ -112,7 +112,6 @@ const WorkReports = () => {
 
   const filteredReports = filter === "All" ? reports : reports.filter((r) => r.status === filter);
 
-  // Rest of your JSX remains the same
   return (
     <Container maxWidth="lg">
       <Typography variant="h4" gutterBottom align="center">
@@ -139,7 +138,7 @@ const WorkReports = () => {
             <Grid item xs={12} sm={4}>
               <FormControl fullWidth>
                 <InputLabel>Status Filter</InputLabel>
-                <Select value={filter} onChange={(e) => setFilter(e.target.value)}>
+                <Select value={filter} onChange={(e) => setFilter(e.target.value)} label="Status Filter">
                   <MenuItem value="All">All</MenuItem>
                   <MenuItem value="Pending">Pending</MenuItem>
                   <MenuItem value="In Progress">In Progress</MenuItem>
@@ -266,6 +265,7 @@ const WorkReports = () => {
             <Select
               value={newReport.status}
               onChange={(e) => setNewReport({ ...newReport, status: e.target.value })}
+              label="Status"
             >
               <MenuItem value="Pending">Pending</MenuItem>
               <MenuItem value="In Progress">In Progress</MenuItem>
