@@ -245,6 +245,8 @@ const EditEmployeeDialog = ({ open, onClose, user, onSave }) => {
                 <MenuItem value="Software Development">Software Development</MenuItem>
                 <MenuItem value="Human Resources">Human Resources</MenuItem>
                 <MenuItem value="Design">Design</MenuItem>
+                <MenuItem value="Testing">Testing</MenuItem>
+                <MenuItem value="Accounting">Accounting</MenuItem>
               </Select> 
                 
         </FormControl>

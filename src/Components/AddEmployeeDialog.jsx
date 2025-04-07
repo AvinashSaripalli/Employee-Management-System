@@ -194,6 +194,8 @@ const AddEmployeeDialog = ({ open, onClose, onSave, employeeId }) => {
                 <MenuItem value="Software Development">Software Development</MenuItem>
                 <MenuItem value="Human Resources">Human Resources</MenuItem>
                 <MenuItem value="Design">Design</MenuItem>
+                <MenuItem value="Testing">Testing</MenuItem>
+                <MenuItem value="Accounting">Accounting</MenuItem>
               </Select>
               {errors.department && <Typography color="error" sx={{ fontSize: '0.8rem', mt: 0.5, ml: 2 }}>{errors.department}</Typography>}
             </FormControl>
