@@ -1,7 +1,7 @@
-import React, { useState } from "react";
-import { 
-  TextField, Button, Box, Typography, FormControl, Container, 
-  MenuItem, Select, InputLabel, Tabs, Tab, Snackbar, Alert, Stepper, Step, StepLabel,Autocomplete,Chip,Grid,IconButton,InputAdornment
+import { useState, useEffect } from "react";
+import {
+  TextField, Button, Box, Typography, FormControl, Container,
+  MenuItem, Select, InputLabel, Tabs, Tab, Snackbar, Alert, Stepper, Step, StepLabel, Autocomplete, Chip, Grid, IconButton, InputAdornment
 } from "@mui/material";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -25,7 +25,7 @@ function Register() {
     photo: null,
     bloodGroup: "",
     dateOfBirth: "",
-    technicalSkills: [], 
+    technicalSkills: [],
   });
 
   const [errors, setErrors] = useState({});
@@ -50,10 +50,20 @@ function Register() {
   }
 `;
 
+  const apiCall = () => {
+    fetch("/api/admin/dropdowns")
+      .then(res => res.json())
+      .then(data => console.log(data))
+      .catch(err => console.error("API error:", err));
+  };
+
+  useEffect(() => {
+    apiCall();
+  }, []);
 
   const validateStep = () => {
     const newErrors = {};
-    
+
     if (activeStep === 0) {
       if (!formValues.firstName) newErrors.firstName = "Enter the First Name";
       else if (!/^[A-Za-z]+(?: [A-Za-z]+)*$/.test(formValues.firstName)) {
@@ -74,8 +84,8 @@ function Register() {
         const dob = new Date(formValues.dateOfBirth);
         const today = new Date();
         const age = today.getFullYear() - dob.getFullYear() -
-                    (today.getMonth() < dob.getMonth() ||
-                    (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate()) ? 1 : 0);
+          (today.getMonth() < dob.getMonth() ||
+            (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate()) ? 1 : 0);
         if (dob > today) {
           newErrors.dateOfBirth = "Date of Birth cannot be in the future";
         } else if (age < 18) {
@@ -83,8 +93,8 @@ function Register() {
         }
       }
     }
-    
-    if (activeStep === 1) { 
+
+    if (activeStep === 1) {
       if (!formValues.companyName) newErrors.companyName = "Company Name is required";
       if (!formValues.department) newErrors.department = "Please select your Department";
       if (!formValues.jobLocation) newErrors.jobLocation = "Please select your Job Location";
@@ -94,7 +104,7 @@ function Register() {
       }
       if (formValues.technicalSkills.length === 0) newErrors.technicalSkills = "Please enter your technical skills";
     }
-    
+
     if (activeStep === 2) {
       if (!formValues.email) {
         newErrors.email = "Email is required";
@@ -131,7 +141,7 @@ function Register() {
     } else {
       setFormValues((prev) => ({ ...prev, [name]: value }));
     }
-    
+
     setErrors((prev) => {
       let newErrors = { ...prev };
       if (name === "firstName" && !/^[a-zA-Z]+( [a-zA-Z]+)*$/.test(value)) {
@@ -151,9 +161,9 @@ function Register() {
       } else if (name === "dateOfBirth") {
         const dob = new Date(value);
         const today = new Date();
-        const age = today.getFullYear() - dob.getFullYear() - 
-                    (today.getMonth() < dob.getMonth() || 
-                    (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate()) ? 1 : 0);
+        const age = today.getFullYear() - dob.getFullYear() -
+          (today.getMonth() < dob.getMonth() ||
+            (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate()) ? 1 : 0);
         if (dob > today) {
           newErrors.dateOfBirth = "Date of Birth cannot be in the future";
         } else if (age < 18) {
@@ -185,7 +195,7 @@ function Register() {
   const handleShowPassword = () => {
     setShowPassword((prev) => !prev);
   };
-  
+
   const handleShowConfirmPassword = () => {
     setShowConfirmPassword((prev) => !prev);
   };
@@ -221,7 +231,7 @@ function Register() {
     formData.append("photo", formValues.photo);
     formData.append("bloodGroup", formValues.bloodGroup);
     formData.append("dateOfBirth", formValues.dateOfBirth);
-    formData.append("technicalSkills", formValues.technicalSkills.join(",")); 
+    formData.append("technicalSkills", formValues.technicalSkills.join(","));
 
     try {
       const response = await axios.post(
@@ -232,10 +242,10 @@ function Register() {
       setSnackbar({ open: true, message: "Registered successfully!", severity: "success" });
       setTimeout(() => navigate("/login"), 1000);
     } catch (error) {
-      setSnackbar({ 
-        open: true, 
-        message: error.response?.data?.error || "Registration failed!", 
-        severity: "error" 
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || "Registration failed!",
+        severity: "error"
       });
     }
   };
@@ -246,15 +256,15 @@ function Register() {
       case 0:
         return (
           <>
-            <TextField label="First Name" name="firstName" margin="dense" fullWidth value={formValues.firstName} inputProps={{maxLength:30}} onChange={handleChange} error={!!errors.firstName} helperText={errors.firstName} />
-            <TextField label="Last Name" name="lastName" margin="dense" fullWidth value={formValues.lastName} inputProps={{maxLength:30}} onChange={handleChange} error={!!errors.lastName} helperText={errors.lastName} />
+            <TextField label="First Name" name="firstName" margin="dense" fullWidth value={formValues.firstName} inputProps={{ maxLength: 30 }} onChange={handleChange} error={!!errors.firstName} helperText={errors.firstName} />
+            <TextField label="Last Name" name="lastName" margin="dense" fullWidth value={formValues.lastName} inputProps={{ maxLength: 30 }} onChange={handleChange} error={!!errors.lastName} helperText={errors.lastName} />
             <FormControl fullWidth margin="dense" error={!!errors.gender}>
               <InputLabel>Gender</InputLabel>
               <Select name="gender" value={formValues.gender} onChange={handleChange} label="Gender">
                 <MenuItem value="Male">Male</MenuItem>
                 <MenuItem value="Female">Female</MenuItem>
               </Select>
-              {errors.gender && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml:2 }}>{errors.gender}</Typography>}
+              {errors.gender && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.gender}</Typography>}
             </FormControl>
             <TextField label="Phone Number" name="phoneNumber" margin="dense" fullWidth inputProps={{ maxLength: 10 }} value={formValues.phoneNumber} onChange={handleChange} error={!!errors.phoneNumber} helperText={errors.phoneNumber} />
             <FormControl fullWidth margin="dense" error={!!errors.bloodGroup}>
@@ -269,7 +279,7 @@ function Register() {
                 <MenuItem value="AB +ve">AB +</MenuItem>
                 <MenuItem value="AB -ve">AB -</MenuItem>
               </Select>
-              {errors.bloodGroup && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml:2 }}>{errors.bloodGroup}</Typography>}
+              {errors.bloodGroup && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.bloodGroup}</Typography>}
             </FormControl>
             <TextField
               label="Date of Birth"
@@ -291,7 +301,7 @@ function Register() {
             />
           </>
         );
-      case 1: 
+      case 1:
         return (
           <>
             <FormControl fullWidth margin="dense" error={!!errors.companyName}>
@@ -300,17 +310,17 @@ function Register() {
                 <MenuItem value="Karncy">Karncy</MenuItem>
                 <MenuItem value="Karnipuna">Karnipuna</MenuItem>
               </Select>
-              {errors.companyName && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml:2 }}>{errors.companyName}</Typography>}
+              {errors.companyName && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.companyName}</Typography>}
             </FormControl>
-            <TextField 
-              label="Designation" 
-              name="designation" 
-              margin="dense" fullWidth 
-              value={formValues.designation} 
-              inputProps={{maxLength:50}} 
-              onChange={handleChange} 
-              error={!!errors.designation} 
-              helperText={errors.designation} 
+            <TextField
+              label="Designation"
+              name="designation"
+              margin="dense" fullWidth
+              value={formValues.designation}
+              inputProps={{ maxLength: 50 }}
+              onChange={handleChange}
+              error={!!errors.designation}
+              helperText={errors.designation}
               sx={{ width: '500px' }}
             />
             <FormControl fullWidth margin="dense" error={!!errors.department}>
@@ -322,7 +332,7 @@ function Register() {
                 <MenuItem value="Testing">Testing</MenuItem>
                 <MenuItem value="Accounting">Accounting</MenuItem>
               </Select>
-              {errors.department && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml:2 }}>{errors.department}</Typography>}
+              {errors.department && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.department}</Typography>}
             </FormControl>
             <FormControl fullWidth margin="dense" error={!!errors.jobLocation}>
               <InputLabel>Job Location</InputLabel>
@@ -335,7 +345,7 @@ function Register() {
                 <MenuItem value="Mumbai">Mumbai</MenuItem>
                 <MenuItem value="Kolkata">Kolkata</MenuItem>
               </Select>
-              {errors.jobLocation && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml:2 }}>{errors.jobLocation}</Typography>}
+              {errors.jobLocation && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.jobLocation}</Typography>}
             </FormControl>
             <Autocomplete
               multiple
@@ -369,24 +379,24 @@ function Register() {
       case 2:
         return (
           <>
-            <TextField 
-              label="Email" 
-              name="email" 
-              margin="dense" fullWidth 
-              value={formValues.email} 
-              inputProps={{maxLength:50}} 
-              onChange={handleChange} 
-              error={!!errors.email} 
-              helperText={errors.email} 
+            <TextField
+              label="Email"
+              name="email"
+              margin="dense" fullWidth
+              value={formValues.email}
+              inputProps={{ maxLength: 50 }}
+              onChange={handleChange}
+              error={!!errors.email}
+              helperText={errors.email}
             />
-            <TextField label="Password" 
+            <TextField label="Password"
               name="password"
-              type={showPassword ? "text" : "password"} 
-              margin="dense" fullWidth 
-              value={formValues.password} 
-              inputProps={{maxLength:10}} 
-              onChange={handleChange} 
-              error={!!errors.password} 
+              type={showPassword ? "text" : "password"}
+              margin="dense" fullWidth
+              value={formValues.password}
+              inputProps={{ maxLength: 10 }}
+              onChange={handleChange}
+              error={!!errors.password}
               helperText={errors.password}
               InputProps={{
                 endAdornment: (
@@ -400,17 +410,17 @@ function Register() {
                     </IconButton>
                   </InputAdornment>
                 ),
-              }} 
+              }}
             />
-            <TextField 
-              label="Confirm Password" 
+            <TextField
+              label="Confirm Password"
               name="confirmPassword"
-              type={showConfirmPassword ? "text" : "password"} 
-              margin="dense" fullWidth 
-              value={formValues.confirmPassword} 
-              inputProps={{ maxLength: 10 }} 
-              onChange={handleChange} 
-              error={!!errors.confirmPassword} 
+              type={showConfirmPassword ? "text" : "password"}
+              margin="dense" fullWidth
+              value={formValues.confirmPassword}
+              inputProps={{ maxLength: 10 }}
+              onChange={handleChange}
+              error={!!errors.confirmPassword}
               helperText={errors.confirmPassword}
               InputProps={{
                 endAdornment: (
@@ -424,13 +434,13 @@ function Register() {
                     </IconButton>
                   </InputAdornment>
                 ),
-              }} 
+              }}
             />
             <Typography>Upload Photo</Typography>
-            <Button variant="outlined" component="label" sx={{ mt: 1, height:56, width: '100%' }}>
+            <Button variant="outlined" component="label" sx={{ mt: 1, height: 56, width: '100%' }}>
               <input type="file" name="photo" onChange={handlePhotoChange} />
             </Button>
-            {errors.photo && <div style={{ color:"#d32f2f", fontSize: '0.8rem', mt:0.5, marginLeft: '25px' }}>{errors.photo}</div>}
+            {errors.photo && <div style={{ color: "#d32f2f", fontSize: '0.8rem', mt: 0.5, marginLeft: '25px' }}>{errors.photo}</div>}
           </>
         );
       default:
@@ -448,8 +458,8 @@ function Register() {
       justifyContent: "center",
       alignItems: "center",
     }}>
-    <Grid container sx={{ minHeight: "100vh" ,  maxWidth: "1000px",}}>
-  
+      <Grid container sx={{ minHeight: "100vh", maxWidth: "1000px", }}>
+
         <Grid item xs={12} md={5} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', p: 5 }}>
           <Box>
             <Typography variant="h3" fontWeight="bold" gutterBottom>
@@ -460,18 +470,18 @@ function Register() {
             </Typography>
           </Box>
         </Grid>
-    
+
         <Grid item xs={12} md={7} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
           <Box maxWidth="500px" sx={{ p: 3, borderRadius: 2, boxShadow: 3, background: "white", width: "100%" }}>
             <Typography variant="h5" sx={{ textAlign: "center", fontWeight: "bold" }}>
               Register
             </Typography>
-    
+
             <Tabs value={tabValue} onChange={handleTabChange} centered sx={{ mb: 2 }}>
               <Tab label="Manager" />
               <Tab label="Employee" />
             </Tabs>
-    
+
             <Stepper activeStep={activeStep} sx={{ mb: 2 }}>
               {steps.map((label) => (
                 <Step key={label}>
@@ -479,10 +489,10 @@ function Register() {
                 </Step>
               ))}
             </Stepper>
-    
+
             <Box component="form" noValidate autoComplete="off">
               {renderStepContent(activeStep)}
-    
+
               <Box
                 sx={{
                   display: 'flex',
@@ -506,7 +516,7 @@ function Register() {
                   {activeStep === steps.length - 1 ? 'Register' : 'Next'}
                 </Button>
               </Box>
-    
+
               <Typography sx={{ textAlign: "center", mt: 2 }}>
                 Already have an account? <a href="/login">Login</a>
               </Typography>
@@ -515,22 +525,22 @@ function Register() {
         </Grid>
       </Grid>
 
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={3000} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
-        <Alert 
-          onClose={() => setSnackbar({ ...snackbar, open: false })} 
-          severity={snackbar.severity} 
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
           sx={{ width: "100%" }}
         >
           {snackbar.message}
         </Alert>
       </Snackbar>
     </Container>
-    
+
   );
 }
 
