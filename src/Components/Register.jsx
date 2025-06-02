@@ -7,6 +7,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { keyframes } from '@emotion/react';
 import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { useDropdownsQuery } from '../redux/slice/apiSlice';
 
 function Register() {
   const [formValues, setFormValues] = useState({
@@ -50,15 +51,10 @@ function Register() {
   }
 `;
 
-  const apiCall = () => {
-    fetch("/api/admin/dropdowns")
-      .then(res => res.json())
-      .then(data => console.log(data))
-      .catch(err => console.error("API error:", err));
-  };
+  const { data, isLoading, error } = useDropdownsQuery();
+  const dropdowns = data?.response || {};
 
   useEffect(() => {
-    apiCall();
   }, []);
 
   const validateStep = () => {
@@ -267,20 +263,32 @@ function Register() {
               {errors.gender && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.gender}</Typography>}
             </FormControl>
             <TextField label="Phone Number" name="phoneNumber" margin="dense" fullWidth inputProps={{ maxLength: 10 }} value={formValues.phoneNumber} onChange={handleChange} error={!!errors.phoneNumber} helperText={errors.phoneNumber} />
+
             <FormControl fullWidth margin="dense" error={!!errors.bloodGroup}>
               <InputLabel>Blood Group</InputLabel>
-              <Select name="bloodGroup" value={formValues.bloodGroup} onChange={handleChange} label="Blood Group">
-                <MenuItem value="A +ve">A +</MenuItem>
-                <MenuItem value="A -ve">A -</MenuItem>
-                <MenuItem value="B +ve">B +</MenuItem>
-                <MenuItem value="B -ve">B -</MenuItem>
-                <MenuItem value="O +ve">O +</MenuItem>
-                <MenuItem value="O -ve">O -</MenuItem>
-                <MenuItem value="AB +ve">AB +</MenuItem>
-                <MenuItem value="AB -ve">AB -</MenuItem>
+              <Select
+                name="bloodGroup"
+                value={formValues.bloodGroup}
+                onChange={handleChange}
+                label="Blood Group"
+              >
+                {isLoading ? (
+                  <MenuItem disabled>Loading...</MenuItem>
+                ) : (
+                  dropdowns.bloodGroup?.map((group) => (
+                    <MenuItem key={group.bloodGroupId} value={group.bloodGroupName}>
+                      {group.bloodGroupName}
+                    </MenuItem>
+                  ))
+                )}
               </Select>
-              {errors.bloodGroup && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.bloodGroup}</Typography>}
+              {errors.bloodGroup && (
+                <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>
+                  {errors.bloodGroup}
+                </Typography>
+              )}
             </FormControl>
+
             <TextField
               label="Date of Birth"
               name="dateOfBirth"
