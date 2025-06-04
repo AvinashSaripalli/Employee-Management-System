@@ -231,7 +231,7 @@ function Register() {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/users/register",
+        "http://localhost:3000/api/users/register",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
@@ -257,8 +257,17 @@ function Register() {
             <FormControl fullWidth margin="dense" error={!!errors.gender}>
               <InputLabel>Gender</InputLabel>
               <Select name="gender" value={formValues.gender} onChange={handleChange} label="Gender">
-                <MenuItem value="Male">Male</MenuItem>
-                <MenuItem value="Female">Female</MenuItem>
+                {/* <MenuItem value="Male">Male</MenuItem>
+                <MenuItem value="Female">Female</MenuItem> */}
+                {isLoading ? (
+                  <MenuItem disabled>Loading...</MenuItem>
+                ) : (
+                  dropdowns.gender?.map((group) => (
+                    <MenuItem key={group.genderId} value={group.genderName}>
+                      {group.genderName}
+                    </MenuItem>
+                  ))
+                )}
               </Select>
               {errors.gender && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.gender}</Typography>}
             </FormControl>
@@ -315,12 +324,21 @@ function Register() {
             <FormControl fullWidth margin="dense" error={!!errors.companyName}>
               <InputLabel>Company Name</InputLabel>
               <Select name="companyName" value={formValues.companyName} onChange={handleChange} label="Company Name">
-                <MenuItem value="Karncy">Karncy</MenuItem>
-                <MenuItem value="Karnipuna">Karnipuna</MenuItem>
+                {/* <MenuItem value="Karncy">Karncy</MenuItem>
+                <MenuItem value="Karnipuna">Karnipuna</MenuItem> */}
+                                {isLoading ? (
+                  <MenuItem disabled>Loading...</MenuItem>
+                ) : (
+                  dropdowns.company?.map((group) => (
+                    <MenuItem key={group.companyId} value={group.companyName}>
+                      {group.companyName}
+                    </MenuItem>
+                  ))
+                )}
               </Select>
               {errors.companyName && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.companyName}</Typography>}
             </FormControl>
-            <TextField
+            {/* <TextField
               label="Designation"
               name="designation"
               margin="dense" fullWidth
@@ -330,28 +348,63 @@ function Register() {
               error={!!errors.designation}
               helperText={errors.designation}
               sx={{ width: '500px' }}
-            />
+            /> */}
+            <FormControl fullWidth margin="dense" error={!!errors.designation}>
+              <InputLabel>designation</InputLabel>
+              <Select name="designation" value={formValues.designation} onChange={handleChange} label="Gender">
+                {/* <MenuItem value="Male">Male</MenuItem>
+                <MenuItem value="Female">Female</MenuItem> */}
+                {isLoading ? (
+                  <MenuItem disabled>Loading...</MenuItem>
+                ) : (
+                  dropdowns.designation?.map((group) => (
+                    <MenuItem key={group.designationId} value={group.designationName}>
+                      {group.designationName}
+                    </MenuItem>
+                  ))
+                )}
+              </Select>
+              {errors.designation && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.designation}</Typography>}
+            </FormControl>
             <FormControl fullWidth margin="dense" error={!!errors.department}>
               <InputLabel>Department</InputLabel>
               <Select name="department" onChange={handleChange} label="Department" value={formValues.department}>
-                <MenuItem value="Software Development">Software Development</MenuItem>
+                {/* <MenuItem value="Software Development">Software Development</MenuItem>
                 <MenuItem value="Human Resources"> Human Resources</MenuItem>
                 <MenuItem value="Design">Design</MenuItem>
                 <MenuItem value="Testing">Testing</MenuItem>
-                <MenuItem value="Accounting">Accounting</MenuItem>
+                <MenuItem value="Accounting">Accounting</MenuItem> */}
+                {isLoading ? (
+                  <MenuItem disabled>Loading...</MenuItem>
+                ) : (
+                  dropdowns.department?.map((group) => (
+                    <MenuItem key={group.departmentId} value={group.departmentName}>
+                      {group.departmentName}
+                    </MenuItem>
+                  ))
+                )}
               </Select>
               {errors.department && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.department}</Typography>}
             </FormControl>
             <FormControl fullWidth margin="dense" error={!!errors.jobLocation}>
               <InputLabel>Job Location</InputLabel>
               <Select name="jobLocation" value={formValues.jobLocation} onChange={handleChange} label="Job Location">
-                <MenuItem value="Hyderabad">Hyderabad</MenuItem>
+                {/* <MenuItem value="Hyderabad">Hyderabad</MenuItem>
                 <MenuItem value="Chennai">Chennai</MenuItem>
                 <MenuItem value="Kerala">Kerala</MenuItem>
                 <MenuItem value="Amaravati">Amaravati</MenuItem>
                 <MenuItem value="Delhi">Delhi</MenuItem>
                 <MenuItem value="Mumbai">Mumbai</MenuItem>
-                <MenuItem value="Kolkata">Kolkata</MenuItem>
+                <MenuItem value="Kolkata">Kolkata</MenuItem> */}
+                                {isLoading ? (
+                  <MenuItem disabled>Loading...</MenuItem>
+                ) : (
+                  dropdowns.city?.map((group) => (
+                    <MenuItem key={group.cityId} value={group.cityName}>
+                      {group.cityName}
+                    </MenuItem>
+                  ))
+                )}
               </Select>
               {errors.jobLocation && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.jobLocation}</Typography>}
             </FormControl>
