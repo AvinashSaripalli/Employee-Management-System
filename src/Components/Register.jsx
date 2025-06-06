@@ -7,7 +7,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { keyframes } from '@emotion/react';
 import { Visibility, VisibilityOff } from "@mui/icons-material";
-import { useDropdownsQuery } from '../redux/slice/apiSlice';
+import { useDropdownsQuery, useRegisterUserMutation } from '../redux/slice/apiSlice';
 
 function Register() {
   const [formValues, setFormValues] = useState({
@@ -17,14 +17,14 @@ function Register() {
     phoneNumber: "",
     password: "",
     confirmPassword: "",
-    companyName: "",
-    gender: "",
-    role: "Manager",
-    department: "",
-    designation: "",
-    jobLocation: "",
+    companyId: "",
+    genderId: "",
+    roleId: "ROL1000002",
+    departmentId: "",
+    designationId: "",
+    cityId: "",
     photo: null,
-    bloodGroup: "",
+    bloodGroupId: "",
     dateOfBirth: "",
     technicalSkills: [],
   });
@@ -69,12 +69,12 @@ function Register() {
       else if (!/^[A-Za-z]+(?: [A-Za-z]+)*$/.test(formValues.lastName)) {
         newErrors.lastName = "Last name should only contain letters and single spaces.";
       }
-      if (!formValues.gender) newErrors.gender = "Please select your Gender";
+      if (!formValues.genderId) newErrors.genderId = "Please select your Gender";
       if (!formValues.phoneNumber) newErrors.phoneNumber = "Please enter your Phone number";
       else if (!/^\d{10}$/.test(formValues.phoneNumber)) {
         newErrors.phoneNumber = "Phone number must be 10 digits";
       }
-      if (!formValues.bloodGroup) newErrors.bloodGroup = "Please select your Blood Group";
+      if (!formValues.bloodGroupId) newErrors.bloodGroupId = "Please select your Blood Group";
       if (!formValues.dateOfBirth) newErrors.dateOfBirth = "Please enter your Date of Birth";
       else {
         const dob = new Date(formValues.dateOfBirth);
@@ -91,29 +91,27 @@ function Register() {
     }
 
     if (activeStep === 1) {
-      if (!formValues.companyName) newErrors.companyName = "Company Name is required";
-      if (!formValues.department) newErrors.department = "Please select your Department";
-      if (!formValues.jobLocation) newErrors.jobLocation = "Please select your Job Location";
-      if (!formValues.designation) newErrors.designation = "Enter the First Name";
-      else if (!/^[A-Za-z]+(?: [A-Za-z]+)*$/.test(formValues.designation)) {
-        newErrors.designation = "Designation should only contain letters and single spaces.";
-      }
+      if (!formValues.companyId) newErrors.companyId = "Company Name is required";
+      if (!formValues.departmentId) newErrors.departmentId = "Please select your Department";
+      if (!formValues.cityId) newErrors.cityId = "Please select your Job Location";
+      if (!formValues.designationId) newErrors.designationId = "Enter the Designation Name";
       if (formValues.technicalSkills.length === 0) newErrors.technicalSkills = "Please enter your technical skills";
     }
 
     if (activeStep === 2) {
       if (!formValues.email) {
         newErrors.email = "Email is required";
-      } else {
-        const emailDomain = formValues.email.split("@")[1];
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formValues.email)) {
-          newErrors.email = "Invalid email address";
-        } else if (formValues.companyName === "Karncy" && emailDomain !== "karncy.com") {
-          newErrors.email = "Email must end with @karncy.com";
-        } else if (formValues.companyName === "Karnipuna" && emailDomain !== "karnipuna.com") {
-          newErrors.email = "Email must end with @karnipuna.com";
-        }
-      }
+       }
+      //  else {
+      //   const emailDomain = formValues.email.split("@")[1];
+      //   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formValues.email)) {
+      //     newErrors.email = "Invalid email address";
+      //   } else if (formValues.companyName === "Karncy" && emailDomain !== "karncy.com") {
+      //     newErrors.email = "Email must end with @karncy.com";
+      //   } else if (formValues.companyName === "Karnipuna" && emailDomain !== "karnipuna.com") {
+      //     newErrors.email = "Email must end with @karnipuna.com";
+      //   }
+      // }
       if (!formValues.password) newErrors.password = "Password is required";
       else if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$/.test(formValues.password)) {
         newErrors.password = "Password must be 8-16 characters, include at least one letter, one number, and one special character";
@@ -146,8 +144,8 @@ function Register() {
         newErrors.lastName = "Only letters and a single space between words allowed";
       } else if (name === "phoneNumber" && !/^(\d{0,10})?$/.test(value)) {
         newErrors.phoneNumber = "Phone number must be 10 digits";
-      } else if (name === "designation" && !/^[a-zA-Z]+( [a-zA-Z]+)*$/.test(value)) {
-        newErrors.designation = "Only letters and a single space between words allowed";
+      } else if (name === "designationId" && !/^[a-zA-Z]+( [a-zA-Z]+)*$/.test(value)) {
+        newErrors.designationId = "Only letters and a single space between words allowed";
       } else if (name === "password") {
         newErrors.password = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$/.test(value)
           ? "" : "Password must be 8-16 characters, include at least one letter, one number, and one special character";
@@ -180,13 +178,21 @@ function Register() {
     setFormValues({ ...formValues, photo: e.target.files[0] });
   };
 
+  // const handleTabChange = (event, newValue) => {
+  //   setTabValue(newValue);
+  //   setFormValues((prev) => ({
+  //     ...prev,
+  //     role: newValue === 0 ? "Manager" : "Employee",
+  //   }));
+  // };
+
   const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-    setFormValues((prev) => ({
-      ...prev,
-      role: newValue === 0 ? "Manager" : "Employee",
-    }));
-  };
+  setTabValue(newValue);
+  setFormValues((prev) => ({
+    ...prev,
+    roleId: newValue === 0 ? "ROL1000002" : "ROL1000003", // Manager: ROL1000002, Employee: ROL1000003
+  }));
+};
 
   const handleShowPassword = () => {
     setShowPassword((prev) => !prev);
@@ -210,6 +216,7 @@ function Register() {
     setActiveStep((prev) => prev - 1);
   };
 
+  const [registerUser, { isLoading: isRegistering, error: registerError }] = useRegisterUserMutation();
   const handleSubmit = async () => {
     const formData = new FormData();
     formData.append("firstName", formValues.firstName);
@@ -217,24 +224,25 @@ function Register() {
     formData.append("email", formValues.email);
     formData.append("phoneNumber", formValues.phoneNumber);
     formData.append("password", formValues.password);
-    formData.append("confirmPassword", formValues.confirmPassword);
-    formData.append("companyName", formValues.companyName);
-    formData.append("gender", formValues.gender);
-    formData.append("role", formValues.role);
-    formData.append("department", formValues.department);
-    formData.append("designation", formValues.designation);
-    formData.append("jobLocation", formValues.jobLocation);
+    // formData.append("confirmPassword", formValues.confirmPassword);
+    formData.append("companyId", formValues.companyId);
+    formData.append("genderId", formValues.genderId);
+    formData.append("roleId", formValues.roleId);
+    formData.append("departmentId", formValues.departmentId);
+    formData.append("designationId", formValues.designationId);
+    formData.append("cityId", formValues.cityId);
     formData.append("photo", formValues.photo);
-    formData.append("bloodGroup", formValues.bloodGroup);
+    formData.append("bloodGroupId", formValues.bloodGroupId);
     formData.append("dateOfBirth", formValues.dateOfBirth);
-    formData.append("technicalSkills", formValues.technicalSkills.join(","));
+    formData.append("technicalSkills", formValues.technicalSkills);
 
     try {
-      const response = await axios.post(
-        "http://localhost:3000/api/users/register",
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
+      // const response = await axios.post(
+      //   "http://localhost:3000/api/admin/register",
+      //   formData,
+      //   { headers: { "Content-Type": "multipart/form-data" } }
+      // );
+      await registerUser(formData).unwrap();
       setSnackbar({ open: true, message: "Registered successfully!", severity: "success" });
       setTimeout(() => navigate("/login"), 1000);
     } catch (error) {
@@ -256,28 +264,28 @@ function Register() {
             <TextField label="Last Name" name="lastName" margin="dense" fullWidth value={formValues.lastName} inputProps={{ maxLength: 30 }} onChange={handleChange} error={!!errors.lastName} helperText={errors.lastName} />
             <FormControl fullWidth margin="dense" error={!!errors.gender}>
               <InputLabel>Gender</InputLabel>
-              <Select name="gender" value={formValues.gender} onChange={handleChange} label="Gender">
+              <Select name="genderId" value={formValues.genderId} onChange={handleChange} label="Gender">
                 {/* <MenuItem value="Male">Male</MenuItem>
                 <MenuItem value="Female">Female</MenuItem> */}
                 {isLoading ? (
                   <MenuItem disabled>Loading...</MenuItem>
                 ) : (
                   dropdowns.gender?.map((group) => (
-                    <MenuItem key={group.genderId} value={group.genderName}>
+                    <MenuItem key={group.genderId} value={group.genderId}>
                       {group.genderName}
                     </MenuItem>
                   ))
                 )}
               </Select>
-              {errors.gender && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.gender}</Typography>}
+              {errors.genderId && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.genderId}</Typography>}
             </FormControl>
             <TextField label="Phone Number" name="phoneNumber" margin="dense" fullWidth inputProps={{ maxLength: 10 }} value={formValues.phoneNumber} onChange={handleChange} error={!!errors.phoneNumber} helperText={errors.phoneNumber} />
 
-            <FormControl fullWidth margin="dense" error={!!errors.bloodGroup}>
+            <FormControl fullWidth margin="dense" error={!!errors.bloodGroupId}>
               <InputLabel>Blood Group</InputLabel>
               <Select
-                name="bloodGroup"
-                value={formValues.bloodGroup}
+                name="bloodGroupId"
+                value={formValues.bloodGroupId}
                 onChange={handleChange}
                 label="Blood Group"
               >
@@ -285,15 +293,15 @@ function Register() {
                   <MenuItem disabled>Loading...</MenuItem>
                 ) : (
                   dropdowns.bloodGroup?.map((group) => (
-                    <MenuItem key={group.bloodGroupId} value={group.bloodGroupName}>
+                    <MenuItem key={group.bloodGroupId} value={group.bloodGroupId}>
                       {group.bloodGroupName}
                     </MenuItem>
                   ))
                 )}
               </Select>
-              {errors.bloodGroup && (
+              {errors.bloodGroupId && (
                 <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>
-                  {errors.bloodGroup}
+                  {errors.bloodGroupId}
                 </Typography>
               )}
             </FormControl>
@@ -323,20 +331,20 @@ function Register() {
           <>
             <FormControl fullWidth margin="dense" error={!!errors.companyName}>
               <InputLabel>Company Name</InputLabel>
-              <Select name="companyName" value={formValues.companyName} onChange={handleChange} label="Company Name">
+              <Select name="companyId" value={formValues.companyId} onChange={handleChange} label="Company Name">
                 {/* <MenuItem value="Karncy">Karncy</MenuItem>
                 <MenuItem value="Karnipuna">Karnipuna</MenuItem> */}
                                 {isLoading ? (
                   <MenuItem disabled>Loading...</MenuItem>
                 ) : (
                   dropdowns.company?.map((group) => (
-                    <MenuItem key={group.companyId} value={group.companyName}>
+                    <MenuItem key={group.companyId} value={group.companyId}>
                       {group.companyName}
                     </MenuItem>
                   ))
                 )}
               </Select>
-              {errors.companyName && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.companyName}</Typography>}
+              {errors.companyId && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.companyId}</Typography>}
             </FormControl>
             {/* <TextField
               label="Designation"
@@ -351,24 +359,24 @@ function Register() {
             /> */}
             <FormControl fullWidth margin="dense" error={!!errors.designation}>
               <InputLabel>designation</InputLabel>
-              <Select name="designation" value={formValues.designation} onChange={handleChange} label="Gender">
+              <Select name="designationId" value={formValues.designationId} onChange={handleChange} label="Gender">
                 {/* <MenuItem value="Male">Male</MenuItem>
                 <MenuItem value="Female">Female</MenuItem> */}
                 {isLoading ? (
                   <MenuItem disabled>Loading...</MenuItem>
                 ) : (
                   dropdowns.designation?.map((group) => (
-                    <MenuItem key={group.designationId} value={group.designationName}>
+                    <MenuItem key={group.designationId} value={group.designationId}>
                       {group.designationName}
                     </MenuItem>
                   ))
                 )}
               </Select>
-              {errors.designation && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.designation}</Typography>}
+              {errors.designationId && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.designationId}</Typography>}
             </FormControl>
             <FormControl fullWidth margin="dense" error={!!errors.department}>
               <InputLabel>Department</InputLabel>
-              <Select name="department" onChange={handleChange} label="Department" value={formValues.department}>
+              <Select name="departmentId" onChange={handleChange} label="Department" value={formValues.departmentId}>
                 {/* <MenuItem value="Software Development">Software Development</MenuItem>
                 <MenuItem value="Human Resources"> Human Resources</MenuItem>
                 <MenuItem value="Design">Design</MenuItem>
@@ -378,17 +386,17 @@ function Register() {
                   <MenuItem disabled>Loading...</MenuItem>
                 ) : (
                   dropdowns.department?.map((group) => (
-                    <MenuItem key={group.departmentId} value={group.departmentName}>
+                    <MenuItem key={group.departmentId} value={group.departmentId}>
                       {group.departmentName}
                     </MenuItem>
                   ))
                 )}
               </Select>
-              {errors.department && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.department}</Typography>}
+              {errors.departmentId && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.departmentId}</Typography>}
             </FormControl>
             <FormControl fullWidth margin="dense" error={!!errors.jobLocation}>
               <InputLabel>Job Location</InputLabel>
-              <Select name="jobLocation" value={formValues.jobLocation} onChange={handleChange} label="Job Location">
+              <Select name="cityId" value={formValues.cityId} onChange={handleChange} label="Job Location">
                 {/* <MenuItem value="Hyderabad">Hyderabad</MenuItem>
                 <MenuItem value="Chennai">Chennai</MenuItem>
                 <MenuItem value="Kerala">Kerala</MenuItem>
@@ -400,13 +408,13 @@ function Register() {
                   <MenuItem disabled>Loading...</MenuItem>
                 ) : (
                   dropdowns.city?.map((group) => (
-                    <MenuItem key={group.cityId} value={group.cityName}>
+                    <MenuItem key={group.cityId} value={group.cityId}>
                       {group.cityName}
                     </MenuItem>
                   ))
                 )}
               </Select>
-              {errors.jobLocation && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.jobLocation}</Typography>}
+              {errors.cityId && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.cityId}</Typography>}
             </FormControl>
             <Autocomplete
               multiple
