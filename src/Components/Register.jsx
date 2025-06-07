@@ -26,8 +26,10 @@ function Register() {
     photo: null,
     bloodGroupId: "",
     dateOfBirth: "",
-    technicalSkills: [],
+    skills: [],
   });
+
+  
 
   const [errors, setErrors] = useState({});
   const [tabValue, setTabValue] = useState(0);
@@ -95,7 +97,7 @@ function Register() {
       if (!formValues.departmentId) newErrors.departmentId = "Please select your Department";
       if (!formValues.cityId) newErrors.cityId = "Please select your Job Location";
       if (!formValues.designationId) newErrors.designationId = "Enter the Designation Name";
-      if (formValues.technicalSkills.length === 0) newErrors.technicalSkills = "Please enter your technical skills";
+      if (formValues.skills.length === 0) newErrors.skills = "Please enter your technical skills";
     }
 
     if (activeStep === 2) {
@@ -128,13 +130,16 @@ function Register() {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    if (name === "technicalSkills") {
-      const skillsArray = value.split(",").map(skill => skill.trim()).filter(skill => skill);
-      setFormValues((prev) => ({ ...prev, [name]: skillsArray }));
-    } else {
+    // const { name, value } = e.target;
+    // if (name === "technicalSkills") {
+    //   const skillsArray = value.split(",").map(skill => skill.trim()).filter(skill => skill);
+    //   setFormValues((prev) => ({ ...prev, [name]: skillsArray }));
+    // } else {
+    //   setFormValues((prev) => ({ ...prev, [name]: value }));
+    // }
+      const { name, value } = e.target;
+      if (name === "skills") return; // Skip since Autocomplete handles this
       setFormValues((prev) => ({ ...prev, [name]: value }));
-    }
 
     setErrors((prev) => {
       let newErrors = { ...prev };
@@ -165,8 +170,8 @@ function Register() {
         } else {
           delete newErrors.dateOfBirth;
         }
-      } else if (name === "technicalSkills" && value.trim() === "") {
-        newErrors.technicalSkills = "Please enter your technical skills";
+      } else if (name === "skills" && value.trim() === "") {
+        newErrors.skills = "Please enter your technical skills";
       } else {
         delete newErrors[name];
       }
@@ -218,31 +223,49 @@ function Register() {
 
   const [registerUser, { isLoading: isRegistering, error: registerError }] = useRegisterUserMutation();
   const handleSubmit = async () => {
-    const formData = new FormData();
-    formData.append("firstName", formValues.firstName);
-    formData.append("lastName", formValues.lastName);
-    formData.append("email", formValues.email);
-    formData.append("phoneNumber", formValues.phoneNumber);
-    formData.append("password", formValues.password);
-    // formData.append("confirmPassword", formValues.confirmPassword);
-    formData.append("companyId", formValues.companyId);
-    formData.append("genderId", formValues.genderId);
-    formData.append("roleId", formValues.roleId);
-    formData.append("departmentId", formValues.departmentId);
-    formData.append("designationId", formValues.designationId);
-    formData.append("cityId", formValues.cityId);
-    formData.append("photo", formValues.photo);
-    formData.append("bloodGroupId", formValues.bloodGroupId);
-    formData.append("dateOfBirth", formValues.dateOfBirth);
-    formData.append("technicalSkills", formValues.technicalSkills);
+    // const formData = new FormData();
+    // formData.append("firstName", formValues.firstName);
+    // formData.append("lastName", formValues.lastName);
+    // formData.append("email", formValues.email);
+    // formData.append("phoneNumber", formValues.phoneNumber);
+    // formData.append("password", formValues.password);
+    // // formData.append("confirmPassword", formValues.confirmPassword);
+    // formData.append("companyId", formValues.companyId);
+    // formData.append("genderId", formValues.genderId);
+    // formData.append("roleId", formValues.roleId);
+    // formData.append("departmentId", formValues.departmentId);
+    // formData.append("designationId", formValues.designationId);
+    // formData.append("cityId", formValues.cityId);
+    // //formData.append("photo", formValues.photo);
+    // formData.append("bloodGroupId", formValues.bloodGroupId);
+    // formData.append("dateOfBirth", formValues.dateOfBirth);
+    // formData.append("technicalSkills", formValues.technicalSkills);
 
+      const payload = {
+      firstName: formValues.firstName,
+      lastName: formValues.lastName,
+      email: formValues.email,
+      phoneNumber: formValues.phoneNumber,
+      password: formValues.password,
+      //confirmPassword: formValues.confirmPassword,
+      companyId: formValues.companyId,
+      genderId: formValues.genderId,
+      roleId: formValues.roleId,
+      departmentId: formValues.departmentId,
+      designationId: formValues.designationId,
+      cityId: formValues.cityId,
+      // photo: formValues.photo,
+      bloodGroupId: formValues.bloodGroupId,
+      dateOfBirth: formValues.dateOfBirth,
+      skills: formValues.skills
+      };
     try {
       // const response = await axios.post(
       //   "http://localhost:3000/api/admin/register",
       //   formData,
       //   { headers: { "Content-Type": "multipart/form-data" } }
       // );
-      await registerUser(formData).unwrap();
+      await registerUser(payload).unwrap();
       setSnackbar({ open: true, message: "Registered successfully!", severity: "success" });
       setTimeout(() => navigate("/login"), 1000);
     } catch (error) {
@@ -320,7 +343,7 @@ function Register() {
               helperText={errors.dateOfBirth}
               sx={{
                 '& input': {
-                  color: 'grey',
+                  color: 'black',
                 }
               }}
             />
@@ -416,7 +439,7 @@ function Register() {
               </Select>
               {errors.cityId && <Typography color="error" sx={{ fontSize: '0.75rem', mt: 0.5, ml: 2 }}>{errors.cityId}</Typography>}
             </FormControl>
-            <Autocomplete
+            {/* <Autocomplete
               multiple
               freeSolo
               options={[]}
@@ -440,6 +463,34 @@ function Register() {
                   fullWidth
                   error={!!errors.technicalSkills}
                   helperText={errors.technicalSkills || "Type a skill and press Enter"}
+                />
+              )}
+            /> */}
+            <Autocomplete
+              multiple
+              options={dropdowns.skill || []}
+              getOptionLabel={(option) => option.skillName}
+              value={dropdowns.skill?.filter((skill) => formValues.skills.includes(skill.skillId)) || []}
+              onChange={(event, newValue) => {
+                const selectedSkillIds = newValue.map((skill) => skill.skillId);
+                setFormValues((prev) => ({ ...prev, skills: selectedSkillIds }));
+                if (selectedSkillIds.length > 0) {
+                  setErrors((prev) => ({ ...prev, skills: "" }));
+                }
+              }}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip variant="outlined" label={option.skillName} {...getTagProps({ index })} />
+                ))
+              }
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Technical Skills"
+                  margin="dense"
+                  fullWidth
+                  error={!!errors.skills}
+                  helperText={errors.skills || "Select one or more skills"}
                 />
               )}
             />

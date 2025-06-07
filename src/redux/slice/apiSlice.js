@@ -15,6 +15,9 @@ export const apiSlice = createApi({
         url: 'register',
         method: 'POST',
         body: payload,
+        headers: {
+         'Content-Type': 'application/json',
+        },
       }),
     }),
   }),
