@@ -3,7 +3,6 @@ import {
   TextField, Button, Box, Typography, FormControl, Container,
   MenuItem, Select, InputLabel, Tabs, Tab, Snackbar, Alert, Stepper, Step, StepLabel, Autocomplete, Chip, Grid, IconButton, InputAdornment
 } from "@mui/material";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { keyframes } from '@emotion/react';
 import { Visibility, VisibilityOff } from "@mui/icons-material";
@@ -29,7 +28,7 @@ function Register() {
     skills: [],
   });
 
-  
+
 
   const [errors, setErrors] = useState({});
   const [tabValue, setTabValue] = useState(0);
@@ -103,7 +102,7 @@ function Register() {
     if (activeStep === 2) {
       if (!formValues.email) {
         newErrors.email = "Email is required";
-       }
+      }
       //  else {
       //   const emailDomain = formValues.email.split("@")[1];
       //   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formValues.email)) {
@@ -137,9 +136,9 @@ function Register() {
     // } else {
     //   setFormValues((prev) => ({ ...prev, [name]: value }));
     // }
-      const { name, value } = e.target;
-      if (name === "skills") return; // Skip since Autocomplete handles this
-      setFormValues((prev) => ({ ...prev, [name]: value }));
+    const { name, value } = e.target;
+    if (name === "skills") return; // Skip since Autocomplete handles this
+    setFormValues((prev) => ({ ...prev, [name]: value }));
 
     setErrors((prev) => {
       let newErrors = { ...prev };
@@ -149,8 +148,6 @@ function Register() {
         newErrors.lastName = "Only letters and a single space between words allowed";
       } else if (name === "phoneNumber" && !/^(\d{0,10})?$/.test(value)) {
         newErrors.phoneNumber = "Phone number must be 10 digits";
-      } else if (name === "designationId" && !/^[a-zA-Z]+( [a-zA-Z]+)*$/.test(value)) {
-        newErrors.designationId = "Only letters and a single space between words allowed";
       } else if (name === "password") {
         newErrors.password = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$/.test(value)
           ? "" : "Password must be 8-16 characters, include at least one letter, one number, and one special character";
@@ -192,12 +189,12 @@ function Register() {
   // };
 
   const handleTabChange = (event, newValue) => {
-  setTabValue(newValue);
-  setFormValues((prev) => ({
-    ...prev,
-    roleId: newValue === 0 ? "ROL1000002" : "ROL1000003", // Manager: ROL1000002, Employee: ROL1000003
-  }));
-};
+    setTabValue(newValue);
+    setFormValues((prev) => ({
+      ...prev,
+      roleId: newValue === 0 ? "ROL1000002" : "ROL1000003", // Manager: ROL1000002, Employee: ROL1000003
+    }));
+  };
 
   const handleShowPassword = () => {
     setShowPassword((prev) => !prev);
@@ -223,49 +220,24 @@ function Register() {
 
   const [registerUser, { isLoading: isRegistering, error: registerError }] = useRegisterUserMutation();
   const handleSubmit = async () => {
-    // const formData = new FormData();
-    // formData.append("firstName", formValues.firstName);
-    // formData.append("lastName", formValues.lastName);
-    // formData.append("email", formValues.email);
-    // formData.append("phoneNumber", formValues.phoneNumber);
-    // formData.append("password", formValues.password);
-    // // formData.append("confirmPassword", formValues.confirmPassword);
-    // formData.append("companyId", formValues.companyId);
-    // formData.append("genderId", formValues.genderId);
-    // formData.append("roleId", formValues.roleId);
-    // formData.append("departmentId", formValues.departmentId);
-    // formData.append("designationId", formValues.designationId);
-    // formData.append("cityId", formValues.cityId);
-    // //formData.append("photo", formValues.photo);
-    // formData.append("bloodGroupId", formValues.bloodGroupId);
-    // formData.append("dateOfBirth", formValues.dateOfBirth);
-    // formData.append("technicalSkills", formValues.technicalSkills);
-
-      const payload = {
+    const payload = {
       firstName: formValues.firstName,
       lastName: formValues.lastName,
       email: formValues.email,
       phoneNumber: formValues.phoneNumber,
       password: formValues.password,
-      //confirmPassword: formValues.confirmPassword,
       companyId: formValues.companyId,
       genderId: formValues.genderId,
       roleId: formValues.roleId,
       departmentId: formValues.departmentId,
       designationId: formValues.designationId,
       cityId: formValues.cityId,
-      // photo: formValues.photo,
       bloodGroupId: formValues.bloodGroupId,
       dateOfBirth: formValues.dateOfBirth,
       skills: formValues.skills
-      };
+    };
     try {
-      // const response = await axios.post(
-      //   "http://localhost:3000/api/admin/register",
-      //   formData,
-      //   { headers: { "Content-Type": "multipart/form-data" } }
-      // );
-      await registerUser(payload).unwrap();
+      await registerUser(payload);
       setSnackbar({ open: true, message: "Registered successfully!", severity: "success" });
       setTimeout(() => navigate("/login"), 1000);
     } catch (error) {
@@ -357,7 +329,7 @@ function Register() {
               <Select name="companyId" value={formValues.companyId} onChange={handleChange} label="Company Name">
                 {/* <MenuItem value="Karncy">Karncy</MenuItem>
                 <MenuItem value="Karnipuna">Karnipuna</MenuItem> */}
-                                {isLoading ? (
+                {isLoading ? (
                   <MenuItem disabled>Loading...</MenuItem>
                 ) : (
                   dropdowns.company?.map((group) => (
@@ -427,7 +399,7 @@ function Register() {
                 <MenuItem value="Delhi">Delhi</MenuItem>
                 <MenuItem value="Mumbai">Mumbai</MenuItem>
                 <MenuItem value="Kolkata">Kolkata</MenuItem> */}
-                                {isLoading ? (
+                {isLoading ? (
                   <MenuItem disabled>Loading...</MenuItem>
                 ) : (
                   dropdowns.city?.map((group) => (
