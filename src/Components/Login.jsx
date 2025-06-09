@@ -4,12 +4,13 @@ import {
   TextField, Button, IconButton, InputAdornment,
   Box, Typography, Container, Snackbar, Alert, Grid
 } from "@mui/material";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { keyframes } from '@emotion/react';
+import { useLoginMutation } from "../redux/slice/apiSlice";
 
 function Login() {
   const [loginValues, setLoginValues] = useState({ email: "", password: "" });
+  const [login, { isLoading }] = useLoginMutation();
   const navigate = useNavigate();
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
 
@@ -38,13 +39,13 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post("http://localhost:5000/api/login", loginValues);
-      if (response.data.success) {
+      const response = await login(loginValues);
+      if (response.success) {
         const {
           token, role, photo, companyName, designation, email, firstName,
           jobLocation, lastName, phoneNumber, department, id, employeeId,
           technicalSkills, dateOfBirth, bloodGroup, gender
-        } = response.data;
+        } = response;
 
         localStorage.setItem("token", token);
         localStorage.setItem("userRole", role);
@@ -71,7 +72,7 @@ function Login() {
             navigate("/sidebar");
           } else if (department === "Human Resources") {
             navigate("/hrsidebar");
-          }else if (role === "Employee") {
+          } else if (role === "Employee") {
             navigate("/employeesidebar");
           } else {
             navigate("/");
@@ -166,8 +167,9 @@ function Login() {
                 color="primary"
                 fullWidth
                 sx={{ mt: 4 }}
+                disabled={isLoading} // Optional: disable button while loading
               >
-                Login
+                {isLoading ? "Logging in..." : "Login"}
               </Button>
 
               <Typography sx={{ textAlign: "center", mt: 2 }}>
@@ -177,7 +179,7 @@ function Login() {
           </Box>
         </Grid>
       </Grid>
-      
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={3000}
