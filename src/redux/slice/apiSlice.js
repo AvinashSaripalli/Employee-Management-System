@@ -35,6 +35,11 @@ export const apiSlice = createApi({
       }),
     }),
 
+    getUserDetails: builder.query({
+      query: () => 'getUserDetails', 
+      transformResponse: (response) => response.response, 
+    }),
+
 
   }),
 });
@@ -42,5 +47,6 @@ export const apiSlice = createApi({
 export const {
   useDropdownsQuery,
   useRegisterUserMutation,
-  useLoginMutation
+  useLoginMutation,
+  useGetUserDetailsQuery
 } = apiSlice;

@@ -39,47 +39,64 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await login(loginValues);
-      if (response.success) {
-        const {
-          token, role, photo, companyName, designation, email, firstName,
-          jobLocation, lastName, phoneNumber, department, id, employeeId,
-          technicalSkills, dateOfBirth, bloodGroup, gender
-        } = response;
+      // const response = await login(loginValues);
+      // if (response.success) {
+      //   const {
+      //     token, role, photo, companyName, designation, email, firstName,
+      //     jobLocation, lastName, phoneNumber, department, id, employeeId,
+      //     technicalSkills, dateOfBirth, bloodGroup, gender
+      //   } = response;
 
-        localStorage.setItem("token", token);
-        localStorage.setItem("userRole", role);
-        localStorage.setItem("userPhoto", photo);
-        localStorage.setItem("companyName", companyName);
-        localStorage.setItem("userDesignation", designation);
-        localStorage.setItem("userJobLocation", jobLocation);
-        localStorage.setItem("userEmail", email);
-        localStorage.setItem("userFirstName", firstName);
-        localStorage.setItem("userLastName", lastName);
-        localStorage.setItem("userPhoneNumber", phoneNumber);
-        localStorage.setItem("userDepartment", department);
-        localStorage.setItem("userId", id);
-        localStorage.setItem("userEmployeeId", employeeId);
-        localStorage.setItem("userTechnicalSkills", technicalSkills);
-        localStorage.setItem("userDateofBirth", dateOfBirth);
-        localStorage.setItem("userBloodGroup", bloodGroup);
-        localStorage.setItem("userGender", gender);
+      //   localStorage.setItem("token", token);
+      //   localStorage.setItem("userRole", role);
+      //   localStorage.setItem("userPhoto", photo);
+      //   localStorage.setItem("companyName", companyName);
+      //   localStorage.setItem("userDesignation", designation);
+      //   localStorage.setItem("userJobLocation", jobLocation);
+      //   localStorage.setItem("userEmail", email);
+      //   localStorage.setItem("userFirstName", firstName);
+      //   localStorage.setItem("userLastName", lastName);
+      //   localStorage.setItem("userPhoneNumber", phoneNumber);
+      //   localStorage.setItem("userDepartment", department);
+      //   localStorage.setItem("userId", id);
+      //   localStorage.setItem("userEmployeeId", employeeId);
+      //   localStorage.setItem("userTechnicalSkills", technicalSkills);
+      //   localStorage.setItem("userDateofBirth", dateOfBirth);
+      //   localStorage.setItem("userBloodGroup", bloodGroup);
+      //   localStorage.setItem("userGender", gender);
 
+      //   setSnackbar({ open: true, message: "Login successful!", severity: "success" });
+
+      //   setTimeout(() => {
+      //     if (role === "Manager") {
+      //       navigate("/sidebar");
+      //     } else if (department === "Human Resources") {
+      //       navigate("/hrsidebar");
+      //     } else if (role === "Employee") {
+      //       navigate("/employeesidebar");
+      //     } else {
+      //       navigate("/");
+      //     }
+      //   }, 1000);
+      // } 
+      // else {
+      //   setSnackbar({ open: true, message: "Incorrect email or password.", severity: "error" });
+      // }
+        const response = await login(loginValues).unwrap(); 
+        if (response.message === "Login Sucessful") {
         setSnackbar({ open: true, message: "Login successful!", severity: "success" });
-
         setTimeout(() => {
-          if (role === "Manager") {
+          // if (role === "Manager") {
+          //   navigate("/sidebar");
+          // } else if (department === "Human Resources") {
+          //   navigate("/hrsidebar");
+          // } else if (role === "Employee") {
+          //   navigate("/employeesidebar");
+          // } else {
             navigate("/sidebar");
-          } else if (department === "Human Resources") {
-            navigate("/hrsidebar");
-          } else if (role === "Employee") {
-            navigate("/employeesidebar");
-          } else {
-            navigate("/");
-          }
+          //}
         }, 1000);
-      } else {
-        setSnackbar({ open: true, message: "Incorrect email or password.", severity: "error" });
+        
       }
     } catch (error) {
       console.error("Login Failed", error);
