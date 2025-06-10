@@ -40,6 +40,20 @@ export const apiSlice = createApi({
       transformResponse: (response) => response.response, 
     }),
 
+    getUserDetails: builder.query({
+          query: () => 'getUserDetails',
+          transformResponse: (response) => response.response,
+        }),
+        updateUser: builder.mutation({
+          query: (payload) => ({
+            url: 'updateUser',
+            method: 'PUT', 
+            body: payload,
+            headers: {
+              // Do not set Content-Type for FormData; browser sets it automatically
+            },
+          }),
+        }),
 
   }),
 });
@@ -48,5 +62,6 @@ export const {
   useDropdownsQuery,
   useRegisterUserMutation,
   useLoginMutation,
-  useGetUserDetailsQuery
+  useGetUserDetailsQuery,
+  useUpdateUserMutation,
 } = apiSlice;

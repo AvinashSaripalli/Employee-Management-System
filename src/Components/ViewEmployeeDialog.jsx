@@ -71,7 +71,7 @@ const ViewEmployeeDialog = ({ open, onClose, user }) => {
               <Typography variant="body1">Employee ID: </Typography>
             </Grid2>
             <Grid2 size={7}>
-              {user.employeeId}
+              {user.userId}
             </Grid2>
             <Grid2 size={0.2}>
             </Grid2>
@@ -79,7 +79,7 @@ const ViewEmployeeDialog = ({ open, onClose, user }) => {
               <Typography variant="body1">Designation: </Typography>
             </Grid2>
             <Grid2 size={7}>
-              {user.designation}
+              {user.designationName}
             </Grid2>
             <Grid2 size={0.2}>
             </Grid2>
@@ -87,7 +87,7 @@ const ViewEmployeeDialog = ({ open, onClose, user }) => {
               <Typography variant="body1">Department: </Typography>
             </Grid2>
             <Grid2 size={7}>
-              {user.department}
+              {user.departmentName}
             </Grid2>
             <Grid2 size={0.2}>
             </Grid2>
@@ -95,7 +95,7 @@ const ViewEmployeeDialog = ({ open, onClose, user }) => {
               <Typography variant="body1">Job Location: </Typography>
             </Grid2>
             <Grid2 size={7}>
-              {user.jobLocation}
+              {user.cityName}
             </Grid2>
             <Grid2 size={0.2}>
             </Grid2>
@@ -111,7 +111,7 @@ const ViewEmployeeDialog = ({ open, onClose, user }) => {
               <Typography variant="body1">Blood Group: </Typography>
             </Grid2>
             <Grid2 size={7}>
-              {user.bloodGroup}
+              {user.bloodGroupName}
             </Grid2>
             <Grid2 size={0.2}>
             </Grid2>
@@ -127,7 +127,7 @@ const ViewEmployeeDialog = ({ open, onClose, user }) => {
               <Typography variant="body1">Gender: </Typography>
             </Grid2>
             <Grid2 size={7}>
-              {user.gender}
+              {user.genderName}
             </Grid2>
             <Grid2 size={0.2}>
             </Grid2>
@@ -135,7 +135,7 @@ const ViewEmployeeDialog = ({ open, onClose, user }) => {
               <Typography variant="body1">Technical Skills: </Typography>
             </Grid2>
             <Grid2 size={7}>
-              {user?.technicalSkills?.map((option, index) => {
+              {user?.skills?.map((option, index) => {
                 return(
                   <Chip variant="outlined" label={option} key={index} sx={{ mr: 1, mb: 1 }} />
                 )

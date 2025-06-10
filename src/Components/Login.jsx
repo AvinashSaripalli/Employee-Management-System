@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import {
   TextField, Button, IconButton, InputAdornment,
-  Box, Typography, Container, Snackbar, Alert, Grid
+  Box, Typography, Container, Snackbar, Alert, Grid, CircularProgress
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { keyframes } from '@emotion/react';
@@ -13,6 +13,7 @@ function Login() {
   const [login, { isLoading }] = useLoginMutation();
   const navigate = useNavigate();
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
+  const [showPassword, setShowPassword] = useState(false);
 
   const gradientAnimation = keyframes`
     0% {
@@ -26,7 +27,6 @@ function Login() {
     }
   `;
 
-  const [showPassword, setShowPassword] = useState(false);
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
 
   const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
@@ -39,68 +39,30 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // const response = await login(loginValues);
-      // if (response.success) {
-      //   const {
-      //     token, role, photo, companyName, designation, email, firstName,
-      //     jobLocation, lastName, phoneNumber, department, id, employeeId,
-      //     technicalSkills, dateOfBirth, bloodGroup, gender
-      //   } = response;
+      const response = await login(loginValues).unwrap();
+      const { message, roleName } = response.response; 
 
-      //   localStorage.setItem("token", token);
-      //   localStorage.setItem("userRole", role);
-      //   localStorage.setItem("userPhoto", photo);
-      //   localStorage.setItem("companyName", companyName);
-      //   localStorage.setItem("userDesignation", designation);
-      //   localStorage.setItem("userJobLocation", jobLocation);
-      //   localStorage.setItem("userEmail", email);
-      //   localStorage.setItem("userFirstName", firstName);
-      //   localStorage.setItem("userLastName", lastName);
-      //   localStorage.setItem("userPhoneNumber", phoneNumber);
-      //   localStorage.setItem("userDepartment", department);
-      //   localStorage.setItem("userId", id);
-      //   localStorage.setItem("userEmployeeId", employeeId);
-      //   localStorage.setItem("userTechnicalSkills", technicalSkills);
-      //   localStorage.setItem("userDateofBirth", dateOfBirth);
-      //   localStorage.setItem("userBloodGroup", bloodGroup);
-      //   localStorage.setItem("userGender", gender);
-
-      //   setSnackbar({ open: true, message: "Login successful!", severity: "success" });
-
-      //   setTimeout(() => {
-      //     if (role === "Manager") {
-      //       navigate("/sidebar");
-      //     } else if (department === "Human Resources") {
-      //       navigate("/hrsidebar");
-      //     } else if (role === "Employee") {
-      //       navigate("/employeesidebar");
-      //     } else {
-      //       navigate("/");
-      //     }
-      //   }, 1000);
-      // } 
-      // else {
-      //   setSnackbar({ open: true, message: "Incorrect email or password.", severity: "error" });
-      // }
-        const response = await login(loginValues).unwrap(); 
-        if (response.message === "Login Sucessful") {
+      if (message === "Login Sucessful") { 
         setSnackbar({ open: true, message: "Login successful!", severity: "success" });
         setTimeout(() => {
-          // if (role === "Manager") {
-          //   navigate("/sidebar");
-          // } else if (department === "Human Resources") {
-          //   navigate("/hrsidebar");
-          // } else if (role === "Employee") {
-          //   navigate("/employeesidebar");
-          // } else {
+          if (roleName.toLowerCase() === "manager") {
             navigate("/sidebar");
-          //}
-        }, 1000);
-        
+          } else if (roleName.toLowerCase() === "human resources") {
+            navigate("/hrsidebar");
+          } else if (roleName.toLowerCase() === "employee") {
+            navigate("/employeesidebar");
+          } else {
+            navigate("/"); 
+          }
+        }, 100);
+      } else {
+        setSnackbar({ open: true, message: "Unexpected response from server.", severity: "error" });
       }
     } catch (error) {
-      console.error("Login Failed", error);
-      setSnackbar({ open: true, message: "Login failed. Please try again.", severity: "error" });
+      console.error("Login Failed:", error);
+      const errorMsg = error?.data?.errorMsg || 
+                       (error?.status === 401 ? "Invalid email or password" : "Login failed. Please try again.");
+      setSnackbar({ open: true, message: errorMsg, severity: "error" });
     }
   };
 
@@ -115,7 +77,6 @@ function Login() {
       alignItems: "center",
     }}>
       <Grid container sx={{ minHeight: "100vh", maxWidth: "1000px" }}>
-        {/* Left Side - Welcome Message */}
         <Grid item xs={12} md={5} sx={{
           display: 'flex',
           justifyContent: 'center',
@@ -154,15 +115,18 @@ function Login() {
               <TextField
                 label="Email"
                 name="email"
+                value={loginValues.email}
                 onChange={handleChange}
                 fullWidth
                 required
                 margin="normal"
+                disabled={isLoading}
               />
               <TextField
                 label="Password"
                 name="password"
                 type={showPassword ? "text" : "password"}
+                value={loginValues.password}
                 onChange={handleChange}
                 fullWidth
                 required
@@ -171,12 +135,13 @@ function Login() {
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton onClick={togglePasswordVisibility} edge="end">
+                      <IconButton onClick={togglePasswordVisibility} edge="end" disabled={isLoading}>
                         {showPassword ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
                     </InputAdornment>
                   ),
                 }}
+                disabled={isLoading}
               />
               <Button
                 type="submit"
@@ -184,7 +149,8 @@ function Login() {
                 color="primary"
                 fullWidth
                 sx={{ mt: 4 }}
-                disabled={isLoading} // Optional: disable button while loading
+                disabled={isLoading}
+                startIcon={isLoading ? <CircularProgress size={20} /> : null}
               >
                 {isLoading ? "Logging in..." : "Login"}
               </Button>
