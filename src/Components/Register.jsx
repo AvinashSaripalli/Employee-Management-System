@@ -52,7 +52,7 @@ function Register() {
   }
 `;
 
-  const { data, isLoading, error } = useDropdownsQuery();
+  const { data, isLoading } = useDropdownsQuery();
   const dropdowns = data?.response || {};
 
   useEffect(() => {

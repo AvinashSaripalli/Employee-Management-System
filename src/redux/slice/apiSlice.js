@@ -8,9 +8,12 @@ export const apiSlice = createApi({
   }),
 
   endpoints: (builder) => ({
-
     dropdowns: builder.query({
       query: () => 'dropdowns',
+    }),
+
+    report: builder.query({
+      query: () => 'report',
     }),
 
     registerUser: builder.mutation({
@@ -35,12 +38,24 @@ export const apiSlice = createApi({
       }),
     }),
 
+    feedback: builder.mutation({
+      query: (payload) => ({
+        url: 'feedback',
+        method: 'PUT',
+        body: payload,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }),
+    }),
 
   }),
 });
 
 export const {
+  useReportQuery,
   useDropdownsQuery,
   useRegisterUserMutation,
-  useLoginMutation
+  useLoginMutation,
+  useFeedbackMutation
 } = apiSlice;
