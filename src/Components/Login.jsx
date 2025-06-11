@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import {
   TextField, Button, IconButton, InputAdornment,
@@ -40,39 +40,21 @@ function Login() {
     e.preventDefault();
     try {
       const response = await login(loginValues);
-      if (response.success) {
-        const {
-          token, role, photo, companyName, designation, email, firstName,
-          jobLocation, lastName, phoneNumber, department, id, employeeId,
-          technicalSkills, dateOfBirth, bloodGroup, gender
-        } = response;
+      if (response.data.statusCode == 201) {
 
-        localStorage.setItem("token", token);
+        const role = response.data.response.roleName
+        const department = null
+
         localStorage.setItem("userRole", role);
-        localStorage.setItem("userPhoto", photo);
-        localStorage.setItem("companyName", companyName);
-        localStorage.setItem("userDesignation", designation);
-        localStorage.setItem("userJobLocation", jobLocation);
-        localStorage.setItem("userEmail", email);
-        localStorage.setItem("userFirstName", firstName);
-        localStorage.setItem("userLastName", lastName);
-        localStorage.setItem("userPhoneNumber", phoneNumber);
-        localStorage.setItem("userDepartment", department);
-        localStorage.setItem("userId", id);
-        localStorage.setItem("userEmployeeId", employeeId);
-        localStorage.setItem("userTechnicalSkills", technicalSkills);
-        localStorage.setItem("userDateofBirth", dateOfBirth);
-        localStorage.setItem("userBloodGroup", bloodGroup);
-        localStorage.setItem("userGender", gender);
 
         setSnackbar({ open: true, message: "Login successful!", severity: "success" });
 
         setTimeout(() => {
-          if (role === "Manager") {
+          if (role === "manager") {
             navigate("/sidebar");
           } else if (department === "Human Resources") {
             navigate("/hrsidebar");
-          } else if (role === "Employee") {
+          } else if (role === "employee") {
             navigate("/employeesidebar");
           } else {
             navigate("/");
