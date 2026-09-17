@@ -18,7 +18,7 @@ import { Edit} from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
 import { LocalizationProvider, DatePicker } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import axios from "axios";
+import axios from '../api/axios';
 import dayjs from "dayjs";
 
 const EmployeeProfile = () => {
@@ -191,7 +191,7 @@ const EmployeeProfile = () => {
     };
   
     try {
-      const response = await axios.patch("http://localhost:5000/api/users/update", dataToUpdate, {
+      const response = await axios.patch("/users/update", dataToUpdate, {
         headers: { Authorization: `Bearer ${token}` },
       });
   
@@ -289,7 +289,7 @@ const EmployeeProfile = () => {
 
       try {
         const response = await axios.patch(
-          "http://localhost:5000/api/users/update-photo",
+          "/users/update-photo",
           formData,
           {
           headers: {
@@ -315,7 +315,20 @@ const EmployeeProfile = () => {
   };
 
   return (
-    <Box sx={{  mt: 6, display: "flex", justifyContent: "center",p: 3 }}>
+    <Box sx={{  mt: 6, display: "flex", justifyContent: "center", p: 3, flexDirection: "column", alignItems: "center" }}>
+      {!userData.userDepartment && (
+        <Box sx={{
+          width: "100%", maxWidth: 900, mb: 2,
+          backgroundColor: "#fff8e1", border: "1px solid #ffe082",
+          borderRadius: 2, p: 2, display: "flex", alignItems: "center", gap: 1
+        }}>
+          <Typography variant="body2" sx={{ color: "#795548", fontWeight: 500 }}>
+            ⏳ Your account is pending company assignment. An admin will add you to the company and department soon.
+            In the meantime, you can complete your personal details below.
+          </Typography>
+        </Box>
+      )}
+      <Box sx={{ display: "flex", justifyContent: "center", width: "100%" }}>
       <Box
         elevation={6}
           sx={{ 
@@ -797,6 +810,7 @@ const EmployeeProfile = () => {
         </Alert>
       </Snackbar>
    </Box>
+  </Box>
   );
 };
 export default EmployeeProfile; 

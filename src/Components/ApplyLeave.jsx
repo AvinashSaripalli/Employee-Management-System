@@ -15,7 +15,7 @@ import {
   CircularProgress,
   Paper
 } from "@mui/material";
-import axios from "axios";
+import axios from '../api/axios';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
@@ -62,12 +62,12 @@ const ApplyLeave = () => {
 
         if (!employeeId || !companyName) return;
 
-        const response = await axios.get("http://localhost:5000/api/leaves", {
+        const response = await axios.get("/leaves", {
           params: { employeeId, companyName },
         });
         setLeaves(response.data);
 
-        const recentResponse = await axios.get("http://localhost:5000/api/leaves/recent", {
+        const recentResponse = await axios.get("/leaves/recent", {
           params: { employeeId, companyName },
         });
         setRecentLeaves(recentResponse.data);
@@ -119,9 +119,9 @@ const ApplyLeave = () => {
     };
 
     try {
-      const response = await axios.post("http://localhost:5000/api/leaves/apply", leaveData);
+      const response = await axios.post("/leaves/apply", leaveData);
       alert(response.data.message);
-      const updatedLeaves = await axios.get("http://localhost:5000/api/leaves", {
+      const updatedLeaves = await axios.get("/leaves", {
         params: { employeeId, companyName },
       });
       setLeaves(updatedLeaves.data);
@@ -398,7 +398,7 @@ const ApplyLeave = () => {
                         </Typography>
                         {leave.reason && (
                           <Typography variant="body2" sx={{ mt: 1}}>
-                            "{leave.reason.substring(0, 50)}{leave.reason.length > 50 ? '...' : ''}"
+                            &quot;{leave.reason.substring(0, 50)}{leave.reason.length > 50 ? '...' : ''}&quot;
                           </Typography>
                         )}
                         <Divider sx={{ my: 2 }} />

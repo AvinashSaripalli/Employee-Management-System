@@ -3,7 +3,7 @@ import {
   Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Paper, Button, Chip, TablePagination, Grid, Card, CardContent, CardHeader
 } from '@mui/material';
-import axios from 'axios';
+import axios from '../api/axios';
 
 const LeaveManagement = () => {
   const [leaves, setLeaves] = useState([]);
@@ -15,12 +15,12 @@ const LeaveManagement = () => {
     try {
       const companyName = localStorage.getItem("companyName"); 
       
-      const response = await axios.get('http://localhost:5000/api/leaves/leave', {
+      const response = await axios.get('/leaves/leave', {
         params: { companyName },
       });
       setLeaves(response.data);
 
-      const countResponse = await axios.get('http://localhost:5000/api/leaves/leave-counts', {
+      const countResponse = await axios.get('/leaves/leave-counts', {
         params: { companyName },
       });
     
@@ -40,7 +40,7 @@ const LeaveManagement = () => {
 
   const handleUpdateStatus = async (leaveId, status) => {
     try {
-      await axios.put('http://localhost:5000/api/leaves/update-status',
+      await axios.put('/leaves/update-status',
         { leaveId, status },
       );
       fetchLeaves();

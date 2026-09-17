@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area,AreaChart, CartesianGrid, PieChart, Pie,Cell,Text, BarChart,Bar,Legend,Sector } from 'recharts';
 import { Box, Typography, Paper, Select, MenuItem, FormControl, InputLabel, Card, CardContent, Grid2  } from '@mui/material';
-import axios from 'axios';
+import axios from '../api/axios';
 
 const Dashboard = () => {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -73,7 +73,7 @@ const Dashboard = () => {
           return;
         }
 
-        const { data } = await axios.get('http://localhost:5000/api/users-by-month', {
+        const { data } = await axios.get('/users-by-month', {
           params: { companyName ,year: selectedYear },
           headers: {
             Authorization: `Bearer ${token}`,
@@ -97,7 +97,7 @@ const Dashboard = () => {
         const currentMonthData = updatedMonthOrder.find((month) => month.name === currentMonthName);
         const newJoinees = currentMonthData ? currentMonthData.employees : 0;
 
-        const { data: leaveData } = await axios.get('http://localhost:5000/api/leaves/approved-leaves-today', {
+        const { data: leaveData } = await axios.get('/leaves/approved-leaves-today', {
           params: { companyName, year: selectedYear },
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -110,7 +110,7 @@ const Dashboard = () => {
           { title: "New Joinees", value: newJoinees },
         ]);
 
-        const { data: usersByLocationData } = await axios.get('http://localhost:5000/api/users-by-location', {
+        const { data: usersByLocationData } = await axios.get('/users-by-location', {
           params: { companyName ,year: selectedYear},
           headers: {
             Authorization: `Bearer ${token}`,
@@ -126,7 +126,7 @@ const Dashboard = () => {
         });
         setLocationOrder(updatedLocationOrder);
 
-        const{ data: usersByDepartmentData } =await axios.get('http://localhost:5000/api/users-by-departments',{
+        const{ data: usersByDepartmentData } =await axios.get('/users-by-departments',{
           params: { companyName ,year: selectedYear},
           headers: {
             Authorization: `Bearer ${token}`,
@@ -141,7 +141,7 @@ const Dashboard = () => {
         });
         setDepartmentOrder(updatedDepartmentOrder);
 
-        const { data: usersByGenderData } = await axios.get('http://localhost:5000/api/users-by-genders', {
+        const { data: usersByGenderData } = await axios.get('/users-by-genders', {
           params: { companyName ,year: selectedYear},
           headers: {
             Authorization: `Bearer ${token}`,

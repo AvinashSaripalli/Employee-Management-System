@@ -1,191 +1,99 @@
 import React, { useEffect, useState } from "react";
-import { Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, FormControl,IconButton,
-  InputAdornment, InputLabel, Select, MenuItem, Typography, Box, Autocomplete, Chip } from "@mui/material";
-import axios from "axios";
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, FormControl,
+  InputLabel, Select, MenuItem, Typography, Box, Autocomplete, Chip, CircularProgress, Alert
+} from "@mui/material";
+import axios from "../api/axios";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs from "dayjs";
-import { Visibility, VisibilityOff } from "@mui/icons-material";
 
 const AddEmployeeDialog = ({ open, onClose, onSave, employeeId }) => {
-  const initialUserState = {
-    employeeId: employeeId || "",
-    firstName: "",
-    lastName: "",
-    companyName: "",
+  const [emailSearch, setEmailSearch] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  const [foundUser, setFoundUser] = useState(null);
+
+  const getInitialAssignState = (empId) => ({
+    employeeId: empId || "",
     department: "",
-    role: "",
     designation: "",
     jobLocation: "",
-    email: "",
     phoneNumber: "",
-    technicalSkills: [],
-    dateOfBirth: null,
-    photo: null,
     bloodGroup: "",
     gender: "",
-    password: "",
-    confirmPassword: ""
-  };
+    dateOfBirth: null,
+    technicalSkills: [],
+    photo: null,
+  });
 
-  const [user, setUser] = useState(initialUserState);
+  const [assign, setAssign] = useState(getInitialAssignState(employeeId));
   const [errors, setErrors] = useState({});
-  const [skillsOption, setSkillsOption] = useState([]);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const skillsOption = [
+    "JavaScript", "Python", "Java", "React", "Node.js", "HTML", "CSS",
+    "Spring MVC", "JDBC", "Angular", "C++", "C#", "Ruby", "Django",
+    "Flask", "SQL", "MongoDB", "AWS",
+  ];
 
   useEffect(() => {
     if (open) {
+      setEmailSearch("");
+      setSearchError("");
+      setFoundUser(null);
       setErrors({});
-      const userCompany = localStorage.getItem('companyName');
-      setUser({
-        ...initialUserState,
-        employeeId: employeeId || "",
-        companyName: userCompany || ""
-      });
+      setAssign(getInitialAssignState(employeeId));
     }
   }, [open, employeeId]);
 
-  useEffect(() => {
-    setSkillsOption([
-      'JavaScript', 'Python', 'Java', 'React', 'Node.js', 'HTML', 'CSS', 
-      'Spring MVC', 'JDBC', 'Angular', 'C++', 'C#', 'Ruby', 'Django', 
-      'Flask', 'SQL', 'MongoDB', 'AWS'
-    ]);
-  }, []);
-
-  const validate = () => {
-    const newErrors = {};
-
-    if (!user.firstName) newErrors.firstName = "Please enter your First Name.";
-    else if (!/^[A-Za-z]+(?: [A-Za-z]+)*$/.test(user.firstName)) {
-      newErrors.firstName = "First name can only contain letters and single spaces.";
+  const handleEmailSearch = async () => {
+    if (!emailSearch.trim()) {
+      setSearchError("Please enter an email address.");
+      return;
     }
-    if (!user.lastName) newErrors.lastName = "Please enter your Last Name.";
-    else if (!/^[A-Za-z]+(?: [A-Za-z]+)*$/.test(user.lastName)) {
-      newErrors.lastName = "Last Name can only contain letters and single spaces.";
-    }
-    if (!user.email) newErrors.email = "Please provide your email address.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user.email)) newErrors.email = "Enter a valid email address (e.g., user@example.com).";
-    if (!user.phoneNumber) newErrors.phoneNumber = "Phone number is required.";
-    else if (!/^\d{10}$/.test(user.phoneNumber)) newErrors.phoneNumber = "Phone number must be exactly 10 digits.";
-    if (!user.designation) newErrors.designation = "Please enter your job designation.";
-    else if (!/^[A-Za-z]+(?: [A-Za-z]+)*$/.test(user.designation.trim())) {
-      newErrors.designation = "Designation can only contain letters and single spaces.";
-    }
-    if (!user.department) newErrors.department = "Department is required";
-    if (!user.role) newErrors.role = "Role is required";
-    if (!user.jobLocation) newErrors.jobLocation = "Job location is required";
-    if (!user.bloodGroup) newErrors.bloodGroup = "Blood group is required";
-    if (!user.gender) newErrors.gender = "Gender is required";
-    if (!user.dateOfBirth) newErrors.dateOfBirth = "Please enter your Date of Birth";
-    else {
-      const dob = new Date(user.dateOfBirth);
-      const today = new Date();
-      const age = today.getFullYear() - dob.getFullYear() -
-                  (today.getMonth() < dob.getMonth() ||
-                  (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate()) ? 1 : 0);
-      if (dob > today) {
-        newErrors.dateOfBirth = "Date of Birth cannot be in the future";
-      } else if (age < 18) {
-        newErrors.dateOfBirth = "You must be at least 18 years old";
+    setSearchLoading(true);
+    setSearchError("");
+    setFoundUser(null);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get("/users/by-email", {
+        params: { email: emailSearch.trim() },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const user = response.data;
+      if (user.companyName) {
+        setSearchError(`This employee is already assigned to "${user.companyName}".`);
+      } else {
+        setFoundUser(user);
       }
-    }    
-    if (!user.photo) newErrors.photo = "Photo is required";
-    if (!user.password) newErrors.password = "Password is required";
-    else if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$/.test(user.password)) {
-      newErrors.password = "Password must be 8-16 characters, include at least one letter, one number, and one special character";
+    } catch (error) {
+      if (error.response?.status === 404) {
+        setSearchError("No registered user found with this email. Ask them to register first.");
+      } else {
+        setSearchError(error.response?.data?.error || "Search failed. Please try again.");
+      }
+    } finally {
+      setSearchLoading(false);
     }
-    if (!user.confirmPassword) newErrors.confirmPassword = "Confirm Password is required";
-    else if (user.confirmPassword !== user.password) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === "photo") {
-      setUser((prev) => ({ ...prev, photo: files[0] }));
+      setAssign((prev) => ({ ...prev, photo: files[0] }));
     } else {
-      setUser((prev) => ({ ...prev, [name]: value }));
+      setAssign((prev) => ({ ...prev, [name]: value }));
     }
-
     setErrors((prev) => {
-      let newErrors = { ...prev };
-      if (name === "firstName") {
-        if (!value) {
-          newErrors.firstName = "First name is required";
-        } else if (!/^[a-zA-Z]+( [a-zA-Z]+)*$/.test(value)) {
-          newErrors.firstName = "Only letters and a single space between words allowed";
-        } else {
-          delete newErrors.firstName;
-        }
-      } else if (name === "lastName") {
-        if (!value) {
-          newErrors.lastName = "Last name is required";
-        } else if (!/^[a-zA-Z]+( [a-zA-Z]+)*$/.test(value)) {
-          newErrors.lastName = "Only letters and a single space between words allowed";
-        } else {
-          delete newErrors.lastName;
-        }
-      } else if (name === "phoneNumber") {
-        if (!value) {
-          newErrors.phoneNumber = "Phone number is required";
-        } else if (!/^\d{0,10}$/.test(value)) {
-          newErrors.phoneNumber = "Phone number must be 10 digits";
-        } else {
-          delete newErrors.phoneNumber;
-        }
+      const newErrors = { ...prev };
+      if (name === "phoneNumber") {
+        if (!value) newErrors.phoneNumber = "Phone number is required.";
+        else if (!/^\d{0,10}$/.test(value)) newErrors.phoneNumber = "Must be 10 digits.";
+        else delete newErrors.phoneNumber;
       } else if (name === "designation") {
-        if (!value) {
-          newErrors.designation = "Designation is required";
-        } else if (!/^[a-zA-Z]+( [a-zA-Z]+)*$/.test(value)) {
-          newErrors.designation = "Only letters and a single space between words allowed";
-        } else {
-          delete newErrors.designation;
-        }
-      } else if (name === "password") {
-        if (!value) {
-          newErrors.password = "Password is required";
-        } else if (!/^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$/.test(value)) {
-          newErrors.password = "Password must be 8-16 characters, include at least one letter, one number, and one special character";
-        } else {
-          delete newErrors.password;
-        }
-        newErrors.confirmPassword = user.confirmPassword === value ? "" : "Passwords do not match";
-      } else if (name === "confirmPassword") {
-        if (value !== user.password) {
-          newErrors.confirmPassword = "Passwords do not match";
-        } else {
-          delete newErrors.confirmPassword;
-        }
-      } else if (name === "email") {
-        const userCompany = localStorage.getItem("companyName")?.toLowerCase();
-        const expectedEmailSuffix = userCompany ? `@${userCompany}.com` : null;
-        
-        if (!value) {
-          newErrors.email = "Email is required";
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-          newErrors.email = "Invalid email address";
-        } else if (!value.toLowerCase().endsWith(expectedEmailSuffix)) {
-          newErrors.email = `Email must end with @${userCompany}.com`;
-        } else {
-          delete newErrors.email;
-        }
-      }
-       else if (name === "department" && !value) {
-        newErrors.department = "Department is required";
-      } else if (name === "role" && !value) {
-        newErrors.role = "Role is required";
-      } else if (name === "jobLocation" && !value) {
-        newErrors.jobLocation = "Job location is required";
-      } else if (name === "bloodGroup" && !value) {
-        newErrors.bloodGroup = "Blood group is required";
-      } else if (name === "gender" && !value) {
-        newErrors.gender = "Gender is required";
+        if (!value) newErrors.designation = "Designation is required.";
+        else if (!/^[a-zA-Z]+( [a-zA-Z]+)*$/.test(value)) newErrors.designation = "Only letters and spaces.";
+        else delete newErrors.designation;
       } else {
         delete newErrors[name];
       }
@@ -193,356 +101,365 @@ const AddEmployeeDialog = ({ open, onClose, onSave, employeeId }) => {
     });
   };
 
-  const handleClickShowPassword = () => {
-    setShowPassword((prev) => !prev);
-  };
-  
-  const handleClickShowConfirmPassword = () => {
-    setShowConfirmPassword((prev) => !prev);
-  };
-
-  const handleSkillsChange = (e, value) => {
-    setUser((prev) => ({ ...prev, technicalSkills: value }));
-    setErrors((prev) => {
-      let newErrors = { ...prev };
-      if (value.length === 0) {
-        newErrors.technicalSkills = "Please select at least one technical skill";
-      } else {
-        delete newErrors.technicalSkills;
-      }
-      return newErrors;
-    });
-  };
+  const handleSkillsChange = (e, value) =>
+    setAssign((prev) => ({ ...prev, technicalSkills: value }));
 
   const handleDateChange = (date) => {
     const formattedDate = date ? dayjs(date).format("YYYY-MM-DD") : null;
-    setUser((prev) => ({ ...prev, dateOfBirth: formattedDate }));
-
+    setAssign((prev) => ({ ...prev, dateOfBirth: formattedDate }));
     setErrors((prev) => {
-      let newErrors = { ...prev };
+      const newErrors = { ...prev };
       if (!formattedDate) {
-        newErrors.dateOfBirth = "Date of birth is required";
+        newErrors.dateOfBirth = "Date of birth is required.";
       } else {
         const dob = new Date(formattedDate);
         const today = new Date();
-        const age = today.getFullYear() - dob.getFullYear() - 
-                    (today.getMonth() < dob.getMonth() || 
-                    (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate()) ? 1 : 0);
-        if (dob > today) {
-          newErrors.dateOfBirth = "Date of birth cannot be in the future";
-        } else if (age < 18) {
-          newErrors.dateOfBirth = "You must be at least 18 years old";
-        } else {
-          delete newErrors.dateOfBirth;
-        }
+        const age =
+          today.getFullYear() -
+          dob.getFullYear() -
+          (today.getMonth() < dob.getMonth() ||
+          (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
+            ? 1
+            : 0);
+        if (dob > today) newErrors.dateOfBirth = "Date of birth cannot be in the future.";
+        else if (age < 18) newErrors.dateOfBirth = "Employee must be at least 18 years old.";
+        else delete newErrors.dateOfBirth;
       }
       return newErrors;
     });
   };
 
+  const validate = () => {
+    const newErrors = {};
+    if (!assign.department) newErrors.department = "Department is required.";
+    if (!assign.designation) newErrors.designation = "Designation is required.";
+    else if (!/^[A-Za-z]+(?: [A-Za-z]+)*$/.test(assign.designation.trim()))
+      newErrors.designation = "Designation can only contain letters and single spaces.";
+    if (!assign.jobLocation) newErrors.jobLocation = "Job location is required.";
+    if (!assign.phoneNumber) newErrors.phoneNumber = "Phone number is required.";
+    else if (!/^\d{10}$/.test(assign.phoneNumber))
+      newErrors.phoneNumber = "Phone number must be 10 digits.";
+    if (!assign.bloodGroup) newErrors.bloodGroup = "Blood group is required.";
+    if (!assign.gender) newErrors.gender = "Gender is required.";
+    if (!assign.dateOfBirth) {
+      newErrors.dateOfBirth = "Date of birth is required.";
+    } else {
+      const dob = new Date(assign.dateOfBirth);
+      const today = new Date();
+      const age =
+        today.getFullYear() -
+        dob.getFullYear() -
+        (today.getMonth() < dob.getMonth() ||
+        (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
+          ? 1
+          : 0);
+      if (dob > today) newErrors.dateOfBirth = "Date of birth cannot be in the future.";
+      else if (age < 18) newErrors.dateOfBirth = "Employee must be at least 18 years old.";
+    }
+    if (!assign.photo) newErrors.photo = "Photo is required.";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSave = async () => {
-    if (!validate()) return;
-  
+    if (!foundUser || !validate()) return;
+    const companyName = localStorage.getItem("companyName");
     const formData = new FormData();
-    formData.append("employeeId", user.employeeId);
-    formData.append("firstName", user.firstName);
-    formData.append("lastName", user.lastName);
-    formData.append("companyName", user.companyName);
-    formData.append("department", user.department);
-    formData.append("role", user.role);
-    formData.append("designation", user.designation);
-    formData.append("jobLocation", user.jobLocation);
-    formData.append("email", user.email);
-    formData.append("phoneNumber", user.phoneNumber);
-    formData.append("technicalSkills", user.technicalSkills.join(","));
-    formData.append("dateOfBirth", user.dateOfBirth);
-    formData.append("photo", user.photo);
-    formData.append("bloodGroup", user.bloodGroup);
-    formData.append("gender", user.gender);
-    formData.append("password", user.password);
-    formData.append("confirmPassword", user.confirmPassword); 
-  
+    formData.append("employeeId", assign.employeeId);
+    formData.append("firstName", foundUser.firstName);
+    formData.append("lastName", foundUser.lastName);
+    formData.append("email", foundUser.email);
+    formData.append("companyName", companyName);
+    formData.append("department", assign.department);
+    formData.append("role", "Employee");
+    formData.append("designation", assign.designation);
+    formData.append("jobLocation", assign.jobLocation);
+    formData.append("phoneNumber", assign.phoneNumber);
+    formData.append("technicalSkills", assign.technicalSkills.join(","));
+    formData.append("dateOfBirth", assign.dateOfBirth);
+    formData.append("bloodGroup", assign.bloodGroup);
+    formData.append("gender", assign.gender);
+    formData.append("photo", assign.photo);
     try {
-      const response = await axios.post(
-        "http://localhost:5000/api/users/registers",
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
-      if (response.status === 201) {
-        alert("User added successfully");
-        setUser(initialUserState);
-        onSave();
-        onClose();
-      }
+      const token = localStorage.getItem("token");
+      await axios.put(`/users/${foundUser.id}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      alert("Employee assigned to company successfully!");
+      onSave();
+      onClose();
     } catch (error) {
-      console.error("Error adding user:", error);
-      const errorMessage = error.response?.data?.error || "User Adding Failed. Please try again.";
-      if (error.response?.data?.details) {
-        alert(`${errorMessage}: ${error.response.data.details}`);
-      } else {
-        alert(errorMessage);
-      }
+      alert(error.response?.data?.error || "Failed to assign employee. Please try again.");
     }
   };
 
   const handleClose = () => {
-    setUser(initialUserState);
+    setEmailSearch("");
+    setSearchError("");
+    setFoundUser(null);
+    setErrors({});
+    setAssign(getInitialAssignState(employeeId));
     onClose();
   };
 
+  const companyName = localStorage.getItem("companyName") || "";
+
   return (
-    <Dialog open={open} onClose={handleClose} PaperProps={{ style: { width: '80%', maxWidth: '800px' } }}>
-      <DialogTitle fontWeight="bold">Add New Employee</DialogTitle>
+    <Dialog open={open} onClose={handleClose} PaperProps={{ style: { width: "80%", maxWidth: "700px" } }}>
+      <DialogTitle fontWeight="bold">Add Employee to Company</DialogTitle>
       <DialogContent>
-        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: "repeat(auto-fit, minmax(370px, 1fr))" }}>
+        {/* Step 1 */}
+        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1, mt: 1 }}>
+          Step 1 — Find Registered Employee
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Enter the employee email. They must have already created an account via the Register page.
+        </Typography>
+        <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
           <TextField
-            label="Employee ID"
-            name="employeeId"
-            value={user.employeeId}
-            variant="outlined"
-            InputProps={{ readOnly: true }}
-            sx={{ ml: 1, width: "720px", mt: 1, mr: 1 }}
+            label="Employee Email"
+            value={emailSearch}
+            onChange={(e) => {
+              setEmailSearch(e.target.value);
+              setSearchError("");
+            }}
+            onKeyDown={(e) => e.key === "Enter" && handleEmailSearch()}
+            fullWidth
+            margin="dense"
+            inputProps={{ maxLength: 100 }}
           />
-          <div style={{ display: "flex", alignItems: "flex-start" }}>
+          <Button
+            variant="contained"
+            onClick={handleEmailSearch}
+            disabled={searchLoading}
+            sx={{ mt: 1, minWidth: 100, height: 56 }}
+          >
+            {searchLoading ? <CircularProgress size={22} color="inherit" /> : "Search"}
+          </Button>
+        </Box>
+
+        {searchError && (
+          <Alert severity="error" sx={{ mt: 1 }}>
+            {searchError}
+          </Alert>
+        )}
+        {foundUser && (
+          <Alert severity="success" sx={{ mt: 1 }}>
+            Found: <strong>{foundUser.firstName} {foundUser.lastName}</strong> ({foundUser.email})
+          </Alert>
+        )}
+
+        {/* Step 2 — shown only after a user is found */}
+        {foundUser && (
+          <>
+            <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 3, mb: 1 }}>
+              Step 2 — Assign Work Details
+            </Typography>
+
+            {/* Read-only identity fields */}
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <TextField
+                label="First Name"
+                value={foundUser.firstName}
+                InputProps={{ readOnly: true }}
+                disabled
+                margin="dense"
+                sx={{ flex: 1 }}
+              />
+              <TextField
+                label="Last Name"
+                value={foundUser.lastName}
+                InputProps={{ readOnly: true }}
+                disabled
+                margin="dense"
+                sx={{ flex: 1 }}
+              />
+            </Box>
             <TextField
-              label="First Name"
-              name="firstName"
-              variant="outlined"
-              value={user.firstName}
-              onChange={handleChange}
-              inputProps={{ maxLength: 30 }}
-              error={!!errors.firstName}
-              helperText={errors.firstName}
-              sx={{ ml: 1, width: '350px', mr: 2.25, mt: 1 }}
-            />
-            <TextField
-              variant="outlined"
-              name="lastName"
-              label="Last Name"
-              value={user.lastName}
-              onChange={handleChange}
-              inputProps={{ maxLength: 30 }}
-              error={!!errors.lastName}
-              helperText={errors.lastName}
-              sx={{ ml: 2.25, width: '350px', mt: 1, mr: 1 }}
-            />
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-start" }}>
-            <TextField
-              label="Company Name"
-              name="companyName"
-              value={user.companyName}
-              variant="outlined"
+              label="Email"
+              value={foundUser.email}
               InputProps={{ readOnly: true }}
               disabled
-              sx={{ ml: 1, width: '350px', mt: 1, mr: 2.25 }}
+              fullWidth
+              margin="dense"
             />
-            <FormControl sx={{ ml: 2.25, width: '350px', mt: 1, mr: 1 }} margin="dense" variant="outlined" error={!!errors.department}>
-              <InputLabel>Department</InputLabel>
-              <Select name="department" value={user.department} onChange={handleChange} label="Department">
-                <MenuItem value="Software Development">Software Development</MenuItem>
-                <MenuItem value="Human Resources">Human Resources</MenuItem>
-                <MenuItem value="Design">Design</MenuItem>
-                <MenuItem value="Testing">Testing</MenuItem>
-                <MenuItem value="Accounting">Accounting</MenuItem>
-              </Select>
-              {errors.department && <Typography color="error" sx={{ fontSize: '0.8rem', mt: 0.5, ml: 2 }}>{errors.department}</Typography>}
-            </FormControl>
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-start" }}>
-            <FormControl sx={{ ml: 1, width: '350px', mr: 2.25 }} margin="dense" variant="outlined" error={!!errors.role}>
-              <InputLabel>Role</InputLabel>
-              <Select name="role" value={user.role} onChange={handleChange} label="Role">
-                <MenuItem value="Employee">Employee</MenuItem>
-              </Select>
-              {errors.role && <Typography color="error" sx={{ fontSize: '0.8rem', mt: 0.5, ml: 2 }}>{errors.role}</Typography>}
-            </FormControl>
-            <TextField
-              variant="outlined"
-              name="designation"
-              label="Designation"
-              value={user.designation}
-              inputProps={{ maxLength: 30 }}
-              onChange={handleChange}
-              error={!!errors.designation}
-              helperText={errors.designation}
-              sx={{ ml: 2.25, width: '350px', mt: 1, mr: 1 }}
-            />
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-start" }}>
-            <FormControl sx={{ ml: 1, width: '350px', mr: 2.25, mt: 1 }} margin="dense" variant="outlined" error={!!errors.jobLocation}>
-              <InputLabel>Job Location</InputLabel>
-              <Select name="jobLocation" value={user.jobLocation} onChange={handleChange} label="Job Location">
-                <MenuItem value="Hyderabad">Hyderabad</MenuItem>
-                <MenuItem value="Chennai">Chennai</MenuItem>
-                <MenuItem value="Kerala">Kerala</MenuItem>
-                <MenuItem value="Amaravati">Amaravati</MenuItem>
-                <MenuItem value="Delhi">Delhi</MenuItem>
-                <MenuItem value="Mumbai">Mumbai</MenuItem>
-                <MenuItem value="Kolkata">Kolkata</MenuItem>
-              </Select>
-              {errors.jobLocation && <Typography color="error" sx={{ fontSize: '0.8rem', mt: 0.5, ml: 2 }}>{errors.jobLocation}</Typography>}
-            </FormControl>
-            <TextField
-              variant="outlined"
-              name="email"
-              label="Email"
-              value={user.email}
-              onChange={handleChange}
-              inputProps={{ maxLength: 50 }}
-              error={!!errors.email}
-              helperText={errors.email}
-              sx={{ ml: 2.25, width: '350px', mt: 1, mr: 1 }}
-            />
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-start" }}>
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <TextField
+                label="Employee ID"
+                value={assign.employeeId}
+                InputProps={{ readOnly: true }}
+                disabled
+                margin="dense"
+                sx={{ flex: 1 }}
+              />
+              <TextField
+                label="Company Name"
+                value={companyName}
+                InputProps={{ readOnly: true }}
+                disabled
+                margin="dense"
+                sx={{ flex: 1 }}
+              />
+            </Box>
+
+            {/* Editable assignment fields */}
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <FormControl margin="dense" variant="outlined" error={!!errors.department} sx={{ flex: 1 }}>
+                <InputLabel>Department</InputLabel>
+                <Select name="department" value={assign.department} onChange={handleChange} label="Department">
+                  <MenuItem value="Software Development">Software Development</MenuItem>
+                  <MenuItem value="Human Resources">Human Resources</MenuItem>
+                  <MenuItem value="Design">Design</MenuItem>
+                  <MenuItem value="Testing">Testing</MenuItem>
+                  <MenuItem value="Accounting">Accounting</MenuItem>
+                </Select>
+                {errors.department && (
+                  <Typography color="error" sx={{ fontSize: "0.75rem", mt: 0.5, ml: 1.5 }}>
+                    {errors.department}
+                  </Typography>
+                )}
+              </FormControl>
+              <TextField
+                label="Designation"
+                name="designation"
+                value={assign.designation}
+                onChange={handleChange}
+                inputProps={{ maxLength: 30 }}
+                error={!!errors.designation}
+                helperText={errors.designation}
+                margin="dense"
+                sx={{ flex: 1 }}
+              />
+            </Box>
+
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <FormControl margin="dense" variant="outlined" error={!!errors.jobLocation} sx={{ flex: 1 }}>
+                <InputLabel>Job Location</InputLabel>
+                <Select name="jobLocation" value={assign.jobLocation} onChange={handleChange} label="Job Location">
+                  <MenuItem value="Hyderabad">Hyderabad</MenuItem>
+                  <MenuItem value="Chennai">Chennai</MenuItem>
+                  <MenuItem value="Kerala">Kerala</MenuItem>
+                  <MenuItem value="Amaravati">Amaravati</MenuItem>
+                  <MenuItem value="Delhi">Delhi</MenuItem>
+                  <MenuItem value="Mumbai">Mumbai</MenuItem>
+                  <MenuItem value="Kolkata">Kolkata</MenuItem>
+                </Select>
+                {errors.jobLocation && (
+                  <Typography color="error" sx={{ fontSize: "0.75rem", mt: 0.5, ml: 1.5 }}>
+                    {errors.jobLocation}
+                  </Typography>
+                )}
+              </FormControl>
+              <TextField
+                label="Phone Number"
+                name="phoneNumber"
+                value={assign.phoneNumber}
+                onChange={handleChange}
+                inputProps={{ maxLength: 10 }}
+                error={!!errors.phoneNumber}
+                helperText={errors.phoneNumber}
+                margin="dense"
+                sx={{ flex: 1 }}
+              />
+            </Box>
+
+            <Box sx={{ display: "flex", gap: 2 }}>
+              <FormControl margin="dense" variant="outlined" error={!!errors.bloodGroup} sx={{ flex: 1 }}>
+                <InputLabel>Blood Group</InputLabel>
+                <Select name="bloodGroup" value={assign.bloodGroup} onChange={handleChange} label="Blood Group">
+                  <MenuItem value="A +ve">A +</MenuItem>
+                  <MenuItem value="A -ve">A -</MenuItem>
+                  <MenuItem value="B +ve">B +</MenuItem>
+                  <MenuItem value="B -ve">B -</MenuItem>
+                  <MenuItem value="O +ve">O +</MenuItem>
+                  <MenuItem value="O -ve">O -</MenuItem>
+                  <MenuItem value="AB +ve">AB +</MenuItem>
+                  <MenuItem value="AB -ve">AB -</MenuItem>
+                </Select>
+                {errors.bloodGroup && (
+                  <Typography color="error" sx={{ fontSize: "0.75rem", mt: 0.5, ml: 1.5 }}>
+                    {errors.bloodGroup}
+                  </Typography>
+                )}
+              </FormControl>
+              <FormControl margin="dense" variant="outlined" error={!!errors.gender} sx={{ flex: 1 }}>
+                <InputLabel>Gender</InputLabel>
+                <Select name="gender" value={assign.gender} onChange={handleChange} label="Gender">
+                  <MenuItem value="Male">Male</MenuItem>
+                  <MenuItem value="Female">Female</MenuItem>
+                </Select>
+                {errors.gender && (
+                  <Typography color="error" sx={{ fontSize: "0.75rem", mt: 0.5, ml: 1.5 }}>
+                    {errors.gender}
+                  </Typography>
+                )}
+              </FormControl>
+            </Box>
+
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DatePicker
                 label="Date of Birth"
-                sx={{ ml: 1, width: '350px', mt: 1, mr: 2.25 }}
-                value={user.dateOfBirth ? dayjs(user.dateOfBirth) : null}
+                sx={{ width: "100%", mt: 1 }}
+                value={assign.dateOfBirth ? dayjs(assign.dateOfBirth) : null}
                 onChange={handleDateChange}
                 maxDate={dayjs()}
                 slotProps={{
                   textField: {
                     error: !!errors.dateOfBirth,
                     helperText: errors.dateOfBirth,
+                    margin: "dense",
+                    fullWidth: true,
                   },
                 }}
               />
             </LocalizationProvider>
-            <TextField
-              label="Phone Number"
-              name="phoneNumber"
-              variant="outlined"
-              value={user.phoneNumber}
-              inputProps={{ maxLength: 10 }}
-              onChange={handleChange}
-              error={!!errors.phoneNumber}
-              helperText={errors.phoneNumber}
-              sx={{ ml: 2.25, width: '350px', mt: 1, mr: 1 }}
-            />
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-start" }}>
-            <FormControl sx={{ ml: 1, width: '350px', mt: 1, mr: 2.25 }} margin="dense" variant="outlined" error={!!errors.bloodGroup}>
-              <InputLabel>Blood Group</InputLabel>
-              <Select name="bloodGroup" value={user.bloodGroup} onChange={handleChange} label="Blood Group">
-                <MenuItem value="A +ve">A +</MenuItem>
-                <MenuItem value="A -ve">A -</MenuItem>
-                <MenuItem value="B +ve">B +</MenuItem>
-                <MenuItem value="B -ve">B -</MenuItem>
-                <MenuItem value="O +ve">O +</MenuItem>
-                <MenuItem value="O -ve">O -</MenuItem>
-                <MenuItem value="AB +ve">AB +</MenuItem>
-                <MenuItem value="AB -ve">AB -</MenuItem>
-              </Select>
-              {errors.bloodGroup && <Typography color="error" sx={{ fontSize: '0.8rem', mt: 0.5, ml: 2 }}>{errors.bloodGroup}</Typography>}
-            </FormControl>
-            <FormControl sx={{ width: '350px', ml: 2.25, mt: 1, mr: 1 }} margin="dense" error={!!errors.gender} variant="outlined">
-              <InputLabel>Gender</InputLabel>
-              <Select name="gender" value={user.gender} onChange={handleChange} label="Gender">
-                <MenuItem value="Male">Male</MenuItem>
-                <MenuItem value="Female">Female</MenuItem>
-              </Select>
-              {errors.gender && <Typography color="error" sx={{ fontSize: '0.8rem', mt: 0.5, ml: 2 }}>{errors.gender}</Typography>}
-            </FormControl>
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-start" }}>
-            <TextField
-              label="Password"
-              name="password"
-              variant="outlined"
-              value={user.password}
-              onChange={handleChange}
-              type={showPassword ? "text" : "password"}
-              inputProps={{ maxLength: 16 }}
-              error={!!errors.password}
-              helperText={errors.password}
-              sx={{ ml: 1, width: '350px', mt: 1, mr: 2.25 }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label="toggle password visibility"
-                      onClick={handleClickShowPassword}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-            <TextField
-              label="Confirm Password"
-              name="confirmPassword"
-              type={showConfirmPassword ? "text" : "password"}
-              variant="outlined"
-              value={user.confirmPassword}
-              inputProps={{ maxLength: 16 }}
-              onChange={handleChange}
-              error={!!errors.confirmPassword}
-              helperText={errors.confirmPassword}
-              sx={{ ml: 2.25, width: '350px', mt: 1, mr: 1 }}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label="toggle confirm password visibility"
-                      onClick={handleClickShowConfirmPassword}
-                      edge="end"
-                    >
-                      {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-              }}
-            />
-          </div>
-          <Typography>Upload Photo</Typography>
-          <div style={{ display: "flex", alignItems: "flex-start" }}>
+
+            <Typography sx={{ mt: 1.5, mb: 0.5 }}>Upload Photo</Typography>
             <Button
               variant="outlined"
               component="label"
-              sx={{ display: 'flex', justifyContent: 'flex-start', height: 56, width: '740px', ml: 1, mt: 1, mr: 1 }}
+              fullWidth
+              sx={{ display: "flex", justifyContent: "flex-start", height: 56 }}
             >
-              
-              <input
-                type="file"
-                name="photo"
-                onChange={handleChange}
-              />
+              <input type="file" name="photo" onChange={handleChange} />
             </Button>
-          </div>
-          {errors.photo && <Typography color="error" sx={{ fontSize: '0.8rem', mt: 0.5, ml: 2 }}>{errors.photo}</Typography>}
-          <div style={{ display: "flex", alignItems: "flex-start" }}>
+            {errors.photo && (
+              <Typography color="error" sx={{ fontSize: "0.75rem", mt: 0.5, ml: 1.5 }}>
+                {errors.photo}
+              </Typography>
+            )}
+
             <Autocomplete
               multiple
               freeSolo
-              sx={{ ml: 1, width: '740px', mt: 1, mr: 1 }}
+              sx={{ mt: 1.5 }}
               options={skillsOption}
-              value={user.technicalSkills}
+              value={assign.technicalSkills}
               onChange={handleSkillsChange}
               renderTags={(value, getTagProps) =>
                 value.map((option, index) => (
-                  <Chip variant="contained" label={option} {...getTagProps({ index })} key={index} />
+                  <Chip variant="outlined" label={option} {...getTagProps({ index })} key={index} />
                 ))
               }
               renderInput={(params) => (
-                <TextField 
-                  {...params} 
-                  label="Technical Skills" 
-                  error={!!errors.technicalSkills}
-                  helperText={errors.technicalSkills}
-                />
+                <TextField {...params} label="Technical Skills" margin="dense" fullWidth />
               )}
             />
-          </div>
-        </Box>
+          </>
+        )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose} variant='contained' color='error'>Cancel</Button>
-        <Button onClick={handleSave} variant='contained'>Add</Button>
+        <Button onClick={handleClose} variant="contained" color="error">
+          Cancel
+        </Button>
+        {foundUser && (
+          <Button onClick={handleSave} variant="contained">
+            Assign to Company
+          </Button>
+        )}
       </DialogActions>
     </Dialog>
   );

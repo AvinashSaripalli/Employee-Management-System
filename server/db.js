@@ -1,19 +1,14 @@
-const mysql = require('mysql2');
-require('dotenv').config();
+const { sequelize } = require("./models");
 
-const db = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER, 
-  password: process.env.DB_PASSWORD, 
-  database: process.env.DB_NAME,
-});
-
-db.connect(err => {
-  if (err) {
-    console.error('MySQL connection error:', err);
-    return;
+async function testConnection() {
+  try {
+    await sequelize.authenticate();
+    console.log("PostgreSQL Connected...");
+  } catch (err) {
+    console.error("PostgreSQL connection error:", err);
   }
-  console.log('MySQL Connected...');
-});
+}
 
-module.exports = db;
+testConnection();
+
+module.exports = sequelize;

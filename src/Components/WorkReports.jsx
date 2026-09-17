@@ -7,7 +7,7 @@ import {
 } from "@mui/material";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import CloseIcon from "@mui/icons-material/Close";
-import axios from "axios";
+import axios from '../api/axios';
 
 const WorkReports = () => {
   const [reports, setReports] = useState([]);
@@ -33,7 +33,7 @@ const WorkReports = () => {
     if (!employeeId) return;
 
     axios
-      .get(`http://localhost:5000/api/reports/getAll?employeeId=${employeeId}`)
+      .get(`/reports/getAll?employeeId=${employeeId}`)
       .then((res) => setReports(res.data))
       .catch((err) => console.error("Axios GET error:", err));
   }, [employeeId]);
@@ -67,7 +67,7 @@ const WorkReports = () => {
       .filter((line) => line.trim() !== "");
 
     try {
-      const response = await axios.post("http://localhost:5000/api/reports", {
+      const response = await axios.post("/reports", {
         ...newReport,
         workDescription: JSON.stringify(workDescriptionArray),
         employeeId,

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import axios from '../api/axios';
 import { 
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, 
   Paper, Typography, Chip, CircularProgress, Box, Card, CardContent, 
@@ -22,7 +22,7 @@ const MyLeaves = () => {
     }
 
     try {
-      const response = await axios.get('http://localhost:5000/api/leaves', {
+      const response = await axios.get('/leaves', {
         params: { employeeId, companyName },
       });
       setLeaves(response.data);

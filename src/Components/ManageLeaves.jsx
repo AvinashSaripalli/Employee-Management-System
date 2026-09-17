@@ -3,7 +3,7 @@ import {
   Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Paper, Button, Chip, TablePagination
 } from '@mui/material';
-import axios from 'axios';
+import axios from '../api/axios';
 
 const ManageLeaves = () => {
   const [leaves, setLeaves] = useState([]);
@@ -15,7 +15,7 @@ const ManageLeaves = () => {
       const token = localStorage.getItem("token");
       const companyName = localStorage.getItem("companyName"); 
       
-      const response = await axios.get('http://localhost:5000/api/leaves/leave', {
+      const response = await axios.get('/leaves/leave', {
         headers: { Authorization: `Bearer ${token}` },
         params: { companyName },
       });
@@ -32,7 +32,7 @@ const ManageLeaves = () => {
   const handleUpdateStatus = async (leaveId, status) => {
     try {
       const token = localStorage.getItem("token");
-      await axios.put('http://localhost:5000/api/leaves/update-status',
+      await axios.put('/leaves/update-status',
         { leaveId, status },
         { headers: { Authorization: `Bearer ${token}` } }
       );

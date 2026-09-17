@@ -1,118 +1,116 @@
-const db = require('../db');
+const { Attendance } = require('../models');
+const { Op, fn, literal } = require('sequelize');
 
-exports.clockIn = (req, res) => {
+exports.clockIn = async (req, res) => {
   const {
     companyName, department, firstName, lastName, email, employeeId, designation, clockInDate, clockInTime
   } = req.body;
 
-  db.query(
-    `INSERT INTO attendance (companyName, department, firstName, lastName, email, employeeId, designation, clockInDate, clockInTime)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [companyName, department, firstName, lastName, email, employeeId, designation, clockInDate, clockInTime],
-    (error, results) => {
-      if (error) {
-        console.error('Clock-in error:', error);
-        return res.status(500).json({ error: 'Failed to record clock-in' });
-      }
-      res.status(201).json({ message: 'Clock-in recorded' });
-    }
-  );
+  try {
+    await Attendance.create({
+      companyName, department, firstName, lastName, email, employeeId,
+      designation, clockInDate, clockInTime,
+    });
+    res.status(201).json({ message: 'Clock-in recorded' });
+  } catch (error) {
+    console.error('Clock-in error:', error);
+    res.status(500).json({ error: 'Failed to record clock-in', details: error.message });
+  }
 };
 
-exports.clockOut = (req, res) => {
+exports.clockOut = async (req, res) => {
   const { employeeId, companyName, clockOutTime, workedTime } = req.body;
 
   if (!employeeId || !companyName || !clockOutTime || !workedTime) {
     return res.status(400).json({ error: 'Missing required fields for clock-out.' });
   }
 
-  const query = `
-    SELECT clockInTime FROM attendance 
-    WHERE employeeId = ? AND companyName = ? AND clockOutTime IS NULL 
-    ORDER BY clockInTime DESC LIMIT 1
-  `;
+  try {
+    const activeRecord = await Attendance.findOne({
+      where: {
+        employeeId,
+        companyName,
+        clockOutTime: null,
+      },
+      order: [['clockInTime', 'DESC']],
+    });
 
-  db.query(query, [employeeId, companyName], (error, results) => {
-    if (error) {
-      console.error('Database error during clock-out fetch:', error.message);
-      return res.status(500).json({ error: 'Failed to fetch clock-in record.' });
-    }
-
-    if (results.length === 0) {
+    if (!activeRecord) {
       return res.status(404).json({ error: 'No active clock-in found for this user.' });
     }
 
-    const clockInTime = results[0].clockInTime;
+    const clockInTime = activeRecord.clockInTime;
     if (new Date(`1970-01-01T${clockOutTime}Z`) <= new Date(`1970-01-01T${clockInTime}Z`)) {
       return res.status(400).json({ error: 'Clock-out time must be after clock-in time.' });
     }
 
-    const updateQuery = `
-      UPDATE attendance
-      SET clockOutTime = ?, workedTime = ?
-      WHERE employeeId = ? AND companyName = ? AND clockOutTime IS NULL
-      ORDER BY clockInTime DESC LIMIT 1
-    `;
+    const result = await Attendance.update(
+      { clockOutTime, workedTime },
+      { where: { id: activeRecord.id, clockOutTime: null } }
+    );
 
-    db.query(updateQuery, [clockOutTime, workedTime, employeeId, companyName], (error, results) => {
-      if (error) {
-        console.error('Database error during clock-out update:', error.message);
-        return res.status(500).json({ error: 'Failed to record clock-out.' });
-      }
-      
-      if (results.affectedRows === 0) {
-        return res.status(404).json({ error: 'No active clock-in found to update.' });
-      }
-
-      res.json({ message: 'Clock-out successfully recorded.' });
-    });
-  });
-};
-
-exports.getAllAttendances = (req, res) => {
-    const { companyName } = req.query; 
-
-    if (!companyName) {
-        return res.status(400).json({ error: 'Company name is required' });
+    if (result[0] === 0) {
+      return res.status(404).json({ error: 'No active clock-in found to update.' });
     }
 
-    const sql = 'SELECT * FROM attendance WHERE companyName = ? ORDER BY clockInDate DESC';
-    
-    db.query(sql, [companyName], (err, results) => {
-        if (err) {
-            console.error('Error fetching attendance records:', err);
-            return res.status(500).json({ error: 'Database error' });
-        }
-        res.json(results);
-    });
+    res.json({ message: 'Clock-out successfully recorded.' });
+  } catch (error) {
+    console.error('Database error during clock-out:', error.message);
+    res.status(500).json({ error: 'Failed to record clock-out.' });
+  }
 };
 
-// Add this to your backend controller file
-exports.getAttendanceStats = (req, res) => {
-    const { companyName } = req.query;
+exports.getAllAttendances = async (req, res) => {
+  const { companyName } = req.query;
 
-    if (!companyName) {
-        return res.status(400).json({ error: 'Company name is required' });
-    }
+  if (!companyName) {
+    return res.status(400).json({ error: 'Company name is required' });
+  }
 
-    const sql = `
-        SELECT 
-            DATE(clockInDate) as date,
-            SUM(CASE WHEN TIME(clockInTime) <= '09:30:00' THEN 1 ELSE 0 END) as onTime,
-            SUM(CASE WHEN TIME(clockInTime) > '09:30:00' THEN 1 ELSE 0 END) as late,
-            COUNT(*) as total
-        FROM attendance
-        WHERE companyName = ? 
-          AND clockInDate >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 DAY)
-        GROUP BY DATE(clockInDate)
-        ORDER BY date ASC
-    `;
-
-    db.query(sql, [companyName], (err, results) => {
-        if (err) {
-            console.error('Error fetching attendance stats:', err);
-            return res.status(500).json({ error: 'Database error' });
-        }
-        res.json(results);
+  try {
+    const results = await Attendance.findAll({
+      where: { companyName },
+      order: [['clockInDate', 'DESC']],
     });
+    res.json(results);
+  } catch (error) {
+    console.error('Error fetching attendance records:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+};
+
+exports.getAttendanceStats = async (req, res) => {
+  const { companyName } = req.query;
+
+  if (!companyName) {
+    return res.status(400).json({ error: 'Company name is required' });
+  }
+
+  try {
+    const results = await Attendance.findAll({
+      attributes: [
+        [literal('"clock_in_date"'), 'date'],
+        [fn('SUM', literal(`CASE WHEN "clock_in_time" <= '09:30:00' THEN 1 ELSE 0 END`)), 'onTime'],
+        [fn('SUM', literal(`CASE WHEN "clock_in_time" > '09:30:00' THEN 1 ELSE 0 END`)), 'late'],
+        [fn('COUNT', literal('*')), 'total'],
+      ],
+      where: {
+        companyName,
+        [Op.and]: literal(`"clock_in_date" >= CURRENT_DATE - INTERVAL '6 days'`),
+      },
+      group: [literal('"clock_in_date"')],
+      order: [[literal('"clock_in_date"'), 'ASC']],
+      raw: true,
+    });
+    const stats = results.map(row => ({
+      date: row.date,
+      onTime: Number(row.onTime) || 0,
+      late: Number(row.late) || 0,
+      total: Number(row.total) || 0,
+    }));
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching attendance stats:', error);
+    res.status(500).json({ error: 'Database error', details: error.message });
+  }
 };

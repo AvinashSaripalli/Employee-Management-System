@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Paper, TableContainer, Table, TableHead, TableBody, TableRow, TableCell, TablePagination, IconButton, Button, Grid, Dialog, DialogContent, DialogTitle } from '@mui/material';
-import axios from 'axios';
+import axios from '../api/axios';
 import CloseIcon from '@mui/icons-material/Close';
 
 const EmployeesReports = () => {
@@ -14,7 +14,7 @@ const EmployeesReports = () => {
 
   useEffect(() => {
     const companyName = localStorage.getItem('companyName');
-    axios.get('http://localhost:5000/api/reports', {
+    axios.get('/reports', {
       params: { companyName }
     })
       .then((response) => {

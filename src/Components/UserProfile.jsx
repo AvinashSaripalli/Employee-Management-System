@@ -18,7 +18,7 @@ import { Edit} from "@mui/icons-material";
 import CloseIcon from "@mui/icons-material/Close";
 import { LocalizationProvider, DatePicker } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import axios from "axios";
+import axios from '../api/axios';
 import dayjs from "dayjs";
 
 const UserProfile = () => {
@@ -191,7 +191,7 @@ const UserProfile = () => {
     };
   
     try {
-      const response = await axios.patch("http://localhost:5000/api/users/update", dataToUpdate, {
+      const response = await axios.patch("/users/update", dataToUpdate, {
         headers: { Authorization: `Bearer ${token}` },
       });
   
@@ -289,7 +289,7 @@ const UserProfile = () => {
 
       try {
         const response = await axios.patch(
-          "http://localhost:5000/api/users/update-photo",
+          "/users/update-photo",
           formData,
           {
           headers: {

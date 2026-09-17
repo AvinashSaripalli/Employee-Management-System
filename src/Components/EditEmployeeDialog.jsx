@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogActions, DialogContent, DialogTitle,Alert, Button, TextField,  FormControl, InputLabel, Select, MenuItem, Chip, Autocomplete, Typography } from '@mui/material';
-import axios from 'axios';
+import axios from '../api/axios';
 import { DemoContainer } from '@mui/x-date-pickers/internals/demo';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -178,7 +178,7 @@ const EditEmployeeDialog = ({ open, onClose, user, onSave }) => {
 
     try {
       const token = localStorage.getItem("token");
-      await axios.put(`http://localhost:5000/api/users/${user.id}`, data, {
+      await axios.put(`/users/${user.id}`, data, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${token}`,

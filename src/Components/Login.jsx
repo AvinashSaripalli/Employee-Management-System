@@ -4,8 +4,8 @@ import {
   TextField, Button, IconButton, InputAdornment,
   Box, Typography, Container, Snackbar, Alert, Grid
 } from "@mui/material";
-import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import axios from "../api/axios";
+import { useNavigate, Link } from "react-router-dom";
 import { keyframes } from '@emotion/react';
 
 function Login() {
@@ -38,7 +38,7 @@ function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post("http://localhost:5000/api/login", loginValues);
+      const response = await axios.post("/login", loginValues);
       if (response.data.success) {
         const {
           token, role, photo, companyName, designation, email, firstName,
@@ -67,14 +67,13 @@ function Login() {
         setSnackbar({ open: true, message: "Login successful!", severity: "success" });
 
         setTimeout(() => {
-          if (role === "Manager") {
+          if (role === "Manager" || role === "Admin") {
             navigate("/sidebar");
           } else if (department === "Human Resources") {
             navigate("/hrsidebar");
-          }else if (role === "Employee") {
-            navigate("/employeesidebar");
           } else {
-            navigate("/");
+            // Employees (assigned or not yet assigned to a company) go to employee sidebar
+            navigate("/employeesidebar");
           }
         }, 1000);
       } else {
@@ -171,7 +170,7 @@ function Login() {
               </Button>
 
               <Typography sx={{ textAlign: "center", mt: 2 }}>
-                Don't have an account? <a href="/register">Register</a>
+                Don&apos;t have an account? <Link to="/register">Register</Link>
               </Typography>
             </form>
           </Box>

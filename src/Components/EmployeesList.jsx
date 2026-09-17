@@ -4,7 +4,7 @@ import {
   IconButton,Menu,MenuItem,
   Divider
 } from '@mui/material';
-import axios from 'axios';
+import axios from '../api/axios';
 import EditEmployeeDialog from './EditEmployeeDialog';
 import AddEmployeeDialog from './AddEmployeeDialog';
 import DeleteDialog from './DeleteDialog';
@@ -46,7 +46,7 @@ const EmployeesList = ({ onClose }) => {
     const token = localStorage.getItem("token");
     const role = localStorage.getItem('userRole'); 
     try {
-      const response = await axios.get('http://localhost:5000/api/users', {
+      const response = await axios.get('/users', {
         params: { companyName, role }, 
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -74,7 +74,7 @@ const EmployeesList = ({ onClose }) => {
   const token = localStorage.getItem('token');
 
   try {
-    const response = await axios.get('http://localhost:5000/api/users/next-employee-id', {
+    const response = await axios.get('/users/next-employee-id', {
       params: { companyName },
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -105,7 +105,7 @@ const EmployeesList = ({ onClose }) => {
   const handleDelete = async (user) => {
     const token = localStorage.getItem("token");
     try {
-      const response = await axios.patch(`http://localhost:5000/api/users/${user.id}`, 
+      const response = await axios.patch(`/users/${user.id}`, 
       {exists: 0},
       {headers: { Authorization: `Bearer ${token}` },
       });
@@ -126,7 +126,7 @@ const EmployeesList = ({ onClose }) => {
     try {
       await Promise.all(
         selectedUsers.map((id) =>
-          axios.patch(`http://localhost:5000/api/users/${id}`, 
+          axios.patch(`/users/${id}`, 
           {exists: 0},
             {headers: { Authorization: `Bearer ${token}` },
           })
@@ -144,11 +144,11 @@ const EmployeesList = ({ onClose }) => {
   
 
   const filteredUsers = users.filter((user) =>
-    user.firstName.toLowerCase().includes(searchValue.toLowerCase()) ||
-    user.lastName.toLowerCase().includes(searchValue.toLowerCase()) ||
-    user.companyName.toLowerCase().includes(searchValue.toLowerCase()) ||
-    user.designation.toLowerCase().includes(searchValue.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchValue.toLowerCase()) 
+    (user.firstName || "").toLowerCase().includes(searchValue.toLowerCase()) ||
+    (user.lastName || "").toLowerCase().includes(searchValue.toLowerCase()) ||
+    (user.companyName || "").toLowerCase().includes(searchValue.toLowerCase()) ||
+    (user.designation || "").toLowerCase().includes(searchValue.toLowerCase()) ||
+    (user.email || "").toLowerCase().includes(searchValue.toLowerCase())
   );
 
   const handleEditDialogClose = () => {

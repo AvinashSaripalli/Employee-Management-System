@@ -1,147 +1,169 @@
-const db = require('../db');
+const { Leave } = require('../models');
+const sequelize = require('../config/database');
+const { Op, fn, literal } = require('sequelize');
 
-exports.leaveApply=(req, res) => {
-    const { employeeId, companyName,leaveType, startDate, endDate, reason, onlyTomorrow, halfDay } = req.body;
-  
-    const sql = `INSERT INTO leaves (employeeId, leave_type, start_date, end_date, reason, only_tomorrow, half_day, status, companyName)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?)`;
-  
-    db.query(sql, [employeeId, leaveType, startDate, endDate, reason, onlyTomorrow, halfDay, companyName], (err, result) => {
-      if (err) return res.status(500).json({ error: "Database error" });
-      res.status(201).json({ message: "Leave applied successfully", leaveId: result.insertId });
+exports.leaveApply = async (req, res) => {
+  const { employeeId, companyName, leaveType, startDate, endDate, reason, onlyTomorrow, halfDay } = req.body;
+
+  try {
+    const leave = await Leave.create({
+      employeeId,
+      leave_type: leaveType,
+      start_date: startDate,
+      end_date: endDate,
+      reason,
+      only_tomorrow: onlyTomorrow || false,
+      half_day: halfDay || false,
+      status: 'Pending',
+      companyName,
     });
-};
-
-exports.getAllLeaves = (req, res) => {
-    const { companyName } = req.query; 
-
-    if (!companyName) {
-        return res.status(400).json({ error: 'Company name is required' });
-    }
-
-    const sql = 'SELECT * FROM leaves WHERE companyName = ? ORDER BY created_at DESC';
-    
-    db.query(sql, [companyName], (err, results) => {
-        if (err) {
-            console.error('Error fetching leave records:', err);
-            return res.status(500).json({ error: 'Database error' });
-        }
-        res.json(results);
-    });
-};
-
-exports.getRecentLeaves = (req, res) => {
-  const { employeeId, companyName } = req.query;
-
-  if (!employeeId || !companyName) {
-    return res.status(400).json({ error: "Employee ID and Company Name are required" });
+    res.status(201).json({ message: "Leave applied successfully", leaveId: leave.id });
+  } catch (error) {
+    console.error('Error applying leave:', error);
+    res.status(500).json({ error: "Database error", details: error.message });
   }
-
-  const query = `
-    SELECT * FROM leaves 
-    WHERE employeeId = ? 
-    AND companyName = ?
-    AND (start_date < NOW() OR start_date > NOW()) 
-    ORDER BY start_date DESC 
-    LIMIT 4
-  `;
-
-  db.query(query, [employeeId, companyName], (err, results) => {
-    if (err) {
-      console.error("Error fetching recent leaves:", err);
-      return res.status(500).json({ message: "Internal Server Error" });
-    }
-    res.status(200).json(results);
-  });
 };
 
-exports.getLeaveCounts = (req, res) => {
+exports.getAllLeaves = async (req, res) => {
   const { companyName } = req.query;
 
   if (!companyName) {
     return res.status(400).json({ error: 'Company name is required' });
   }
 
-  const query = `
-    SELECT 
-      COUNT(*) as total,
-      SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) as approved,
-      SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending,
-      SUM(CASE WHEN status = 'Rejected' THEN 1 ELSE 0 END) as rejected
-    FROM leaves
-    WHERE companyName = ?
-  `;
-
-  db.query(query, [companyName], (err, results) => {
-    if (err) {
-      console.error('Database query error:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(results[0]);
-  });
+  try {
+    const results = await Leave.findAll({
+      where: { companyName },
+      order: [['created_at', 'DESC']],
+    });
+    res.json(results);
+  } catch (error) {
+    console.error('Error fetching leave records:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 };
 
+exports.getRecentLeaves = async (req, res) => {
+  const { employeeId, companyName } = req.query;
 
-exports.updateLeaveStatus = (req, res) => {
-    const { leaveId, status } = req.body;
+  if (!employeeId || !companyName) {
+    return res.status(400).json({ error: "Employee ID and Company Name are required" });
+  }
 
-    if (!leaveId || !status) {
-        return res.status(400).json({ error: 'Leave ID and status are required' });
-    }
-
-    const sql = 'UPDATE leaves SET status = ? WHERE id = ?';
-    db.query(sql, [status, leaveId], (err, result) => {
-        if (err) {
-            console.error('Error updating leave status:', err);
-            return res.status(500).json({ error: 'Database error' });
-        }
-        res.json({ message: `Leave ${status} successfully!` });
+  try {
+    const results = await Leave.findAll({
+      where: {
+        employeeId,
+        companyName,
+        [Op.and]: literal('("start_date" < NOW() OR "start_date" > NOW())'),
+      },
+      order: [['start_date', 'DESC']],
+      limit: 4,
     });
+    res.status(200).json(results);
+  } catch (error) {
+    console.error("Error fetching recent leaves:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
 };
 
-exports.getLeavesByEmployee = (req, res) => {
-    const { employeeId,companyName } = req.query;
+exports.getLeaveCounts = async (req, res) => {
+  const { companyName } = req.query;
 
-    if (!employeeId) {
-        return res.status(400).json({ message: "Employee ID is required" });
-    }
+  if (!companyName) {
+    return res.status(400).json({ error: 'Company name is required' });
+  }
 
-    const query = "SELECT * FROM leaves WHERE employeeId = ? AND companyName = ? ORDER BY created_at DESC";
-    db.query(query, [employeeId, companyName], (err, results) => {
-        if (err) {
-            console.error("Error fetching leaves:", err);
-            return res.status(500).json({ message: "Internal Server Error" });
-        }
-        res.status(200).json(results);
+  try {
+    const results = await Leave.findAll({
+      attributes: [
+        [fn('COUNT', literal('*')), 'total'],
+        [fn('SUM', literal(`CASE WHEN "status" = 'Approved' THEN 1 ELSE 0 END`)), 'approved'],
+        [fn('SUM', literal(`CASE WHEN "status" = 'Pending' THEN 1 ELSE 0 END`)), 'pending'],
+        [fn('SUM', literal(`CASE WHEN "status" = 'Rejected' THEN 1 ELSE 0 END`)), 'rejected'],
+      ],
+      where: { companyName },
+      raw: true,
     });
+    const counts = results[0] || {};
+    res.json({
+      total: Number(counts.total) || 0,
+      approved: Number(counts.approved) || 0,
+      pending: Number(counts.pending) || 0,
+      rejected: Number(counts.rejected) || 0,
+    });
+  } catch (error) {
+    console.error('Database query error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 };
 
-exports.getApprovedLeavesToday = (req, res) => {
-    const { companyName, year } = req.query;
+exports.updateLeaveStatus = async (req, res) => {
+  const { leaveId, status } = req.body;
 
-    if (!companyName || !year) {
-        return res.status(400).json({ error: "Missing required parameters" });
+  if (!leaveId || !status) {
+    return res.status(400).json({ error: 'Leave ID and status are required' });
+  }
+
+  try {
+    const result = await Leave.update({ status }, { where: { id: leaveId } });
+    if (result[0] === 0) {
+      return res.status(404).json({ error: 'Leave record not found' });
     }
+    res.json({ message: `Leave ${status} successfully!` });
+  } catch (error) {
+    console.error('Error updating leave status:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+};
 
-    const today = new Date();
-    const currentDate = today.getDate();
-    const currentMonth = today.getMonth() + 1; 
+exports.getLeavesByEmployee = async (req, res) => {
+  const { employeeId, companyName } = req.query;
 
-    const query = `
-        SELECT COUNT(*) AS leaveCount 
-        FROM leaves 
-        WHERE companyName = ? 
-        AND status = 'approved' 
-        AND YEAR(start_date) = ? 
-        AND MONTH(start_date) = ? 
-        AND DAY(start_date) = ?
-    `;
+  if (!employeeId) {
+    return res.status(400).json({ message: "Employee ID is required" });
+  }
 
-    db.query(query, [companyName, year, currentMonth, currentDate], (err, results) => {
-        if (err) {
-            console.error('Error fetching approved leaves:', err);
-            return res.status(500).json({ error: 'Internal server error' });
-        }
-        res.json({ leaveCount: results[0].leaveCount });
+  try {
+    const results = await Leave.findAll({
+      where: { employeeId, companyName },
+      order: [['created_at', 'DESC']],
     });
+    res.status(200).json(results);
+  } catch (error) {
+    console.error("Error fetching leaves:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+exports.getApprovedLeavesToday = async (req, res) => {
+  const { companyName, year } = req.query;
+
+  if (!companyName || !year) {
+    return res.status(400).json({ error: "Missing required parameters" });
+  }
+
+  const today = new Date();
+  const currentDate = today.getDate();
+  const currentMonth = today.getMonth() + 1;
+
+  try {
+    const result = await Leave.findAll({
+      attributes: [[fn('COUNT', literal('*')), 'leaveCount']],
+      where: {
+        companyName,
+        status: 'approved',
+        [Op.and]: [
+          literal(`EXTRACT(YEAR FROM "start_date") = ${parseInt(year)}`),
+          literal(`EXTRACT(MONTH FROM "start_date") = ${currentMonth}`),
+          literal(`EXTRACT(DAY FROM "start_date") = ${currentDate}`),
+        ],
+      },
+      raw: true,
+    });
+    res.json({ leaveCount: Number(result[0].leaveCount) || 0 });
+  } catch (error) {
+    console.error('Error fetching approved leaves:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };

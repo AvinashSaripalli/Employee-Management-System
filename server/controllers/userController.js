@@ -1,13 +1,14 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const db = require("../db");
+const { User } = require("../models");
+const sequelize = require("../config/database");
+const { Op, fn, col, literal } = require("sequelize");
 require("dotenv").config();
-const nodemailer = require("nodemailer");
 
 exports.registerUsers = async (req, res) => {
   const {
-    firstName, lastName, email, phoneNumber, password, companyName, role, 
-    designation, department, jobLocation, dateOfBirth, bloodGroup, 
+    firstName, lastName, email, phoneNumber, password, companyName, role,
+    designation, department, jobLocation, dateOfBirth, bloodGroup,
     technicalSkills, employeeId, gender, confirmPassword
   } = req.body;
 
@@ -27,248 +28,126 @@ exports.registerUsers = async (req, res) => {
   const photo = `/uploads/${req.file.filename}`;
 
   try {
-    const checkEmailQuery = "SELECT email FROM users WHERE email = ?";
-    db.query(checkEmailQuery, [email], async (err, results) => {
-      if (err) {
-        console.error("MySQL error:", err);
-        return res.status(500).json({ error: "Database error", details: err.message });
-      }
-      if (results.length > 0) {
-        return res.status(400).json({ error: "Email already exists" });
-      }
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already exists" });
+    }
 
-      try {
-        const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-        const insertQuery = `INSERT INTO users 
-          (firstName, lastName, email, phoneNumber, password, companyName, role, 
-           designation, department, jobLocation, dateOfBirth, bloodGroup, photo, 
-           technicalSkills, employeeId, gender, confirmPassword) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-        db.query(
-          insertQuery,
-          [
-            firstName, lastName, email, phoneNumber, hashedPassword, companyName,
-            role, designation, department, jobLocation, dateOfBirth, bloodGroup,
-            photo, technicalSkills, employeeId, gender, confirmPassword
-          ],
-          (err, result) => {
-            if (err) {
-              console.error("MySQL error:", err);
-              return res.status(500).json({ error: "Failed to add user", details: err.message });
-            }
-            res.status(201).json({ message: "User added successfully" });
-          }
-        );
-      } catch (hashError) {
-        console.error("Error hashing password:", hashError);
-        return res.status(500).json({ error: "Error hashing password", details: hashError.message });
-      }
+    await User.create({
+      firstName, lastName, email, phoneNumber, password: hashedPassword, companyName,
+      role, designation, department, jobLocation, dateOfBirth, bloodGroup,
+      photo, technicalSkills, employeeId, gender,
     });
+
+    return res.status(201).json({ message: "User added successfully" });
   } catch (error) {
     console.error("Server error:", error);
-    res.status(500).json({ error: "Server error", details: error.message });
+    return res.status(500).json({ error: "Server error", details: error.message });
   }
 };
 
 exports.registerUser = async (req, res) => {
-  const {firstName, lastName, email, phoneNumber, password, companyName,role, designation, department, jobLocation, dateOfBirth,bloodGroup, technicalSkills, gender, confirmPassword} = req.body;
-  
-  const photo = req.file ? `/uploads/${req.file.filename}` : null;
+  const { firstName, lastName, email, password, confirmPassword } = req.body;
+
+  if (!firstName || !firstName.trim()) {
+    return res.status(400).json({ error: "First name is required" });
+  }
+  if (!lastName || !lastName.trim()) {
+    return res.status(400).json({ error: "Last name is required" });
+  }
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
+  if (!password) {
+    return res.status(400).json({ error: "Password is required" });
+  }
+  if (!confirmPassword) {
+    return res.status(400).json({ error: "Confirm password is required" });
+  }
+  if (password !== confirmPassword) {
+    return res.status(400).json({ error: "Passwords do not match" });
+  }
 
   try {
-    const checkEmailQuery = "SELECT email FROM users WHERE email = ?";
-    db.query(checkEmailQuery, [email], async (err, results) => {
-      if (err) {
-        console.error("MySQL error:", err);
-        return res.status(500).json({ error: "Database error" });
-      }
-      if (results.length > 0) {
-        return res.status(400).json({ error: "Email already exists" });
-      }
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already exists" });
+    }
 
-      const getLastEmployeeQuery = `
-        SELECT employeeId FROM users WHERE companyName = ?  ORDER BY employeeId DESC LIMIT 1
-      `;
-      db.query(getLastEmployeeQuery, [companyName], async (err, results) => {
-        if (err) {
-          console.error("MySQL error:", err);
-          return res.status(500).json({ error: "Error fetching last employee ID" });
-        }
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-        let newEmployeeId;
-        if (results.length > 0) {
-          const lastEmployeeId = results[0].employeeId;
-          const prefix = lastEmployeeId.slice(0, 2);
-          const number = parseInt(lastEmployeeId.slice(2)) + 1;
-          newEmployeeId = `${prefix}${number.toString().padStart(3, '0')}`;
-        } else {
-          newEmployeeId = companyName === "Karncy" ? "KC001" : "KN001";
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        const insertQuery = `INSERT INTO users 
-          (firstName, lastName, email, phoneNumber, password, companyName, role, designation, department, jobLocation, dateOfBirth, bloodGroup, photo, technicalSkills, employeeId, gender, confirmPassword) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-        db.query(insertQuery, 
-          [firstName, lastName, email, phoneNumber, hashedPassword, companyName, role, designation, department, jobLocation, dateOfBirth, bloodGroup, photo, technicalSkills, newEmployeeId, gender, confirmPassword], 
-          (err, result) => {
-            if (err) {
-              console.error("MySQL error:", err);
-              return res.status(500).json({ error: "Failed to add user" });
-            }
-            res.status(201).json({ message: "User added successfully", employeeId: newEmployeeId });
-          }
-        );
-      });
+    await User.create({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email,
+      password: hashedPassword,
+      role: "Employee",
     });
+
+    return res.status(201).json({ message: "Registered successfully" });
   } catch (error) {
-    console.error("Error hashing password:", error);
-    res.status(500).json({ error: "Server error" });
+    console.error("Error registering user:", error);
+    return res.status(500).json({ error: "Server error", details: error.message });
   }
 };
 
-// const transporter = nodemailer.createTransport({
-//   host: process.env.EMAIL_HOST,
-//   port: process.env.EMAIL_PORT,
-//   secure: false,
-//   auth: {
-//     user: process.env.EMAIL_USER,
-//     pass: process.env.EMAIL_PASS,
-//   },
-// });
+exports.getUserByEmail = async (req, res) => {
+  const { email } = req.query;
 
-// exports.registerUser = async (req, res) => {
-//   const {
-//     firstName,
-//     lastName,
-//     email,
-//     phoneNumber,
-//     password,
-//     companyName,
-//     role,
-//     designation,
-//     department,
-//     jobLocation,
-//     dateOfBirth,
-//     bloodGroup,
-//     technicalSkills,
-//     gender,
-//     confirmPassword,
-//   } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email is required" });
+  }
 
-//   const photo = req.file ? `/uploads/${req.file.filename}` : null;
+  try {
+    const user = await User.findOne({ where: { email, exists: 1 } });
+    if (!user) {
+      return res.status(404).json({ error: "No registered user found with this email" });
+    }
 
-//   try {
-//     const checkEmailQuery = "SELECT email FROM users WHERE email = ?";
-//     db.query(checkEmailQuery, [email], async (err, results) => {
-//       if (err) {
-//         console.error("MySQL error:", err);
-//         return res.status(500).json({ error: "Database error" });
-//       }
-//       if (results.length > 0) {
-//         return res.status(400).json({ error: "Email already exists" });
-//       }
+    return res.status(200).json({
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      companyName: user.companyName || null,
+      role: user.role,
+    });
+  } catch (error) {
+    console.error("Error finding user by email:", error);
+    return res.status(500).json({ error: "Server error", details: error.message });
+  }
+};
 
-//       const getLastEmployeeQuery = `
-//         SELECT employeeId FROM users WHERE companyName = ? ORDER BY employeeId DESC LIMIT 1
-//       `;
-//       db.query(getLastEmployeeQuery, [companyName], async (err, results) => {
-//         if (err) {
-//           console.error("MySQL error:", err);
-//           return res.status(500).json({ error: "Error fetching last employee ID" });
-//         }
+exports.getUnassignedUsers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      where: { companyName: null, exists: 1 },
+      order: [["id", "ASC"]],
+    });
 
-//         let newEmployeeId;
-//         if (results.length > 0) {
-//           const lastEmployeeId = results[0].employeeId;
-//           const prefix = lastEmployeeId.slice(0, 2);
-//           const number = parseInt(lastEmployeeId.slice(2)) + 1;
-//           newEmployeeId = `${prefix}${number.toString().padStart(3, "0")}`;
-//         } else {
-//           newEmployeeId = companyName === "Karncy" ? "KC001" : "KN001";
-//         }
+    const result = users.map((u) => ({
+      id: u.id,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      email: u.email,
+    }));
 
-//         const hashedPassword = await bcrypt.hash(password, 10);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error("Error fetching unassigned users:", error);
+    return res.status(500).json({ error: "Server error", details: error.message });
+  }
+};
 
-//         const insertQuery = `INSERT INTO users 
-//           (firstName, lastName, email, phoneNumber, password, companyName, role, designation, department, jobLocation, dateOfBirth, bloodGroup, photo, technicalSkills, employeeId, gender, confirmPassword) 
-//           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-//         db.query(
-//           insertQuery,
-//           [
-//             firstName,
-//             lastName,
-//             email,
-//             phoneNumber,
-//             hashedPassword,
-//             companyName,
-//             role,
-//             designation,
-//             department,
-//             jobLocation,
-//             dateOfBirth,
-//             bloodGroup,
-//             photo,
-//             technicalSkills,
-//             newEmployeeId,
-//             gender,
-//             confirmPassword,
-//           ],
-//           async (err, result) => {
-//             if (err) {
-//               console.error("MySQL error:", err);
-//               return res.status(500).json({ error: "Failed to add user" });
-//             }
-
-//             try {
-//               const mailOptions = {
-//                 from: `"${companyName}" <${process.env.EMAIL_USER}>`,
-//                 to: email,
-//                 subject: "Your Login Credentials",
-//                 html: `
-//                   <h3>Welcome to ${companyName}!</h3>
-//                   <p>Your account has been successfully created. Below are your login credentials:</p>
-//                   <ul>
-//                     <li><strong>Email:</strong> ${email}</li>
-//                     <li><strong>Password:</strong> ${password}</li>
-//                     <li><strong>Employee ID:</strong> ${newEmployeeId}</li>
-//                   </ul>
-//                   <p>Please keep this information secure and do not share it with others.</p>
-//                   <p>Best regards,<br>${companyName} Team</p>
-//                 `,
-//               };
-
-//               await transporter.sendMail(mailOptions);
-//               console.log("Email sent successfully to:", email);
-//             } catch (emailError) {
-//               console.error("Error sending email:", emailError);
-//               return res.status(500).json({ error: "User registered but failed to send email", details: emailError.message });
-//             }
-
-//             res.status(201).json({ message: "User added successfully", employeeId: newEmployeeId });
-//           }
-//         );
-//       });
-//     });
-//   } catch (error) {
-//     console.error("Error hashing password:", error);
-//     res.status(500).json({ error: "Server error" });
-//   }
-// };
-
-exports.loginUser = (req, res) => {
+exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
-  const query = "SELECT * FROM users WHERE email = ? AND `exists` = 1";
-  db.query(query, [email], async (err, results) => {
-    if (err || results.length === 0) {
+  try {
+    const user = await User.findOne({ where: { email, exists: 1 } });
+    if (!user) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
-    const user = results[0];
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
@@ -276,7 +155,7 @@ exports.loginUser = (req, res) => {
     const token = jwt.sign(
       { id: user.id, role: user.role, companyName: user.companyName, department: user.department },
       process.env.JWT_SECRET,
-      { expiresIn: "8h" } 
+      { expiresIn: "8h" }
     );
     const photoUrl = user.photo ? `${req.protocol}://${req.get("host")}${user.photo}` : null;
     res.status(200).json({
@@ -296,229 +175,273 @@ exports.loginUser = (req, res) => {
       lastName: user.lastName,
       technicalSkills: user.technicalSkills,
       dateOfBirth: user.dateOfBirth,
-      bloodGroup:user.bloodGroup,
-      gender:user.gender,
+      bloodGroup: user.bloodGroup,
+      gender: user.gender,
     });
-  });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
 };
 
-exports.updateUser = (req, res) => {
-  const { id, designation, department, jobLocation, technicalSkills, phoneNumber, dateOfBirth,bloodGroup,gender } = req.body;
+exports.updateUser = async (req, res) => {
+  const { id, designation, department, jobLocation, technicalSkills, phoneNumber, dateOfBirth, bloodGroup, gender } = req.body;
   const skillsString = technicalSkills ? technicalSkills.join(",") : null;
 
-  const query = "UPDATE users SET designation=?, department=?, jobLocation=?, technicalSkills=?, phoneNumber=?, dateOfBirth=?, bloodGroup=?, gender=? WHERE id=?";
-  db.query(query, [designation, department, jobLocation, skillsString, phoneNumber, dateOfBirth, bloodGroup, gender, id], (err, result) => {
-      if (err) {
-          console.error("Update error:", err);
-          return res.status(500).json({ success: false, message: "Update failed" });
-      }
-      res.json({ success: true, message: "User updated successfully" });
-  });
-};
-
-exports.updateUserPhoto = (req, res) => {
-    const { id } = req.body;
-    const photo = req.file ? `/uploads/${req.file.filename}` : null;
-  
-    if (!id || !photo) {
-      return res.status(400).json({ success: false, message: "Invalid request." });
+  try {
+    const result = await User.update(
+      { designation, department, jobLocation, technicalSkills: skillsString, phoneNumber, dateOfBirth, bloodGroup, gender },
+      { where: { id } }
+    );
+    if (result[0] === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
     }
-    
-    const query = `UPDATE users SET photo = ? WHERE id = ?`;
-    db.query(query, [photo, id], (err, result) => {
-      if (err) {
-        console.error("Error updating photo:", err);
-        return res.status(500).json({ success: false, message: "Failed to update photo." });
-      }
-      res.status(200).json({
-        success: true,
-        message: "Photo updated successfully.",
-        photoUrl: `${req.protocol}://${req.get("host")}${photo}`,
-      });
-    });
+    return res.json({ success: true, message: "User updated successfully" });
+  } catch (error) {
+    console.error("Update error:", error);
+    return res.status(500).json({ success: false, message: "Update failed" });
+  }
 };
 
-exports.getUsers = (req, res) => {
-    const { companyName, role } = req.query;
+exports.updateUserPhoto = async (req, res) => {
+  const { id } = req.body;
+  const photo = req.file ? `/uploads/${req.file.filename}` : null;
+
+  if (!id || !photo) {
+    return res.status(400).json({ success: false, message: "Invalid request." });
+  }
+
+  try {
+    const result = await User.update({ photo }, { where: { id } });
+    if (result[0] === 0) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    res.status(200).json({
+      success: true,
+      message: "Photo updated successfully.",
+      photoUrl: `${req.protocol}://${req.get("host")}${photo}`,
+    });
+  } catch (error) {
+    console.error("Error updating photo:", error);
+    res.status(500).json({ success: false, message: "Failed to update photo." });
+  }
+};
+
+exports.getUsers = async (req, res) => {
+  const { companyName, role } = req.query;
 
   if (!companyName) {
     return res.status(400).json({ error: 'Company name is required' });
   }
 
-  let query;
-  const values = [companyName,];
-
-  if (role === 'Manager') {
-    query = 'SELECT * FROM users WHERE companyName = ? AND `exists` = 1'; 
-  } else {
-    query = `SELECT * FROM users WHERE companyName = ? AND (role = 'Employee' OR role = 'Manager' OR role = 'Admin') AND \`exists\` = 1`;
-  } 
-
-  db.query(query, values, (err, results) => {
-    if (err) {
-      console.error('Error fetching users:', err);
-      return res.status(500).json({ error: 'Error fetching users' });
+  try {
+    let where = { companyName, exists: 1 };
+    if (role !== 'Manager') {
+      where.role = { [Op.in]: ['Employee', 'Manager', 'Admin'] };
     }
 
+    const results = await User.findAll({ where, order: [['id', 'ASC']] });
+
     const users = results.map(user => ({
-      ...user,
+      ...user.toJSON(),
       photo: user.photo ? `${req.protocol}://${req.get('host')}${user.photo}` : null,
       technicalSkills: user.technicalSkills ? user.technicalSkills.split(",") : null
     }));
 
-    res.status(200).json(users);
-  });
-};
-
-
-exports.getUsersByMonth = (req, res) => {
-  const { companyName,year } = req.query;
-
-  if (!companyName|| !year) {
-    return res.status(400).json({ error: 'Company name is required' });
+    return res.status(200).json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    return res.status(500).json({ error: 'Error fetching users' });
   }
-  const query = `
-    SELECT 
-      MONTH(created_at) AS month,
-      SUM(CASE WHEN \`exists\` = 1 THEN 1 ELSE 0 END) AS employees,
-      SUM(CASE WHEN \`exists\` = 0 THEN 1 ELSE 0 END) AS deletedemployees
-    FROM users
-    WHERE companyName = ? AND YEAR(created_at) = ?
-    GROUP BY MONTH(created_at)
-  `;
-
-  db.query(query, [companyName,year], (err, results) => {
-    if (err) {
-      console.error('Database query error:', err);
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(results);
-  });
 };
 
-exports.getUsersByLocation = (req, res) => {
-  const { companyName,year } = req.query;
+exports.getUsersByMonth = async (req, res) => {
+  const { companyName, year } = req.query;
 
-    if (!companyName|| !year) {
-      return res.status(400).json({ error: 'Company name is required' });
-    }
-  
-    const query = `
-      SELECT jobLocation AS locationName, COUNT(*) AS locations 
-      FROM users 
-      WHERE companyName = ? AND \`exists\` = 1 AND YEAR(created_at) = ?
-      GROUP BY jobLocation
-    `;
-  
-    db.query(query, [companyName, year], (err, results) => {
-      if (err) {
-        console.error('Database query error:', err);
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json(results);
+  if (!companyName || !year) {
+    return res.status(400).json({ error: 'Company name and year are required' });
+  }
+
+  try {
+    const results = await User.findAll({
+      attributes: [
+        [fn('EXTRACT', literal('MONTH FROM "created_at"')), 'month'],
+        [fn('SUM', literal('CASE WHEN "exists" = 1 THEN 1 ELSE 0 END')), 'employees'],
+        [fn('SUM', literal('CASE WHEN "exists" = 0 THEN 1 ELSE 0 END')), 'deletedemployees'],
+      ],
+      where: {
+        companyName,
+        [Op.and]: sequelize.where(fn('EXTRACT', literal('YEAR FROM "created_at"')), year),
+      },
+      group: [literal('EXTRACT(MONTH FROM "created_at")')],
+      raw: true,
     });
+    const stats = results.map(row => ({
+      month: Number(row.month) || 0,
+      employees: Number(row.employees) || 0,
+      deletedemployees: Number(row.deletedemployees) || 0,
+    }));
+    res.json(stats);
+  } catch (error) {
+    console.error('Database query error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 };
 
-exports.getUsersByGenders = (req, res) => {
-    const { companyName, year } = req.query;
+exports.getUsersByLocation = async (req, res) => {
+  const { companyName, year } = req.query;
 
-    if (!companyName || !year ) {
-      return res.status(400).json({ error: 'Company name is required' });
-    }
-  
-    const query = `
-      SELECT gender AS genderName, COUNT(*) AS genders 
-      FROM users 
-      WHERE companyName = ? AND \`exists\` = 1 AND YEAR(created_at) = ?
-      GROUP BY gender
-    `;
-  
-    db.query(query, [companyName,year], (err, results) => {
-      if (err) {
-        console.error('Database query error:', err);
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json(results);
+  if (!companyName || !year) {
+    return res.status(400).json({ error: 'Company name and year are required' });
+  }
+
+  try {
+    const results = await User.findAll({
+      attributes: [
+        [literal('"job_location"'), 'locationName'],
+        [fn('COUNT', literal('*')), 'locations'],
+      ],
+      where: {
+        companyName,
+        exists: 1,
+        [Op.and]: sequelize.where(fn('EXTRACT', literal('YEAR FROM "created_at"')), year),
+      },
+      group: [literal('"job_location"')],
+      raw: true,
     });
+    const stats = results.map(row => ({
+      locationName: row.locationName,
+      locations: Number(row.locations) || 0,
+    }));
+    res.json(stats);
+  } catch (error) {
+    console.error('Database query error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 };
 
-exports.getUsersByDepartments = (req, res) => {
-    const { companyName, year } = req.query;
+exports.getUsersByGenders = async (req, res) => {
+  const { companyName, year } = req.query;
 
-    if (!companyName || !year) {
-      return res.status(400).json({ error: 'Company name is required' });
-    }
-  
-    const query = `
-      SELECT department AS departmentName, COUNT(*) AS indepartment 
-      FROM users 
-      WHERE companyName = ? AND \`exists\` = 1 AND YEAR(created_at) = ?
-      GROUP BY department
-    `;
-  
-    db.query(query, [companyName, year], (err, results) => {
-      if (err) {
-        console.error('Database query error:', err);
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json(results);
+  if (!companyName || !year) {
+    return res.status(400).json({ error: 'Company name and year are required' });
+  }
+
+  try {
+    const results = await User.findAll({
+      attributes: [
+        [literal('"gender"'), 'genderName'],
+        [fn('COUNT', literal('*')), 'genders'],
+      ],
+      where: {
+        companyName,
+        exists: 1,
+        [Op.and]: sequelize.where(fn('EXTRACT', literal('YEAR FROM "created_at"')), year),
+      },
+      group: ['gender'],
+      raw: true,
     });
+    const stats = results.map(row => ({
+      genderName: row.genderName,
+      genders: Number(row.genders) || 0,
+    }));
+    res.json(stats);
+  } catch (error) {
+    console.error('Database query error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 };
 
-exports.updateUserDetails = (req, res) => {
+exports.getUsersByDepartments = async (req, res) => {
+  const { companyName, year } = req.query;
+
+  if (!companyName || !year) {
+    return res.status(400).json({ error: 'Company name and year are required' });
+  }
+
+  try {
+    const results = await User.findAll({
+      attributes: [
+        [literal('"department"'), 'departmentName'],
+        [fn('COUNT', literal('*')), 'indepartment'],
+      ],
+      where: {
+        companyName,
+        exists: 1,
+        [Op.and]: sequelize.where(fn('EXTRACT', literal('YEAR FROM "created_at"')), year),
+      },
+      group: ['department'],
+      raw: true,
+    });
+    const stats = results.map(row => ({
+      departmentName: row.departmentName,
+      indepartment: Number(row.indepartment) || 0,
+    }));
+    res.json(stats);
+  } catch (error) {
+    console.error('Database query error:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+};
+
+exports.updateUserDetails = async (req, res) => {
   const { id } = req.params;
-  const { firstName, lastName, companyName, role, gender, designation, email, phoneNumber, department, bloodGroup, technicalSkills, dateOfBirth,jobLocation} = req.body;
+  const { firstName, lastName, companyName, role, gender, designation, email, phoneNumber, department, bloodGroup, technicalSkills, dateOfBirth, jobLocation } = req.body;
   const photo = req.file ? `/uploads/${req.file.filename}` : null;
-  
-  const query = `UPDATE users SET firstName = ?, lastName = ?, companyName = ?, role = ?, gender = ?, designation = ?, email = ?, phoneNumber = ?, department= ?, bloodGroup = ?, technicalSkills = ?, dateOfBirth = ?, jobLocation = ?, photo = COALESCE(?, photo) WHERE id = ?`;
-  const values = [firstName, lastName, companyName, role, gender,  designation, email, phoneNumber, department, bloodGroup, technicalSkills, dateOfBirth,jobLocation, photo, id];
 
-  db.query(query, values, (err, result) => {
-    if (err) {
-      return res.status(500).json({ error: err.message });
+  try {
+    const values = {
+      firstName, lastName, companyName, role, gender, designation, email, phoneNumber,
+      department, bloodGroup, technicalSkills, dateOfBirth, jobLocation,
+    };
+    if (photo) {
+      values.photo = photo;
+    }
+
+    const result = await User.update(values, { where: { id } });
+    if (result[0] === 0) {
+      return res.status(404).json({ error: 'User not found' });
     }
     res.status(200).json({ message: 'User updated successfully!' });
-  });
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ error: error.message });
+  }
 };
 
-exports.toggleUserExists = (req, res) => {
+exports.toggleUserExists = async (req, res) => {
   const { id } = req.params;
-  
-  db.query('SELECT `exists` FROM users WHERE id = ?', [id], (err, results) => {
-    if (err || results.length === 0) {
+
+  try {
+    const user = await User.findByPk(id);
+    if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const newExists = results[0].exists ? 0 : 1;
-    db.query('UPDATE users SET `exists` = ? WHERE id = ?', [newExists, id], (err, result) => {
-      if (err) {
-        console.error('Error toggling user:', err);
-        return res.status(500).json({ success: false, message: 'Failed to update user status' });
-      }
-      res.json({ success: true, message: 'User status updated successfully' });
-    });
-  });
+    await user.update({ exists: user.exists ? 0 : 1 });
+    res.json({ success: true, message: 'User status updated successfully' });
+  } catch (error) {
+    console.error('Error toggling user:', error);
+    res.status(500).json({ success: false, message: 'Failed to update user status' });
+  }
 };
 
-exports.getNextEmployeeId = (req, res) => {
+exports.getNextEmployeeId = async (req, res) => {
   const { companyName } = req.query;
 
   if (!companyName) {
     return res.status(400).json({ error: 'Company name is required' });
   }
 
-  const getLastEmployeeQuery = `
-    SELECT employeeId FROM users WHERE companyName = ? ORDER BY employeeId DESC LIMIT 1
-  `;
-  db.query(getLastEmployeeQuery, [companyName], (err, results) => {
-    if (err) {
-      console.error('MySQL error:', err);
-      return res.status(500).json({ error: 'Error fetching last employee ID' });
-    }
+  try {
+    const lastUser = await User.findOne({
+      where: { companyName },
+      order: [['employeeId', 'DESC']],
+    });
 
     let newEmployeeId;
-    if (results.length > 0) {
-      const lastEmployeeId = results[0].employeeId;
+    if (lastUser && lastUser.employeeId) {
+      const lastEmployeeId = lastUser.employeeId;
       const prefix = lastEmployeeId.slice(0, 2);
       const number = parseInt(lastEmployeeId.slice(2)) + 1;
       newEmployeeId = `${prefix}${number.toString().padStart(3, '0')}`;
@@ -527,32 +450,34 @@ exports.getNextEmployeeId = (req, res) => {
     }
 
     res.status(200).json({ employeeId: newEmployeeId });
-  });
+  } catch (error) {
+    console.error('Error fetching last employee ID:', error);
+    res.status(500).json({ error: 'Error fetching last employee ID' });
+  }
 };
 
-exports.getUsersList = (req, res) => {
+exports.getUsersList = async (req, res) => {
   const { companyName } = req.query;
 
   if (!companyName) {
     return res.status(400).json({ error: 'Company name is required' });
   }
 
-  const query = 'SELECT * FROM users WHERE companyName = ? AND `exists` = 1';
-  const values = [companyName];
-
-  db.query(query, values, (err, results) => {
-    if (err) {
-      console.error('Error fetching users:', err);
-      return res.status(500).json({ error: 'Error fetching users' });
-    }
+  try {
+    const results = await User.findAll({
+      where: { companyName, exists: 1 },
+      order: [['id', 'ASC']],
+    });
 
     const users = results.map(user => ({
-      ...user,
+      ...user.toJSON(),
       photo: user.photo ? `${req.protocol}://${req.get('host')}${user.photo}` : null,
       technicalSkills: user.technicalSkills ? user.technicalSkills.split(",") : null
     }));
 
     res.status(200).json(users);
-  });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Error fetching users' });
+  }
 };
-

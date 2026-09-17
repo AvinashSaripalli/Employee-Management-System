@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Paper, TableContainer, Table, TableHead, TableBody, TableRow, TableCell, TablePagination, IconButton, Button, Grid, Dialog, DialogActions, DialogContent, DialogTitle, TextField,InputAdornment } from '@mui/material';
-import axios from 'axios';
+import axios from '../api/axios';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 
@@ -17,7 +17,7 @@ const Reports = () => {
 
   useEffect(() => {
     const companyName = localStorage.getItem('companyName');
-    axios.get('http://localhost:5000/api/reports',{
+    axios.get('/reports',{
       params: { companyName }
     })
       .then((response) => {
@@ -64,7 +64,7 @@ const Reports = () => {
       return;
     }
 
-    axios.put(`http://localhost:5000/api/reports/feedback/${selectedReport.id}`, {
+    axios.put(`/reports/feedback/${selectedReport.id}`, {
       employeeId: selectedReport.employeeId,
       feedback: feedback.trim(),
     })

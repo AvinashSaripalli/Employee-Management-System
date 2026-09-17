@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { OrganizationChart } from 'primereact/organizationchart';
 import { Box, Typography, Chip, Drawer, List, ListItem, ListItemAvatar, ListItemText, Avatar } from '@mui/material';
-import axios from 'axios';
+import axios from '../api/axios';
 
 const CompanyStructure = () => {
   const [data, setData] = useState([]);
@@ -21,7 +21,7 @@ const CompanyStructure = () => {
       const role = localStorage.getItem('userRole');
 
       try {
-        const response = await axios.get('http://localhost:5000/api/users', {
+        const response = await axios.get('/users', {
           params: { companyName, role },
           headers: { Authorization: `Bearer ${token}` },
         });

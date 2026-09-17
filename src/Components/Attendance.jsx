@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import axios from '../api/axios';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Paper, Typography, Chip, CircularProgress, Box, TablePagination,
@@ -23,8 +23,8 @@ const Attendance = () => {
     const companyName = localStorage.getItem('companyName');
     try {
       const [attendanceRes, statsRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/attendance', { params: { companyName } }),
-        axios.get('http://localhost:5000/api/attendance/stats', { params: { companyName } })
+        axios.get('/attendance', { params: { companyName } }),
+        axios.get('/attendance/stats', { params: { companyName } })
       ]);
 
       setAttendances(attendanceRes.data);
