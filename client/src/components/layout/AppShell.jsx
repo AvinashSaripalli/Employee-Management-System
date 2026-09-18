@@ -304,11 +304,6 @@ const AppShell = ({
         }}
       >
         <Toolbar sx={{ height: TOPBAR_HEIGHT, minHeight: `${TOPBAR_HEIGHT}px !important`, gap: 1, px: { xs: 1, md: 2 } }}>
-          <Tooltip title={open ? 'Collapse menu' : 'Expand menu'}>
-            <IconButton onClick={() => setOpen(!open)} sx={{ color: 'text.primary' }} aria-label="Toggle navigation">
-              <MenuIcon size="22" variant="Outline" />
-            </IconButton>
-          </Tooltip>
 
           <Box sx={{ lineHeight: 1.1, display: { xs: 'none', sm: 'block' }, minWidth: 0 }}>
             <Typography variant="h6" sx={{ mb: 0.25, fontSize: { sm: '1.05rem' }, color: 'primary.main' }} noWrap>
