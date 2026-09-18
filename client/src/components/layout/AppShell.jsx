@@ -6,8 +6,9 @@ import {
 } from '@mui/material';
 import {
   Menu as MenuIcon, SearchNormal1, Notification, ArrowCircleLeft,
-  ArrowCircleRight, LogoutCurve, ArrowDown2, InfoCircle,
+  ArrowCircleRight, Refresh, LogoutCurve, ArrowDown2, InfoCircle,
 } from 'iconsax-react';
+import axios from '../../api/axios';
 
 const OPEN_WIDTH = 256;
 const CLOSED_WIDTH = 82;
@@ -39,9 +40,62 @@ const AppShell = ({
 }) => {
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
+  const [notificationAnchor, setNotificationAnchor] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
 
   const handleMenu = (e) => setAnchorEl(e.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
+
+  const fetchNotifications = async () => {
+    const companyName = localStorage.getItem('companyName');
+    const role = localStorage.getItem('userRole');
+    const department = localStorage.getItem('userDepartment');
+    if (!companyName) return;
+
+    setNotificationsLoading(true);
+    try {
+      const requests = [
+        axios.get('/tasks', { params: { companyName, myTasks: 'true' } }),
+      ];
+      const canReviewLeaves = ['Admin', 'Manager'].includes(role) || department === 'Human Resources';
+      if (canReviewLeaves) {
+        requests.push(axios.get('/leaves/leave', { params: { companyName, status: 'Pending' } }));
+      }
+
+      const results = await Promise.allSettled(requests);
+      const taskResult = results[0];
+      const taskNotifications = taskResult.status === 'fulfilled'
+        ? taskResult.value.data
+            .filter((task) => task.status !== 5 && task.status !== 7)
+            .slice(0, 5)
+            .map((task) => ({
+              id: `task-${task.id}`,
+              icon: 'task',
+              title: task.title || 'Assigned task',
+              detail: task.status === 3 ? 'Task is in progress' : 'Task needs your attention',
+            }))
+        : [];
+      const leaveResult = results[1];
+      const leaveNotifications = leaveResult?.status === 'fulfilled'
+        ? leaveResult.value.data.slice(0, 5).map((leave) => ({
+            id: `leave-${leave.id}`,
+            icon: 'leave',
+            title: 'Leave request pending',
+            detail: leave.employee_name || leave.employee?.firstName || 'Employee request',
+          }))
+        : [];
+      setNotifications([...leaveNotifications, ...taskNotifications]);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchNotifications();
+  }, []);
 
   const drawerWidth = open ? OPEN_WIDTH : CLOSED_WIDTH;
 
@@ -217,11 +271,53 @@ const AppShell = ({
             </Typography>
           </Box>
 
-          <IconButton sx={{ color: 'text.primary', display: { xs: 'none', sm: 'inline-flex' } }} aria-label="Notifications">
-            <Badge color="secondary" variant="dot" overlap="circular">
+          <IconButton
+            onClick={(event) => { setNotificationAnchor(event.currentTarget); fetchNotifications(); }}
+            sx={{ color: 'text.primary', display: { xs: 'none', sm: 'inline-flex' } }}
+            aria-label="Notifications"
+          >
+            <Badge badgeContent={notifications.length || null} color="secondary" max={9}>
               <Notification size="20" variant="Outline" />
             </Badge>
           </IconButton>
+
+          <Menu
+            anchorEl={notificationAnchor}
+            open={Boolean(notificationAnchor)}
+            onClose={() => setNotificationAnchor(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            slotProps={{ paper: { sx: { width: 330, maxWidth: 'calc(100vw - 32px)' } } }}
+          >
+            <Box sx={{ px: 2, py: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Notifications</Typography>
+              <Tooltip title="Refresh notifications">
+                <IconButton size="small" onClick={fetchNotifications} aria-label="Refresh notifications">
+                  <Refresh size="16" variant="Outline" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <Divider />
+            {notificationsLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={22} /></Box>
+            ) : notifications.length > 0 ? (
+              notifications.map((notification) => (
+                <MenuItem key={notification.id} onClick={() => setNotificationAnchor(null)} sx={{ py: 1.2, whiteSpace: 'normal' }}>
+                  <ListItemIcon sx={{ minWidth: 34, color: notification.icon === 'leave' ? 'warning.main' : 'primary.main' }}>
+                    {notification.icon === 'leave' ? <InfoCircle size="18" variant="Bold" /> : <Notification size="18" variant="Bold" />}
+                  </ListItemIcon>
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>{notification.title}</Typography>
+                    <Typography variant="caption" color="text.secondary">{notification.detail}</Typography>
+                  </Box>
+                </MenuItem>
+              ))
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 3, textAlign: 'center' }}>
+                You are all caught up.
+              </Typography>
+            )}
+          </Menu>
 
           <Divider orientation="vertical" flexItem sx={{ my: 1.5, display: { xs: 'none', sm: 'block' } }} />
 
