@@ -5,6 +5,8 @@ const sequelize = require("../config/database");
 const { Op, fn, col, literal } = require("sequelize");
 require("dotenv").config();
 
+const DEFAULT_COMPANY = "KN Advisors";
+
 exports.registerUsers = async (req, res) => {
   const {
     firstName, lastName, email, phoneNumber, password, companyName, role,
@@ -36,7 +38,7 @@ exports.registerUsers = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await User.create({
-      firstName, lastName, email, phoneNumber, password: hashedPassword, companyName,
+      firstName, lastName, email, phoneNumber, password: hashedPassword, companyName: DEFAULT_COMPANY,
       role, designation, department, jobLocation, dateOfBirth, bloodGroup,
       photo, technicalSkills, employeeId, gender,
     });
@@ -84,6 +86,7 @@ exports.registerUser = async (req, res) => {
       email,
       password: hashedPassword,
       role: "Employee",
+      companyName: DEFAULT_COMPANY,
     });
 
     return res.status(201).json({ message: "Registered successfully" });
@@ -446,7 +449,7 @@ exports.getNextEmployeeId = async (req, res) => {
       const number = parseInt(lastEmployeeId.slice(2)) + 1;
       newEmployeeId = `${prefix}${number.toString().padStart(3, '0')}`;
     } else {
-      newEmployeeId = companyName === 'Karncy' ? 'KC001' : 'KN001';
+      newEmployeeId = 'KN001';
     }
 
     res.status(200).json({ employeeId: newEmployeeId });

@@ -68,15 +68,15 @@ const AppShell = ({
         <Box sx={{ px: open ? 1.6 : 0, pt: 2.2, pb: 1.6, display: 'flex', justifyContent: open ? 'flex-start' : 'center' }}>
           {open ? (
             <img
-              src="/image 25.png"
-              alt="Company Logo"
-              style={{ height: 34, width: 'auto', objectFit: 'contain', maxWidth: 196 }}
+              src="/KN Advisors.png"
+              alt="KN Advisors Logo"
+              style={{ height: 38, width: 'auto', objectFit: 'contain', maxWidth: 210 }}
             />
           ) : (
             <img
-              src="/image 26.png"
-              alt="Company Logo"
-              style={{ height: 30, width: 'auto', objectFit: 'contain' }}
+              src="/KN Advisors.png"
+              alt="KN Advisors Logo"
+              style={{ height: 32, width: 'auto', objectFit: 'contain' }}
             />
           )}
         </Box>

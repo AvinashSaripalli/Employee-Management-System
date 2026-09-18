@@ -72,11 +72,11 @@ const EmployeeManagement = ({ onClose }) => {
   const handleClickOpenAddUser = () => {
     const companyName = localStorage.getItem('companyName');
     const companyPrefixes = {
-        "Karncy": "KC",
+        "KN Advisors": "KN",
         "Karnipuna": "KN"
     };
   
-    const prefix = companyPrefixes[companyName] || "EMP"; 
+    const prefix = companyPrefixes[companyName] || "KN"; 
 
     const employeeIds = users
       .map((user) => user.employeeId)

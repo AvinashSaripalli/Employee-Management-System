@@ -122,7 +122,7 @@ function Login() {
 
         <Stack spacing={1.5} sx={{ position: "relative" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <img src="/image 25.png" alt="Company Logo" style={{ height: 38, width: "auto" }} />
+            <img src="/KN Advisors.png" alt="KN Advisors Logo" style={{ height: 42, width: "auto", objectFit: "contain" }} />
           </Box>
           <Typography variant="h5" fontWeight={700} sx={{ color: "#FFE2C2" }}>
             Employee Management System
