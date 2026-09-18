@@ -15,7 +15,7 @@ import Reports from '../reports/Reports';
 import { ThreeDot } from 'react-loading-indicators';
 import CompanyStructure from '../company/CompanyStructure';
 import Workgroups from '../workgroups/Workgroups';
-// import TasksProjects from '../tasks/TasksProjects';
+import TasksProjects from '../tasks/TasksProjects';
 
 const Sidebar = () => {
   const [selectedComponent, setSelectedComponent] = useState('EmployeesList');
@@ -52,7 +52,7 @@ const Sidebar = () => {
     }
     switch (selectedComponent) {
       case 'Dashboard': return <Dashboard />;
-      // case 'Tasks and Projects': return <TasksProjects />;
+      case 'Tasks and Projects': return <TasksProjects />;
       case 'Employees List': return <EmployeesList />;
       case 'Company Structure': return <CompanyStructure />;
       case 'Work Groups': return <Workgroups />;
@@ -113,12 +113,10 @@ const Sidebar = () => {
                 ?  <Element4 size="24" variant="Bold"/>
                 :  <Element4 size="24" variant="Outline"/>
             },
-            // { 
-            //   text: 'Tasks and Projects', 
-            //   icon: selectedComponent === 'Tasks and Projects' 
-            //     ? <TaskSquare size="25" color="#14286d" variant="Bold"/>  
-            //     : <TaskSquare size="25" color="#14286d" variant="Outline"/> 
-            // },
+            { text: 'Tasks and Projects', icon: selectedComponent === 'Tasks and Projects'
+                ? <TaskSquare size="25" color="#14286d" variant="Bold"/>  
+                : <TaskSquare size="25" color="#14286d" variant="Outline"/> 
+            },
             { text: 'Employees List', icon:  selectedComponent === 'Employees List' 
                 ?  <RowVertical size="25" variant="Bold"/>
                 :   <RowVertical size="25" variant="Outline"/> 
