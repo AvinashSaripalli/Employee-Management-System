@@ -22,14 +22,14 @@ import {
   Button,
   Grid,
   TextField,
-  DialogActions,
+DialogActions,
   FormControl,
   InputLabel,
   Select,
   Autocomplete,
 } from '@mui/material';
 import axios from '../../api/axios';
-import CloseIcon from '@mui/icons-material/Close';
+import { Close as CloseIcon, Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
 
 const Workgroups = () => {
   const [workgroups, setWorkgroups] = useState([]);
@@ -207,33 +207,39 @@ const Workgroups = () => {
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
-      <Grid container spacing={3} justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 'bold' }} align="center" gutterBottom>
-          Work Groups
-        </Typography>
-        <Grid>
-          <Button
-            variant="outlined"
-            color="primary"
-            onClick={() => {
-              setIsEditMode(false);
-              setOpenDialog(true);
-            }}
-          >
-            Add WorkGroups
-          </Button>
-        </Grid>
-      </Grid>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+            Work Groups
+          </Typography>
+          <Typography color="text.secondary" sx={{ fontSize: '0.88rem' }}>
+            Collaborate with partner companies and manage cross-company groups
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={() => {
+            setIsEditMode(false);
+            setOpenDialog(true);
+          }}
+        >
+          Add WorkGroup
+        </Button>
+      </Box>
       <TableContainer
         component={Paper}
         sx={{
           maxHeight: '462px',
           overflowY: 'auto',
-          boxShadow: 'rgba(0, 0, 0, 0.1) 0px 2px 12px',
+          borderRadius: 3,
+          border: '1px solid #E8EEF9',
+          boxShadow: '0 6px 18px rgba(20,40,109,0.07)',
         }}
       >
         <Table stickyHeader aria-label="workgroups table">
-          <TableHead sx={{ backgroundColor: '#f4f7fe', height: '80px' }}>
+          <TableHead sx={{ backgroundColor: '#f4f7fe' }}>
             <TableRow>
               <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
                 ID
@@ -258,16 +264,22 @@ const Workgroups = () => {
           <TableBody>
             {groupedData.length > 0 ? (
               groupedData.map((group) => (
-                <TableRow key={group.id}>
+                <TableRow key={group.id} hover>
                   <TableCell align="center">{group.id}</TableCell>
-                  <TableCell align="left">{group.partnerCompanyName}</TableCell>
+                  <TableCell align="left">
+                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                      {group.partnerCompanyName}
+                    </Typography>
+                  </TableCell>
                   <TableCell align="center">
                     {new Date(group.createdOn).toLocaleDateString('en-GB')}
                   </TableCell>
                   <TableCell align="center">
                     <Chip
                       label={group.privacyType}
-                      style={{ width: '100px', minWidth: 'unset' }}
+                      color={group.privacyType === 'Public' ? 'info' : 'secondary'}
+                      variant="outlined"
+                      sx={{ width: '100px', minWidth: 'unset' }}
                     />
                   </TableCell>
                   <TableCell align="center">
@@ -289,8 +301,9 @@ const Workgroups = () => {
                   </TableCell>
                   <TableCell>
                     <Button
-                      variant="contained"
+                      variant="outlined"
                       size="small"
+                      startIcon={<EditIcon sx={{ fontSize: 16 }} />}
                       onClick={() => handleEditClick(group)}
                     >
                       Edit

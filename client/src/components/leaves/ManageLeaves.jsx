@@ -50,15 +50,24 @@ const ManageLeaves = () => {
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
-      <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 2 }}>Leave Management</Typography>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
+          Leave Management
+        </Typography>
+        <Typography color="text.secondary" sx={{ fontSize: '0.88rem' }}>
+          Approve or reject leave requests submitted by employees
+        </Typography>
+      </Box>
 
       <TableContainer component={Paper} sx={{
         maxHeight: '462px',
         overflowY: 'auto',
-        boxShadow: "rgba(0, 0, 0, 0.1) 0px 2px 12px",
+        borderRadius: 3,
+        border: '1px solid #E8EEF9',
+        boxShadow: '0 6px 18px rgba(20,40,109,0.07)',
       }}>
         <Table stickyHeader aria-label="leaves table">
-          <TableHead sx={{ backgroundColor: '#f4f7fe', height:"80px" }} >
+          <TableHead sx={{ backgroundColor: '#f4f7fe' }}>
             <TableRow>
               <TableCell align='center' sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Employee ID</TableCell>
               <TableCell align='left' sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Leave Type</TableCell>
@@ -73,9 +82,16 @@ const ManageLeaves = () => {
               leaves
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((leave, index) => (
-                  <TableRow key={index} sx={{ '&:nth-of-type(odd)': { backgroundColor: '#f9f9f9' } }}>
+                  <TableRow key={index} hover>
                     <TableCell align='center'>{leave.employeeId}</TableCell>
-                    <TableCell align='left'>{leave.leave_type}</TableCell>
+                    <TableCell align='left'>
+                      <Chip
+                        size="small"
+                        label={leave.leave_type}
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </TableCell>
                     <TableCell align='left'>{new Date(leave.start_date).toLocaleDateString('en-GB')}</TableCell>
                     <TableCell align='left'>{new Date(leave.end_date).toLocaleDateString('en-GB')}</TableCell>
                     <TableCell align='left'>{leave.reason}</TableCell>
@@ -83,6 +99,7 @@ const ManageLeaves = () => {
                       {leave.status === 'Pending' ? (
                         <>
                           <Button
+                            size="small"
                             variant="contained"
                             color="success"
                             onClick={() => handleUpdateStatus(leave.id, 'Approved')}
@@ -91,7 +108,8 @@ const ManageLeaves = () => {
                             Approve
                           </Button>
                           <Button
-                            variant="contained"
+                            size="small"
+                            variant="outlined"
                             color="error"
                             onClick={() => handleUpdateStatus(leave.id, 'Rejected')}
                           >
@@ -105,7 +123,7 @@ const ManageLeaves = () => {
                             leave.status === 'Approved' ? 'success' :
                               leave.status === 'Rejected' ? 'error' : 'warning'
                           }
-                          style={{ width: "100px", minWidth: "unset"}}
+                          sx={{ width: "100px", minWidth: "unset" }}
                         />
                       )}
                     </TableCell>

@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer,
   TableHead, TableRow, Chip, Avatar, Dialog, DialogTitle, DialogContent,
   DialogActions, Button, Grid, TextField, MenuItem, Select, FormControl,
   InputLabel, IconButton, LinearProgress, Checkbox, Tooltip, Tab, Tabs,
-  Autocomplete as MUIAutocomplete,
+  Autocomplete as MUIAutocomplete, ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -15,7 +15,16 @@ import {
   AddCircleOutline as AddCircleOutlineIcon,
   DeleteOutline as DeleteOutlineIcon,
   Search as SearchIcon,
+  GridView as GridViewIcon,
+  BarChart as BarChartIcon,
 } from '@mui/icons-material';
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip,
+  CartesianGrid, PieChart, Pie, Cell, Legend, AreaChart, Area, LabelList,
+} from 'recharts';
+import {
+  TaskSquare, TickCircle, Clock, Timer1, NoteRemove, Ranking, UserSquare, ChartSquare,
+} from 'iconsax-react';
 import axios from '../../api/axios';
 
 const STATUS_META = {
@@ -136,6 +145,7 @@ const TasksProjects = () => {
   const [search, setSearch] = useState('');
   const [myTasksOnly, setMyTasksOnly] = useState(false);
   const [tab, setTab] = useState(0);
+  const [statsView, setStatsView] = useState(false);
 
   const currentEmployeeId = localStorage.getItem('userEmployeeId') || '';
   const currentRole = localStorage.getItem('userRole') || '';
@@ -150,6 +160,85 @@ const TasksProjects = () => {
     },
     [currentEmployeeId, currentRole]
   );
+
+  const stats = useMemo(() => {
+    const statusCounts = {};
+    const priorityCounts = {};
+    Object.keys(STATUS_META).forEach((k) => { statusCounts[k] = 0; });
+    Object.keys(PRIORITY_META).forEach((k) => { priorityCounts[k] = 0; });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const workloadMap = {};
+    const overdueList = [];
+    let completed = 0;
+    let inProgress = 0;
+    let overdue = 0;
+
+    tasks.forEach((task) => {
+      statusCounts[task.status] = (statusCounts[task.status] || 0) + 1;
+      priorityCounts[task.priority] = (priorityCounts[task.priority] || 0) + 1;
+
+      if (task.status === 5) completed += 1;
+      if (task.status === 3) inProgress += 1;
+
+      const key = task.responsibleId || 'Unassigned';
+      workloadMap[key] = workloadMap[key] || { count: 0, completed: 0 };
+      workloadMap[key].count += 1;
+      if (task.status === 5) workloadMap[key].completed += 1;
+
+      const deadline = task.deadline ? new Date(task.deadline) : null;
+      if (deadline && task.status !== 5 && task.status !== 7 && deadline < today) {
+        overdue += 1;
+        const daysOver = Math.max(1, Math.round((today - deadline) / (1000 * 60 * 60 * 24)));
+        overdueList.push({ ...task, daysOver });
+      }
+    });
+
+    const workload = Object.entries(workloadMap)
+      .map(([employeeId, w]) => {
+        const u = users.find((x) => x.employeeId === employeeId);
+        return {
+          employeeId,
+          name: u ? `${u.firstName} ${u.lastName}` : employeeId === 'Unassigned' ? 'Unassigned' : employeeId,
+          photo: u?.photo || '',
+          count: w.count,
+          completed: w.completed,
+          pending: w.count - w.completed,
+          pct: w.count ? Math.round((w.completed / w.count) * 100) : 0,
+        };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    const monthly = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthly.push({ name: d.toLocaleString('en', { month: 'short' }), created: 0 });
+    }
+    tasks.forEach((task) => {
+      const created = new Date(task.createdAt);
+      const monthIdx = (now.getFullYear() - created.getFullYear()) * 12 + (now.getMonth() - created.getMonth());
+      if (monthIdx >= 0 && monthIdx < 12) {
+        monthly[11 - monthIdx].created += 1;
+      }
+    });
+
+    return {
+      total: tasks.length,
+      completed,
+      inProgress,
+      overdue,
+      completionRate: tasks.length ? Math.round((completed / tasks.length) * 100) : 0,
+      myTasks: tasks.filter((t) => t.responsibleId === currentEmployeeId).length,
+      byStatus: Object.entries(statusCounts).map(([status, count]) => ({ status: Number(status), count })),
+      byPriority: Object.entries(priorityCounts).map(([priority, count]) => ({ priority: Number(priority), count })),
+      monthly,
+      workload,
+      overdueList: overdueList.sort((a, b) => b.daysOver - a.daysOver),
+    };
+  }, [tasks, users, currentEmployeeId]);
 
   const fetchTasks = useCallback(async () => {
     setLoading(true);
@@ -454,18 +543,41 @@ const TasksProjects = () => {
           </Typography>
         </Grid>
         <Grid item>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={handleOpenCreate}
-          >
-            Add Task
-          </Button>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={statsView ? 'stats' : 'list'}
+              onChange={(e, value) => value && setStatsView(value === 'stats')}
+              sx={{
+                bgcolor: '#EEF2FA',
+                borderRadius: 2,
+                '& .MuiToggleButton-root': {
+                  border: 'none',
+                  color: '#5B6B99',
+                  px: 1.5,
+                  '&.Mui-selected': { bgcolor: '#fff', color: 'primary.main', boxShadow: '0 2px 6px rgba(20,40,109,0.18)' },
+                },
+              }}
+            >
+              <ToggleButton value="list"><GridViewIcon sx={{ fontSize: 18, mr: 0.75 }} />List</ToggleButton>
+              <ToggleButton value="stats"><BarChartIcon sx={{ fontSize: 18, mr: 0.75 }} />Statistics</ToggleButton>
+            </ToggleButtonGroup>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={handleOpenCreate}
+            >
+              Add Task
+            </Button>
+          </Box>
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 2.5, mb: 3 }}>
+      {!statsView && (
+        <Box>
+          <Paper sx={{ p: 2.5, mb: 3 }}>
         <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} sm={3}>
             <TextField
@@ -640,6 +752,12 @@ const TasksProjects = () => {
           </TableBody>
         </Table>
       </TableContainer>
+        </Box>
+      )}
+
+      {statsView && (
+        <StatsBoard stats={stats} onView={handleView} />
+      )}
 
       {/* Create / Edit Task Dialog */}
       <Dialog open={openForm} onClose={() => setOpenForm(false)} fullWidth maxWidth="sm">
@@ -1080,6 +1198,303 @@ const TasksProjects = () => {
           </>
         )}
       </Dialog>
+    </Box>
+  );
+};
+
+const STATUS_COLORS = {
+  1: '#94A3B8',
+  2: '#0284C7',
+  3: '#F59E0B',
+  4: '#8B5CF6',
+  5: '#16A34A',
+  6: '#64748B',
+  7: '#E11D48',
+};
+
+const PRIORITY_COLORS = { 0: '#94A3B8', 1: '#0284C7', 2: '#E11D48' };
+
+const StatTile = ({ icon, label, value, sub, color, tint }) => (
+  <Paper
+    sx={{
+      p: 2,
+      borderRadius: 3,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 1.8,
+      border: '1px solid #E8EEF9',
+      boxShadow: '0 6px 18px rgba(20,40,109,0.07)',
+      height: '100%',
+    }}
+  >
+    <Box
+      sx={{
+        width: 52,
+        height: 52,
+        borderRadius: 2.5,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: tint,
+        color,
+        flexShrink: 0,
+      }}
+    >
+      {icon}
+    </Box>
+    <Box sx={{ minWidth: 0 }}>
+      <Typography variant="h5" sx={{ fontWeight: 'bold', lineHeight: 1.1 }}>
+        {value}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" noWrap>
+        {label}
+      </Typography>
+      {sub && (
+        <Typography variant="caption" color="text.secondary" noWrap>
+          {sub}
+        </Typography>
+      )}
+    </Box>
+  </Paper>
+);
+
+const ChartCard = ({ title, subtitle, children, extra }) => (
+  <Paper
+    sx={{
+      p: 2.5,
+      borderRadius: 3,
+      border: '1px solid #E8EEF9',
+      boxShadow: '0 6px 18px rgba(20,40,109,0.07)',
+      height: '100%',
+    }}
+  >
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
+      <Box>
+        <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+          {title}
+        </Typography>
+        {subtitle && (
+          <Typography variant="caption" color="text.secondary">
+            {subtitle}
+          </Typography>
+        )}
+      </Box>
+      {extra}
+    </Box>
+    {children}
+  </Paper>
+);
+
+const CHART_TOOLTIP_STYLE = {
+  borderRadius: 10,
+  border: '1px solid #E8EEF9',
+  boxShadow: '0 8px 24px rgba(20,40,109,0.12)',
+  fontSize: 13,
+};
+
+const StatsBoard = ({ stats, onView }) => {
+  const statusData = stats.byStatus
+    .filter((d) => d.count > 0)
+    .map((d) => ({ name: STATUS_META[d.status].label, value: d.count, color: STATUS_COLORS[d.status] }));
+  const priorityData = stats.byPriority
+    .filter((d) => d.count > 0)
+    .map((d) => ({ name: PRIORITY_META[d.priority].label, value: d.count, color: PRIORITY_COLORS[d.priority] }));
+  const workloadData = stats.workload.map((w) => ({ name: w.name, Done: w.completed, Pending: w.pending }));
+
+  const tiles = [
+    { icon: <TaskSquare size="26" />, label: 'Total Tasks', value: stats.total, sub: `${stats.myTasks} assigned to you`, color: '#14286D', tint: '#E2E7F5' },
+    { icon: <TickCircle size="26" />, label: 'Completed', value: stats.completed, sub: `${stats.completionRate}% completion rate`, color: '#16A34A', tint: '#E7F6EC' },
+    { icon: <Clock size="26" />, label: 'In Progress', value: stats.inProgress, sub: 'currently being worked on', color: '#D97706', tint: '#FEF3E2' },
+    { icon: <NoteRemove size="26" />, label: 'Overdue', value: stats.overdue, sub: 'past their deadline', color: '#E11D48', tint: '#FDECF0' },
+    { icon: <Ranking size="26" />, label: 'Completion Rate', value: `${stats.completionRate}%`, sub: 'of all tasks done', color: '#0284C7', tint: '#E0F2FE' },
+    { icon: <UserSquare size="26" />, label: 'My Tasks', value: stats.myTasks, sub: 'assigned to you', color: '#7C3AED', tint: '#F1E9FC' },
+  ];
+
+  if (stats.total === 0) {
+    return (
+      <Paper sx={{ p: 6, borderRadius: 3, border: '1px dashed #C9D6EE', textAlign: 'center' }}>
+        <ChartSquare size="48" color="#C9D6EE" />
+        <Typography variant="h6" sx={{ mt: 1.5, fontWeight: 'bold' }}>
+          No statistics yet
+        </Typography>
+        <Typography color="text.secondary" sx={{ fontSize: '0.9rem' }}>
+          Add some tasks and they will start appearing here.
+        </Typography>
+      </Paper>
+    );
+  }
+
+  return (
+    <Box>
+      <Grid container spacing={2.5}>
+        {tiles.map((t) => (
+          <Grid item xs={12} sm={6} md={4} xl={2} key={t.label}>
+            <StatTile {...t} />
+          </Grid>
+        ))}
+      </Grid>
+
+      <Grid container spacing={2.5} sx={{ mt: 0 }}>
+        <Grid item xs={12} md={5}>
+          <ChartCard title="Status Breakdown" subtitle="All tasks grouped by current status" extra={
+            <Chip size="small" label={`${stats.total} total`} sx={{ bgcolor: '#EEF2FA', color: 'primary.main', fontWeight: 'bold' }} />
+          }>
+            {statusData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart>
+                  <Pie
+                    data={statusData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={62}
+                    outerRadius={92}
+                    paddingAngle={3}
+                    stroke="none"
+                  >
+                    {statusData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <RechartsTooltip contentStyle={CHART_TOOLTIP_STYLE} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>No data</Typography>
+            )}
+          </ChartCard>
+        </Grid>
+
+        <Grid item xs={12} md={7}>
+          <ChartCard title="Priority Distribution" subtitle="How tasks break down by priority" extra={
+            <Typography variant="caption" color="text.secondary">
+              {priorityData.filter((d) => d.name === 'High').length > 0
+                ? `${priorityData.find((d) => d.name === 'High')?.value || 0} high priority` : 'no high priority'}
+            </Typography>
+          }>
+            {priorityData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={priorityData} barSize={52} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EEF2FA" />
+                  <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={13} />
+                  <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={13} />
+                  <RechartsTooltip cursor={{ fill: '#F6F9FF' }} contentStyle={CHART_TOOLTIP_STYLE} />
+                  <Bar dataKey="value" radius={[8, 8, 8, 8]}>
+                    {priorityData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                    <LabelList dataKey="value" position="top" style={{ fill: '#64748B', fontSize: 12, fontWeight: 'bold' }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>No data</Typography>
+            )}
+          </ChartCard>
+        </Grid>
+      </Grid>
+
+      <Grid container spacing={2.5} sx={{ mt: 0 }}>
+        <Grid item xs={12} md={7}>
+          <ChartCard title="Workload by Member" subtitle="Assigned vs completed tasks per member">
+            {workloadData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={Math.max(220, workloadData.length * 58)}>
+                <BarChart data={workloadData} layout="vertical" margin={{ top: 0, right: 24, left: 4, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#EEF2FA" />
+                  <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} fontSize={12} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={128}
+                    tickLine={false}
+                    axisLine={false}
+                    fontSize={12}
+                  />
+                  <RechartsTooltip cursor={{ fill: '#F6F9FF' }} contentStyle={CHART_TOOLTIP_STYLE} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="Done" stackId="a" fill="#16A34A" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="Pending" stackId="a" fill="#E2E8F0" radius={[0, 8, 8, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <Typography color="text.secondary" sx={{ py: 6, textAlign: 'center' }}>No data</Typography>
+            )}
+          </ChartCard>
+        </Grid>
+
+        <Grid item xs={12} md={5}>
+          <ChartCard title="Tasks Created" subtitle="Over the last 12 months" extra={
+            <Chip size="small" label="per month" sx={{ bgcolor: '#EEF2FA', color: 'primary.main', fontSize: 11 }} />
+          }>
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={stats.monthly} margin={{ top: 4, right: 8, left: -22, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="createdGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#14286D" stopOpacity={0.28} />
+                    <stop offset="100%" stopColor="#14286D" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#EEF2FA" />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={11} />
+                <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={12} />
+                <RechartsTooltip cursor={{ stroke: '#C9D6EE' }} contentStyle={CHART_TOOLTIP_STYLE} />
+                <Area type="monotone" dataKey="created" name="Created" stroke="#14286D" strokeWidth={2.5} fill="url(#createdGradient)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        </Grid>
+      </Grid>
+
+      <Paper sx={{ mt: 2.5, borderRadius: 3, border: '1px solid #E8EEF9', boxShadow: '0 6px 18px rgba(20,40,109,0.07)', overflow: 'hidden' }}>
+        <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid #EEF2FA', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Timer1 size="20" color="#E11D48" />
+          <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+            Overdue Tasks
+          </Typography>
+          <Chip size="small" label={`${stats.overdue}`} sx={{ bgcolor: '#FDECF0', color: '#E11D48', fontWeight: 'bold' }} />
+        </Box>
+        {stats.overdueList.length > 0 ? (
+          <TableContainer sx={{ maxHeight: 300, overflowY: 'auto' }}>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Task</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Assignee</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Deadline</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }} align="right">Overdue</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {stats.overdueList.map((task) => {
+                  const statusMeta = STATUS_META[task.status] || STATUS_META[2];
+                  return (
+                    <TableRow key={task.id} hover sx={{ cursor: 'pointer' }} onClick={() => onView(task)}>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>{task.title}</Typography>
+                        <Chip size="small" label={statusMeta.label} color={statusMeta.color} variant="outlined" sx={{ mt: 0.5, height: 20, fontSize: 11 }} />
+                      </TableCell>
+                      <TableCell>{task.responsible ? `${task.responsible.firstName} ${task.responsible.lastName}` : task.responsibleId}</TableCell>
+                      <TableCell>{new Date(task.deadline).toLocaleDateString('en-GB')}</TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" sx={{ color: '#E11D48', fontWeight: 'bold' }}>
+                          {task.daysOver} day{task.daysOver > 1 ? 's' : ''}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          <Box sx={{ px: 2.5, py: 3, textAlign: 'center' }}>
+            <TickCircle size="32" color="#16A34A" />
+            <Typography color="text.secondary" sx={{ mt: 1, fontSize: '0.9rem' }}>
+              Nothing overdue. Great job!
+            </Typography>
+          </Box>
+        )}
+      </Paper>
     </Box>
   );
 };
