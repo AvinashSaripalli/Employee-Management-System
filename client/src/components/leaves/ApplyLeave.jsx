@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   TextField,
   Button,
@@ -13,84 +13,140 @@ import {
   Divider,
   Chip,
   CircularProgress,
-  Paper
-} from "@mui/material";
+  Paper,
+  LinearProgress,
+  Snackbar,
+  Alert,
+  ToggleButton,
+  ToggleButtonGroup,
+  Stack,
+} from '@mui/material';
 import axios from '../../api/axios';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { PickersDay } from '@mui/x-date-pickers/PickersDay';
 import dayjs from 'dayjs';
+import { Calendar, TickCircle, Clock, InfoCircle } from 'iconsax-react';
+import { LEAVE_TYPE_META, statusColor, formatLeaveDate, leaveIdentityParams } from '../../utils/leaveConfig';
+
+const isWeekend = (date) => {
+  const day = dayjs(date).day();
+  return day === 0 || day === 6;
+};
+
+const workingDaysBetween = (start, end, halfDay, holidaySet) => {
+  if (!start || !end) return 0;
+  if (halfDay) return 0.5;
+  let count = 0;
+  let cursor = dayjs(start);
+  const last = dayjs(end);
+  if (cursor.isAfter(last)) return 0;
+  while (!cursor.isAfter(last)) {
+    const key = cursor.format('YYYY-MM-DD');
+    if (!isWeekend(cursor) && !holidaySet.has(key)) count += 1;
+    cursor = cursor.add(1, 'day');
+  }
+  return count;
+};
 
 const ApplyLeave = () => {
-  const [leaveType, setLeaveType] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [reason, setReason] = useState("");
+  const [leaveType, setLeaveType] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [reason, setReason] = useState('');
   const [onlyTomorrow, setOnlyTomorrow] = useState(false);
   const [halfDay, setHalfDay] = useState(false);
+  const [halfDaySession, setHalfDaySession] = useState('AM');
+  const [contactPhone, setContactPhone] = useState(localStorage.getItem('userPhoneNumber') || '');
   const [errors, setErrors] = useState({});
-  const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [recentLeaves, setRecentLeaves] = useState([]);
+  const [myLeaves, setMyLeaves] = useState([]);
+  const [balance, setBalance] = useState(null);
+  const [policies, setPolicies] = useState({ types: {}, holidays: [] });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  const tomorrowDate = tomorrow.toISOString().split("T")[0];
+  const today = dayjs().format('YYYY-MM-DD');
+  const tomorrowDate = dayjs().add(1, 'day').format('YYYY-MM-DD');
+  const holidaySet = useMemo(
+    () => new Set((policies.holidays || []).map((h) => h.date)),
+    [policies.holidays]
+  );
+  const upcomingHolidays = useMemo(
+    () =>
+      (policies.holidays || [])
+        .filter((h) => h.date >= today)
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(0, 8),
+    [policies.holidays, today]
+  );
 
-  const upcomingHolidays = [
-    { date: "2025-01-26", name: "Republic Day" },
-    { date: "2025-03-17", name: "Holi" },
-    { date: "2025-04-14", name: "Ambedkar Jayanti" },
-    { date: "2025-05-01", name: "Labour Day" },
-    { date: "2025-08-15", name: "Independence Day" },
-    { date: "2025-08-29", name: "Raksha Bandhan" },
-    { date: "2025-10-02", name: "Gandhi Jayanti" },
-    { date: "2025-10-22", name: "Dussehra" },
-    { date: "2025-11-01", name: "Diwali" },
-    { date: "2025-11-14", name: "Children's Day" },
-    { date: "2025-12-25", name: "Christmas" },
-    { date: "2026-01-01", name: "New Year's Day" },
-  ];
+  const gender = (localStorage.getItem('userGender') || '').toLowerCase();
+  const leaveTypeOptions = useMemo(
+    () =>
+      Object.entries(policies.types || {}).filter(([, policy]) => {
+        if (!policy.gender) return true;
+        if (!gender) return true;
+        return policy.gender.toLowerCase() === gender;
+      }),
+    [policies.types, gender]
+  );
 
-  useEffect(() => {
-    const fetchLeaves = async () => {
-      try {
-        const employeeId = localStorage.getItem("userEmployeeId");
-        const companyName = localStorage.getItem("companyName");
+  const selectedPolicy = policies.types?.[leaveType];
+  const selectedBalance = balance?.breakdown?.find((row) => row.leaveType === leaveType);
+  const requestedDays = workingDaysBetween(startDate, endDate, halfDay, holidaySet);
 
-        if (!employeeId || !companyName) return;
-
-        const response = await axios.get("/leaves", {
-          params: { employeeId, companyName },
-        });
-        setLeaves(response.data);
-
-        const recentResponse = await axios.get("/leaves/recent", {
-          params: { employeeId, companyName },
-        });
-        setRecentLeaves(recentResponse.data);
-      } catch (error) {
-        console.error("Error fetching leaves:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeaves();
+  const loadData = useCallback(async () => {
+    const params = leaveIdentityParams();
+    try {
+      const [policyRes, balanceRes, leavesRes, recentRes] = await Promise.allSettled([
+        axios.get('/leaves/policies'),
+        axios.get('/leaves/balance', { params }),
+        axios.get('/leaves', { params }),
+        axios.get('/leaves/recent', { params }),
+      ]);
+      if (policyRes.status === 'fulfilled') setPolicies(policyRes.value.data);
+      if (balanceRes.status === 'fulfilled') setBalance(balanceRes.value.data);
+      if (leavesRes.status === 'fulfilled') setMyLeaves(leavesRes.value.data || []);
+      if (recentRes.status === 'fulfilled') setRecentLeaves(recentRes.value.data || []);
+      const failed = [balanceRes, leavesRes, recentRes].find((result) => result.status === 'rejected');
+      if (failed) console.error('Error fetching leave data:', failed.reason);
+    } catch (error) {
+      console.error('Error fetching leave data:', error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const minStartDate = selectedPolicy?.allowPast
+    ? dayjs().subtract(selectedPolicy.maxPastDays || 7, 'day').format('YYYY-MM-DD')
+    : today;
+
   const validateForm = () => {
-    let newErrors = {};
-    if (!leaveType) newErrors.leaveType = "Leave type is required.";
-    if (!startDate) newErrors.startDate = "Start date is required.";
-    if (!endDate) newErrors.endDate = "End date is required.";
+    const newErrors = {};
+    if (!leaveType) newErrors.leaveType = 'Leave type is required.';
+    if (!startDate) newErrors.startDate = 'Start date is required.';
+    if (!endDate) newErrors.endDate = 'End date is required.';
     if (startDate && endDate && startDate > endDate) {
-      newErrors.endDate = "End date cannot be before start date.";
+      newErrors.endDate = 'End date cannot be before start date.';
     }
-    if (reason.length < 10) {
-      newErrors.reason = "Reason must be at least 10 characters.";
+    if (halfDay && startDate && endDate && startDate !== endDate) {
+      newErrors.endDate = 'Half-day leave must be a single date.';
+    }
+    if (reason.trim().length < 10) {
+      newErrors.reason = 'Reason must be at least 10 characters.';
+    }
+    if (requestedDays <= 0 && startDate && endDate) {
+      newErrors.endDate = 'Selected range has no working days.';
+    }
+    if (selectedBalance?.available != null && requestedDays > selectedBalance.available) {
+      newErrors.leaveType = `Only ${selectedBalance.available} day(s) remaining for this type.`;
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -99,45 +155,51 @@ const ApplyLeave = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-
-    const employeeId = localStorage.getItem("userEmployeeId");
-    const companyName = localStorage.getItem("companyName");
-    if (!employeeId) {
-      alert("Error: Employee ID not found. Please log in again.");
-      return;
-    }
-
-    const leaveData = {
-      employeeId,
-      companyName,
-      leaveType,
-      startDate,
-      endDate,
-      reason,
-      onlyTomorrow,
-      halfDay,
-    };
-
+    setSubmitting(true);
     try {
-      const response = await axios.post("/leaves/apply", leaveData);
-      alert(response.data.message);
-      const updatedLeaves = await axios.get("/leaves", {
-        params: { employeeId, companyName },
+      const response = await axios.post('/leaves/apply', {
+        ...leaveIdentityParams(),
+        leaveType,
+        startDate,
+        endDate,
+        reason: reason.trim(),
+        onlyTomorrow,
+        halfDay,
+        halfDaySession: halfDay ? halfDaySession : null,
+        contactPhone,
       });
-      setLeaves(updatedLeaves.data);
+      if (response.data.leave?.employeeId) {
+        localStorage.setItem('userEmployeeId', response.data.leave.employeeId);
+      }
+      if (response.data.leave?.companyName) {
+        localStorage.setItem('companyName', response.data.leave.companyName);
+      }
+      setSnackbar({
+        open: true,
+        message: response.data.message || 'Leave request submitted',
+        severity: 'success',
+      });
       handleClear();
+      await loadData();
     } catch (error) {
-      alert("Failed to apply for leave. Please try again.");
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.error || 'Failed to apply for leave.',
+        severity: 'error',
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleClear = () => {
-    setLeaveType("");
-    setStartDate("");
-    setEndDate("");
-    setReason("");
+    setLeaveType('');
+    setStartDate('');
+    setEndDate('');
+    setReason('');
     setOnlyTomorrow(false);
     setHalfDay(false);
+    setHalfDaySession('AM');
     setErrors({});
   };
 
@@ -149,148 +211,210 @@ const ApplyLeave = () => {
       setEndDate(tomorrowDate);
       setHalfDay(false);
     } else {
-      setStartDate("");
-      setEndDate("");
+      setStartDate('');
+      setEndDate('');
     }
   };
 
   const handleHalfDayChange = (e) => {
-    if (e.target.checked) {
+    const checked = e.target.checked;
+    setHalfDay(checked);
+    if (checked) {
       setOnlyTomorrow(false);
+      if (startDate) setEndDate(startDate);
     }
-    setHalfDay(e.target.checked);
   };
 
-  const isHoliday = (date) => {
-    const currentDate = dayjs(date).format('YYYY-MM-DD');
-    return upcomingHolidays.some((holiday) => holiday.date === currentDate);
-  };
+  const leaveDateMap = useMemo(() => {
+    const map = {};
+    myLeaves
+      .filter((leave) => ['Pending', 'Approved'].includes(leave.status))
+      .forEach((leave) => {
+        let cursor = dayjs(leave.start_date);
+        const last = dayjs(leave.end_date);
+        while (!cursor.isAfter(last)) {
+          map[cursor.format('YYYY-MM-DD')] = leave.status;
+          cursor = cursor.add(1, 'day');
+        }
+      });
+    return map;
+  }, [myLeaves]);
 
   const CustomDay = (props) => {
     const { day, outsideCurrentMonth, ...other } = props;
-    const isHolidayDate = !outsideCurrentMonth && isHoliday(day);
-    const holidayName = isHolidayDate
-      ? upcomingHolidays.find((holiday) => holiday.date === dayjs(day).format('YYYY-MM-DD'))?.name
-      : '';
-
+    const key = dayjs(day).format('YYYY-MM-DD');
+    const holiday = !outsideCurrentMonth && holidaySet.has(key);
+    const leaveStatus = !outsideCurrentMonth ? leaveDateMap[key] : null;
+    const weekend = isWeekend(day);
     return (
-      <Box
-        sx={{
-          position: 'relative',
-          '& .holiday-indicator': {
-            position: 'absolute',
-            bottom: 4,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 6,
-            height: 6,
-            borderRadius: '50%',
-            backgroundColor: '#ff9800', 
-          },
-        }}
-      >
-        <PickersDay {...other} day={day} outsideCurrentMonth={outsideCurrentMonth} />
-        {isHolidayDate && (
+      <Box sx={{ position: 'relative' }}>
+        <PickersDay
+          {...other}
+          day={day}
+          outsideCurrentMonth={outsideCurrentMonth}
+          sx={{
+            ...(weekend && !outsideCurrentMonth ? { color: 'text.disabled' } : {}),
+            ...(leaveStatus === 'Approved' ? { bgcolor: 'success.light', fontWeight: 700 } : {}),
+            ...(leaveStatus === 'Pending' ? { bgcolor: 'warning.light', fontWeight: 700 } : {}),
+          }}
+        />
+        {holiday && (
           <Box
-            className="holiday-indicator"
-            title={holidayName}
+            title={policies.holidays.find((h) => h.date === key)?.name}
+            sx={{
+              position: 'absolute',
+              bottom: 4,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              bgcolor: 'secondary.main',
+            }}
           />
         )}
       </Box>
     );
   };
 
-  const getStatusChip = (status) => {
-    switch (status) {
-      case 'Approved':
-        return <Chip label="Approved" color="success" size="small" />;
-      case 'Pending':
-        return <Chip label="Pending" color="warning" size="small" />;
-      case 'Rejected':
-        return <Chip label="Rejected" color="error" size="small" />;
-      default:
-        return <Chip label={status} size="small" />;
-    }
-  };
+  const summaryCards = [
+    { label: 'Annual quota', value: balance?.allocated ?? '—', icon: <Calendar size={18} color="#14286D" /> },
+    { label: 'Available', value: balance?.available ?? '—', icon: <TickCircle size={18} color="#16A34A" /> },
+    { label: 'Pending', value: balance?.pending ?? '—', icon: <Clock size={18} color="#F59E0B" /> },
+    { label: 'Public holidays', value: balance?.holidays ?? upcomingHolidays.length, icon: <InfoCircle size={18} color="#FE8600" /> },
+  ];
 
   return (
-    <Box sx={{ maxWidth: 1380, margin: "auto", mt: 3, ml: 6 }}>
+    <Box sx={{ maxWidth: 1380, mx: 'auto', mt: 2, px: { xs: 1, md: 2 } }}>
       <Grid container spacing={3}>
         <Grid item xs={12} md={8}>
-          <Card elevation={3} sx={{ mb: 2 }}>
-            <Grid container spacing={2}>
-              <Grid item xs={3}>
-                <CardContent sx={{ py: 1, textAlign: 'center' }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                    Total Leaves
-                  </Typography>
-                  <Typography variant="h5">12</Typography>
-                </CardContent>
+          <Grid container spacing={1.5} sx={{ mb: 2 }}>
+            {summaryCards.map((card) => (
+              <Grid item xs={6} sm={3} key={card.label}>
+                <Card sx={{ height: '100%' }}>
+                  <CardContent sx={{ py: 1.5, px: 2 }}>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                      {card.icon}
+                      <Typography variant="caption" color="text.secondary">
+                        {card.label}
+                      </Typography>
+                    </Stack>
+                    <Typography variant="h5">{loading ? '—' : card.value}</Typography>
+                  </CardContent>
+                </Card>
               </Grid>
-              <Grid item xs={3}>
-                <CardContent sx={{ py: 1, textAlign: 'center' }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                    Leave Balance
-                  </Typography>
-                  <Typography variant="h5">10</Typography>
-                </CardContent>
-              </Grid>
-              <Grid item xs={3}>
-                <CardContent sx={{ py: 1, textAlign: 'center' }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                    Extra Leaves taken
-                  </Typography>
-                  <Typography variant="h5">8</Typography>
-                </CardContent>
-              </Grid>
-              <Grid item xs={3}>
-                <CardContent sx={{ py: 1, textAlign: 'center' }}>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
-                    Public Holidays
-                  </Typography>
-                  <Typography variant="h5">24</Typography>
-                </CardContent>
-              </Grid>
-            </Grid>
-          </Card>
+            ))}
+          </Grid>
 
-          <Card elevation={3}>
+          {balance?.breakdown?.length > 0 && (
+            <Card sx={{ mb: 2 }}>
+              <CardContent>
+                <Typography variant="subtitle1" sx={{ mb: 1.5 }}>
+                  Leave balances
+                </Typography>
+                <Grid container spacing={1.5}>
+                  {balance.breakdown.map((row) => {
+                    const meta = LEAVE_TYPE_META[row.leaveType] || {};
+                    const max = row.allocated || 1;
+                    const consumed = row.used + row.pending;
+                    const pct = row.allocated == null ? 0 : Math.min(100, (consumed / max) * 100);
+                    return (
+                      <Grid item xs={12} sm={6} md={4} key={row.leaveType}>
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            p: 1.25,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 2,
+                            bgcolor: meta.bg || '#F6F8FE',
+                          }}
+                        >
+                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                              {row.code} · {row.leaveType}
+                            </Typography>
+                            <Typography variant="caption">
+                              {row.allocated == null ? `${row.used} used` : `${row.available} left`}
+                            </Typography>
+                          </Stack>
+                          {row.allocated != null && (
+                            <LinearProgress
+                              variant="determinate"
+                              value={pct}
+                              sx={{ mt: 1, height: 6, borderRadius: 4, bgcolor: '#fff' }}
+                            />
+                          )}
+                        </Paper>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
             <CardContent>
-              <Typography variant="h5" mb={2} textAlign="left">
-                Apply Leave
+              <Typography variant="h5" mb={0.5}>
+                Apply for leave
               </Typography>
-              <Grid container spacing={1}>
-                <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Working days exclude weekends and public holidays. Requests go to HR or your manager for approval.
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
                   <form onSubmit={handleSubmit}>
                     <Grid container spacing={2}>
                       <Grid item xs={12}>
                         <TextField
                           select
-                          label="Leave Type"
+                          label="Leave type"
                           value={leaveType}
                           onChange={(e) => setLeaveType(e.target.value)}
                           fullWidth
                           error={!!errors.leaveType}
-                          helperText={errors.leaveType}
+                          helperText={errors.leaveType || (selectedPolicy?.minNoticeDays
+                            ? `Requires ${selectedPolicy.minNoticeDays} day(s) notice`
+                            : selectedPolicy?.allowPast
+                              ? 'Backdated applications allowed for a limited period'
+                              : ' ')}
                         >
-                          <MenuItem value="Sick Leave">Sick Leave</MenuItem>
-                          <MenuItem value="Casual Leave">Casual Leave</MenuItem>
-                          <MenuItem value="Earned Leave">Earned Leave</MenuItem>
+                          {leaveTypeOptions.map(([name, policy]) => (
+                            <MenuItem key={name} value={name}>
+                              {policy.code} — {name}
+                              {policy.allocated != null ? ` (${policy.allocated} / year)` : ' (unlimited)'}
+                            </MenuItem>
+                          ))}
                         </TextField>
                       </Grid>
 
                       <Grid item xs={6}>
                         <FormControlLabel
                           control={<Checkbox checked={onlyTomorrow} onChange={handleOnlyTomorrowChange} />}
-                          label="Only For Tomorrow"
+                          label="Only tomorrow"
                         />
                       </Grid>
                       <Grid item xs={6}>
                         <FormControlLabel
                           control={<Checkbox checked={halfDay} onChange={handleHalfDayChange} />}
-                          label="Half Day"
+                          label="Half day"
                         />
                       </Grid>
+
+                      {halfDay && (
+                        <Grid item xs={12}>
+                          <ToggleButtonGroup
+                            exclusive
+                            size="small"
+                            value={halfDaySession}
+                            onChange={(_, value) => value && setHalfDaySession(value)}
+                          >
+                            <ToggleButton value="AM">First half (AM)</ToggleButton>
+                            <ToggleButton value="PM">Second half (PM)</ToggleButton>
+                          </ToggleButtonGroup>
+                        </Grid>
+                      )}
 
                       <Grid item xs={6}>
                         <TextField
@@ -298,11 +422,14 @@ const ApplyLeave = () => {
                           label="From"
                           InputLabelProps={{ shrink: true }}
                           value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
+                          onChange={(e) => {
+                            setStartDate(e.target.value);
+                            if (halfDay) setEndDate(e.target.value);
+                          }}
                           fullWidth
                           error={!!errors.startDate}
                           helperText={errors.startDate}
-                          inputProps={{ min: today.toISOString().split("T")[0] }}
+                          inputProps={{ min: minStartDate }}
                           disabled={onlyTomorrow}
                         />
                       </Grid>
@@ -316,55 +443,68 @@ const ApplyLeave = () => {
                           fullWidth
                           error={!!errors.endDate}
                           helperText={errors.endDate}
-                          inputProps={{ min: startDate || today.toISOString().split("T")[0] }}
-                          disabled={onlyTomorrow}
+                          inputProps={{ min: startDate || minStartDate }}
+                          disabled={onlyTomorrow || halfDay}
                         />
                       </Grid>
 
                       <Grid item xs={12}>
                         <TextField
-                          label="Reason for Leave"
+                          label="Contact while on leave"
+                          value={contactPhone}
+                          onChange={(e) => setContactPhone(e.target.value)}
+                          fullWidth
+                          placeholder="Phone number"
+                        />
+                      </Grid>
+
+                      <Grid item xs={12}>
+                        <TextField
+                          label="Reason"
                           value={reason}
                           onChange={(e) => setReason(e.target.value)}
                           fullWidth
                           multiline
                           rows={3}
-                          margin="normal"
                           error={!!errors.reason}
-                          helperText={errors.reason}
+                          helperText={errors.reason || `${reason.trim().length}/10 characters minimum`}
                         />
                       </Grid>
 
+                      {requestedDays > 0 && (
+                        <Grid item xs={12}>
+                          <Alert severity={selectedBalance?.available != null && requestedDays > selectedBalance.available ? 'warning' : 'info'}>
+                            This request uses <strong>{requestedDays}</strong> working day{requestedDays === 1 ? '' : 's'}
+                            {selectedBalance?.available != null
+                              ? `. Remaining after submit: ${Number((selectedBalance.available - requestedDays).toFixed(1))}`
+                              : '.'}
+                          </Alert>
+                        </Grid>
+                      )}
+
                       <Grid item xs={6}>
-                        <Button
-                          variant="contained"
-                          fullWidth
-                          sx={{ backgroundColor: "#E0E0E0", color: "#000" }}
-                          onClick={handleClear}
-                        >
+                        <Button variant="outlined" fullWidth onClick={handleClear} disabled={submitting}>
                           Clear
                         </Button>
                       </Grid>
                       <Grid item xs={6}>
-                        <Button type="submit" variant="contained" fullWidth color="primary">
-                          Apply
+                        <Button type="submit" variant="contained" fullWidth disabled={submitting}>
+                          {submitting ? 'Submitting…' : 'Submit request'}
                         </Button>
                       </Grid>
                     </Grid>
                   </form>
                 </Grid>
 
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={12} md={6}>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DateCalendar
-                      slots={{ day: CustomDay }}
-                      sx={{
-                        '& .Mui-selected': {
-                          backgroundColor: '#1976d2 !important',
-                        },
-                      }}
-                    />
+                    <DateCalendar slots={{ day: CustomDay }} />
                   </LocalizationProvider>
+                  <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
+                    <Chip size="small" label="Holiday" sx={{ bgcolor: 'secondary.light' }} />
+                    <Chip size="small" label="Pending" color="warning" />
+                    <Chip size="small" label="Approved" color="success" />
+                  </Stack>
                 </Grid>
               </Grid>
             </CardContent>
@@ -372,74 +512,85 @@ const ApplyLeave = () => {
         </Grid>
 
         <Grid item xs={12} md={4}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            <Card elevation={3} sx={{ borderRadius: 3 }}>
+          <Stack spacing={2.5}>
+            <Card>
               <CardContent>
-                <Typography variant="h6" mb={2} sx={{ fontWeight: 'bold' }}>
-                  Recent Leaves
+                <Typography variant="h6" mb={2}>
+                  Recent requests
                 </Typography>
                 {loading ? (
                   <Box display="flex" justifyContent="center" p={2}>
                     <CircularProgress size={24} />
                   </Box>
                 ) : recentLeaves.length > 0 ? (
-                  <Box sx={{ maxHeight: 200, overflowY: 'auto', pr: 1 }}>
-                    {recentLeaves.map((leave, index) => (
-                      <Box key={index} sx={{ mb: 2 }}>
-                        <Box display="flex" alignItems="center" mb={1} justifyContent="space-between">
-                          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                            {leave.leave_type}
-                          </Typography>
-                          {getStatusChip(leave.status)}
-                        </Box>
-                        <Typography variant="body2" color="text.secondary">
-                          {dayjs(leave.start_date).format('MMM D, YYYY')} -{' '}
-                          {dayjs(leave.end_date).format('MMM D, YYYY')}
+                  recentLeaves.map((leave) => (
+                    <Box key={leave.id} sx={{ mb: 2 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Typography variant="subtitle2">{leave.leave_type}</Typography>
+                        <Chip label={leave.status} color={statusColor(leave.status)} size="small" />
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatLeaveDate(leave.start_date)} – {formatLeaveDate(leave.end_date)}
+                        {leave.days ? ` · ${leave.days} day(s)` : ''}
+                      </Typography>
+                      {leave.review_comment && leave.status !== 'Pending' && (
+                        <Typography variant="caption" color="text.secondary">
+                          Reviewer: {leave.review_comment}
                         </Typography>
-                        {leave.reason && (
-                          <Typography variant="body2" sx={{ mt: 1}}>
-                            &quot;{leave.reason.substring(0, 50)}{leave.reason.length > 50 ? '...' : ''}&quot;
-                          </Typography>
-                        )}
-                        <Divider sx={{ my: 2 }} />
-                      </Box>
-                    ))}
-                  </Box>
+                      )}
+                      <Divider sx={{ mt: 1.5 }} />
+                    </Box>
+                  ))
                 ) : (
-                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: '#fafafa' }}>
+                  <Paper elevation={0} sx={{ p: 2, textAlign: 'center', bgcolor: 'background.default' }}>
                     <Typography variant="body2" color="text.secondary">
-                      No recent leave applications found.
+                      No leave applications yet.
                     </Typography>
                   </Paper>
                 )}
               </CardContent>
             </Card>
 
-            <Card elevation={3} sx={{ borderRadius: 3 }}>
+            <Card>
               <CardContent>
-                <Typography variant="h6" mb={2} sx={{ fontWeight: 'bold' }}>
-                  Upcoming Holidays
+                <Typography variant="h6" mb={2}>
+                  Upcoming holidays
                 </Typography>
-                <Box sx={{ maxHeight: 180, overflowY: 'auto', pr: 1 }}>
-                  {upcomingHolidays.map((holiday, index) => (
-                    <Box key={index} sx={{ mb: 1 }}>
-                      <Box>
-                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
-                          {holiday.name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {dayjs(holiday.date).format('MMMM D, YYYY (dddd)')}
-                        </Typography>
-                      </Box>
-                      {index < upcomingHolidays.length - 1 && <Divider sx={{ my: 1.5 }} />}
+                {upcomingHolidays.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No upcoming holidays on the calendar.
+                  </Typography>
+                ) : (
+                  upcomingHolidays.map((holiday, index) => (
+                    <Box key={holiday.date} sx={{ mb: 1 }}>
+                      <Typography variant="subtitle2">{holiday.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {dayjs(holiday.date).format('MMMM D, YYYY (dddd)')}
+                      </Typography>
+                      {index < upcomingHolidays.length - 1 && <Divider sx={{ my: 1.25 }} />}
                     </Box>
-                  ))}
-                </Box>
+                  ))
+                )}
               </CardContent>
             </Card>
-          </Box>
+          </Stack>
         </Grid>
       </Grid>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

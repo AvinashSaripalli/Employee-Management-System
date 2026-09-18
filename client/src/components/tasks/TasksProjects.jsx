@@ -277,10 +277,8 @@ const TasksProjects = () => {
   }, [fetchTasks]);
 
   useEffect(() => {
-    if (openForm) {
-      fetchUsers();
-    }
-  }, [openForm, fetchUsers]);
+    fetchUsers();
+  }, [fetchUsers]);
 
   const resetForm = () => {
     setFormData(initialState);
@@ -291,6 +289,10 @@ const TasksProjects = () => {
 
   const handleOpenCreate = () => {
     resetForm();
+    setFormData((prev) => ({
+      ...prev,
+      responsibleId: currentEmployeeId || prev.responsibleId,
+    }));
     setOpenForm(true);
   };
 

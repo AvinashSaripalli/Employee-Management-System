@@ -12,6 +12,12 @@ const Leave = sequelize.define(
     employeeId: {
       type: DataTypes.STRING,
     },
+    employee_name: {
+      type: DataTypes.STRING,
+    },
+    department: {
+      type: DataTypes.STRING,
+    },
     leave_type: {
       type: DataTypes.STRING,
     },
@@ -20,6 +26,10 @@ const Leave = sequelize.define(
     },
     end_date: {
       type: DataTypes.DATEONLY,
+    },
+    days: {
+      type: DataTypes.DECIMAL(5, 1),
+      defaultValue: 1,
     },
     reason: {
       type: DataTypes.TEXT,
@@ -32,9 +42,30 @@ const Leave = sequelize.define(
       type: DataTypes.BOOLEAN,
       defaultValue: false,
     },
+    half_day_session: {
+      type: DataTypes.STRING,
+    },
+    contact_phone: {
+      type: DataTypes.STRING,
+    },
     status: {
       type: DataTypes.STRING,
       defaultValue: "Pending",
+    },
+    reviewer_id: {
+      type: DataTypes.INTEGER,
+    },
+    reviewer_name: {
+      type: DataTypes.STRING,
+    },
+    review_comment: {
+      type: DataTypes.TEXT,
+    },
+    reviewed_at: {
+      type: DataTypes.DATE,
+    },
+    cancelled_at: {
+      type: DataTypes.DATE,
     },
     companyName: {
       type: DataTypes.STRING,

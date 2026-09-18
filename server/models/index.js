@@ -91,6 +91,19 @@ TaskMember.belongsTo(User, {
   constraints: false,
 });
 
+Leave.belongsTo(User, {
+  foreignKey: "employeeId",
+  targetKey: "employeeId",
+  as: "employee",
+  constraints: false,
+});
+User.hasMany(Leave, {
+  foreignKey: "employeeId",
+  sourceKey: "employeeId",
+  as: "leaves",
+  constraints: false,
+});
+
 module.exports = {
   sequelize,
   User,

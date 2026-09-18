@@ -1,5 +1,6 @@
 const { Task, TaskChecklistItem, User, TaskActivity, TaskMember } = require("../models");
 const { Op } = require("sequelize");
+const { ensureCompanyMembership, DEFAULT_COMPANY } = require("../utils/companyMembership");
 
 const STATUS = {
   NEW: 1,
@@ -100,6 +101,7 @@ const taskInclude = (includeChecklist = true) => {
 const getEmployeeId = async (userId) => {
   const user = await User.findByPk(userId);
   if (!user) return null;
+  await ensureCompanyMembership(user, DEFAULT_COMPANY);
   return user.employeeId || String(user.id);
 };
 
@@ -237,8 +239,9 @@ exports.getTask = async (req, res) => {
 exports.createTask = async (req, res) => {
   const {
     title, description, responsibleId, deadline, priority, parentId,
-    companyName, taskControl, checklist, members,
+    taskControl, checklist, members,
   } = req.body;
+  const companyName = req.body.companyName || req.user?.companyName;
 
   if (!title || !title.trim()) {
     return res.status(400).json({ error: "Task title is required" });
@@ -246,12 +249,13 @@ exports.createTask = async (req, res) => {
   if (!companyName) {
     return res.status(400).json({ error: "Company name is required" });
   }
-  if (!responsibleId) {
-    return res.status(400).json({ error: "Assign a responsible employee" });
-  }
 
   try {
     const creatorEmployeeId = await getEmployeeId(req.user.id);
+    const assigneeId = responsibleId || creatorEmployeeId;
+    if (!assigneeId) {
+      return res.status(400).json({ error: "Assign a responsible employee" });
+    }
 
     const task = await Task.create({
       title: title.trim(),
@@ -259,7 +263,7 @@ exports.createTask = async (req, res) => {
       status: STATUS.PENDING,
       priority: priority !== undefined ? priority : 1,
       createdBy: creatorEmployeeId,
-      responsibleId,
+      responsibleId: assigneeId,
       deadline: deadline || null,
       parentId: parentId || null,
       companyName,

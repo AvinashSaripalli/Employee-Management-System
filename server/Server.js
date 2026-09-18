@@ -22,6 +22,9 @@ app.use('/uploads', express.static(uploadsDir));
 const userRoutes = require('./routes/userRoutes');
 app.use('/api', userRoutes);
 
+const { ensureLeaveSchema } = require('./utils/leaveSchema');
+const { backfillCompanyMembership } = require('./utils/companyMembership');
+
 const leaveRoutes = require('./routes/leaveRoutes');
 app.use('/api/leaves', verifyToken, leaveRoutes);
 
@@ -53,6 +56,13 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
+ensureLeaveSchema()
+  .then(() => backfillCompanyMembership())
+  .catch((err) => {
+    console.error('Startup data sync failed:', err.message);
+  })
+  .finally(() => {
+    app.listen(port, () => {
+      console.log(`Server running on http://localhost:${port}`);
+    });
+  });

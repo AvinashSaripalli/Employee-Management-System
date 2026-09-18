@@ -106,14 +106,21 @@ function Register() {
     if (!validate()) return;
 
     try {
-      await axios.post("/users/register", {
+      const response = await axios.post("/users/register", {
         firstName: formValues.firstName,
         lastName: formValues.lastName,
         email: formValues.email,
         password: formValues.password,
         confirmPassword: formValues.confirmPassword,
       });
-      setSnackbar({ open: true, message: "Registered successfully!", severity: "success" });
+      const assignedId = response.data?.employeeId;
+      setSnackbar({
+        open: true,
+        message: assignedId
+          ? `Registered successfully. Your company ID is ${assignedId}.`
+          : "Registered successfully!",
+        severity: "success"
+      });
       setTimeout(() => navigate("/login"), 1000);
     } catch (error) {
       setSnackbar({

@@ -3,9 +3,8 @@ const bcrypt = require("bcryptjs");
 const { User } = require("../models");
 const sequelize = require("../config/database");
 const { Op, fn, col, literal } = require("sequelize");
+const { DEFAULT_COMPANY, generateEmployeeId, ensureCompanyMembership } = require("../utils/companyMembership");
 require("dotenv").config();
-
-const DEFAULT_COMPANY = "KN Advisors";
 
 exports.registerUsers = async (req, res) => {
   const {
@@ -36,14 +35,15 @@ exports.registerUsers = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const assignedEmployeeId = employeeId || await generateEmployeeId(DEFAULT_COMPANY);
 
     await User.create({
       firstName, lastName, email, phoneNumber, password: hashedPassword, companyName: DEFAULT_COMPANY,
       role, designation, department, jobLocation, dateOfBirth, bloodGroup,
-      photo, technicalSkills, employeeId, gender,
+      photo, technicalSkills, employeeId: assignedEmployeeId, gender,
     });
 
-    return res.status(201).json({ message: "User added successfully" });
+    return res.status(201).json({ message: "User added successfully", employeeId: assignedEmployeeId, companyName: DEFAULT_COMPANY });
   } catch (error) {
     console.error("Server error:", error);
     return res.status(500).json({ error: "Server error", details: error.message });
@@ -79,6 +79,7 @@ exports.registerUser = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const employeeId = await generateEmployeeId(DEFAULT_COMPANY);
 
     await User.create({
       firstName: firstName.trim(),
@@ -87,9 +88,14 @@ exports.registerUser = async (req, res) => {
       password: hashedPassword,
       role: "Employee",
       companyName: DEFAULT_COMPANY,
+      employeeId,
     });
 
-    return res.status(201).json({ message: "Registered successfully" });
+    return res.status(201).json({
+      message: "Registered successfully",
+      employeeId,
+      companyName: DEFAULT_COMPANY,
+    });
   } catch (error) {
     console.error("Error registering user:", error);
     return res.status(500).json({ error: "Server error", details: error.message });
@@ -155,8 +161,15 @@ exports.loginUser = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
+    await ensureCompanyMembership(user);
     const token = jwt.sign(
-      { id: user.id, role: user.role, companyName: user.companyName, department: user.department },
+      {
+        id: user.id,
+        role: user.role,
+        companyName: user.companyName,
+        department: user.department,
+        employeeId: user.employeeId,
+      },
       process.env.JWT_SECRET,
       { expiresIn: "8h" }
     );
@@ -438,21 +451,7 @@ exports.getNextEmployeeId = async (req, res) => {
   }
 
   try {
-    const lastUser = await User.findOne({
-      where: { companyName },
-      order: [['employeeId', 'DESC']],
-    });
-
-    let newEmployeeId;
-    if (lastUser && lastUser.employeeId) {
-      const lastEmployeeId = lastUser.employeeId;
-      const prefix = lastEmployeeId.slice(0, 2);
-      const number = parseInt(lastEmployeeId.slice(2)) + 1;
-      newEmployeeId = `${prefix}${number.toString().padStart(3, '0')}`;
-    } else {
-      newEmployeeId = 'KN001';
-    }
-
+    const newEmployeeId = await generateEmployeeId(companyName);
     res.status(200).json({ employeeId: newEmployeeId });
   } catch (error) {
     console.error('Error fetching last employee ID:', error);
