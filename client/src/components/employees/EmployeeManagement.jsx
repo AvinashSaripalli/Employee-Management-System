@@ -8,10 +8,8 @@ import axios from '../../api/axios';
 import EditEmployeeDialog from './EditEmployeeDialog';
 import AddEmployeeDialog from './AddEmployeeDialog';
 import DeleteDialog from './DeleteDialog';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ViewEmployeeDialog from './ViewEmployeeDialog';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import { More, ArrowUp2, ArrowDown2 } from 'iconsax-react';
 
 const EmployeeManagement = ({ onClose }) => {
   const [openAddUser, setOpenAddUser] = useState(false);
@@ -260,7 +258,7 @@ const EmployeeManagement = ({ onClose }) => {
                 </TableCell>
               <TableCell align='center' sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Photo</TableCell>
               <TableCell align='center' sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' ,cursor: 'pointer', alignItems: 'center',justifyContent: 'center' }} onClick={handleSortByEmployeeId}>
-                Employee ID  {sortOrder === 'asc' ? <ArrowDownwardIcon fontSize="small" /> : <ArrowUpwardIcon fontSize="small" />}
+                Employee ID  {sortOrder === 'asc' ? <ArrowDown2 size="16" /> : <ArrowUp2 size="16" />}
               </TableCell>
               <TableCell align='left' sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Name</TableCell>
               <TableCell align='left' sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Designation</TableCell>
@@ -302,7 +300,7 @@ const EmployeeManagement = ({ onClose }) => {
                   </TableCell>
                 <TableCell align='left'>  
                 <IconButton onClick={(event) => handleMenuOpen(event, user)}>
-                  <MoreVertIcon />
+                  <More size="18" variant="Outline" />
                 </IconButton>
                 <Menu
                 anchorEl={anchorEl}

@@ -8,11 +8,8 @@ import axios from '../../api/axios';
 import EditEmployeeDialog from './EditEmployeeDialog';
 import AddEmployeeDialog from './AddEmployeeDialog';
 import DeleteDialog from './DeleteDialog';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ViewEmployeeDialog from './ViewEmployeeDialog';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import { SearchNormal1, Add, Trash, Eye, Edit, UserSquare } from 'iconsax-react';
+import { SearchNormal1, Add, Trash, Eye, Edit, UserSquare, More, ArrowUp2, ArrowDown2 } from 'iconsax-react';
 
 const EmployeesList = ({ onClose }) => {
   const [openAddUser, setOpenAddUser] = useState(false);
@@ -237,7 +234,7 @@ const EmployeesList = ({ onClose }) => {
               </TableCell>
               <TableCell align="center">Photo</TableCell>
               <TableCell align="center" sx={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={handleSortByEmployeeId}>
-                Employee ID {sortOrder === 'asc' ? <ArrowDownwardIcon fontSize="small" /> : <ArrowUpwardIcon fontSize="small" />}
+                Employee ID {sortOrder === 'asc' ? <ArrowDown2 size="16" /> : <ArrowUp2 size="16" />}
               </TableCell>
               <TableCell align="left">Name</TableCell>
               <TableCell align="left">Designation</TableCell>
@@ -271,7 +268,7 @@ const EmployeesList = ({ onClose }) => {
                       </IconButton>
                     </Tooltip>
                     <IconButton size="small" onClick={(event) => handleMenuOpen(event, user)}>
-                      <MoreVertIcon fontSize="small" />
+                      <More size="18" variant="Outline" />
                     </IconButton>
                   </Box>
                   <Menu

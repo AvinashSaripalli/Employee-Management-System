@@ -5,8 +5,7 @@ import {
 } from "@mui/material";
 import axios from '../../api/axios';
 import { useNavigate, Link } from "react-router-dom";
-import { Visibility, VisibilityOff } from "@mui/icons-material";
-import { TaskSquare, People, Activity, ArrowLeft2, Lock, Sms, User } from "iconsax-react";
+import { TaskSquare, People, Activity, ArrowLeft2, Lock, Sms, User, Eye, EyeSlash } from "iconsax-react";
 
 function Register() {
   const [formValues, setFormValues] = useState({
@@ -327,7 +326,7 @@ function Register() {
                       onClick={() => setShowPassword((prev) => !prev)}
                       edge="end"
                     >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                      {showPassword ? <EyeSlash size="20" variant="Outline" /> : <Eye size="20" variant="Outline" />}
                     </IconButton>
                   </InputAdornment>
                 ),
@@ -355,7 +354,7 @@ function Register() {
                       onClick={() => setShowConfirmPassword((prev) => !prev)}
                       edge="end"
                     >
-                      {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                      {showConfirmPassword ? <EyeSlash size="20" variant="Outline" /> : <Eye size="20" variant="Outline" />}
                     </IconButton>
                   </InputAdornment>
                 ),

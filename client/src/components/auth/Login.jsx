@@ -1,10 +1,9 @@
 import React, { useState } from "react";
-import { Visibility, VisibilityOff } from "@mui/icons-material";
 import {
   TextField, Button, IconButton, InputAdornment, Box, Typography,
   Snackbar, Alert, Stack, Divider, CircularProgress,
 } from "@mui/material";
-import { TaskSquare, People, Activity, UserSquare, ArrowRight2, Lock, Sms } from "iconsax-react";
+import { TaskSquare, People, Activity, UserSquare, ArrowRight2, Lock, Sms, Eye, EyeSlash } from "iconsax-react";
 import axios from "../../api/axios";
 import { useNavigate, Link } from "react-router-dom";
 
@@ -227,7 +226,7 @@ function Login() {
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton onClick={togglePasswordVisibility} edge="end">
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                      {showPassword ? <EyeSlash size="20" variant="Outline" /> : <Eye size="20" variant="Outline" />}
                     </IconButton>
                   </InputAdornment>
                 ),
