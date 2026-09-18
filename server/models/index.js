@@ -8,6 +8,7 @@ const Task = require("./Task");
 const TaskChecklistItem = require("./TaskChecklistItem");
 const TaskActivity = require("./TaskActivity");
 const TaskMember = require("./TaskMember");
+const Department = require("./Department");
 
 Workgroup.belongsTo(User, {
   foreignKey: "employeeId",
@@ -91,6 +92,9 @@ TaskMember.belongsTo(User, {
   constraints: false,
 });
 
+Department.belongsTo(Department, { foreignKey: "parentId", as: "parent", constraints: false });
+Department.hasMany(Department, { foreignKey: "parentId", as: "children", constraints: false });
+
 Leave.belongsTo(User, {
   foreignKey: "employeeId",
   targetKey: "employeeId",
@@ -115,4 +119,5 @@ module.exports = {
   TaskChecklistItem,
   TaskActivity,
   TaskMember,
+  Department,
 };

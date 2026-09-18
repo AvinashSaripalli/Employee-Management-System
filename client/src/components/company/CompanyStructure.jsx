@@ -66,6 +66,7 @@ const BITRIX_LEVEL_STYLES = {
 const CompanyStructure = () => {
   const [data, setData] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -80,7 +81,7 @@ const CompanyStructure = () => {
   // Add / Edit Department modal
   const [deptModalOpen, setDeptModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState(null);
-  const [deptForm, setDeptForm] = useState({ name: '', supervisorId: '' });
+  const [deptForm, setDeptForm] = useState({ name: '', supervisorId: '', parentId: '' });
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
@@ -106,7 +107,21 @@ const CompanyStructure = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchDepartments();
   }, []);
+
+  const fetchDepartments = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await axios.get('/departments', {
+        params: { companyName },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setDepartments(response.data);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
 
   // Distinct department names in current company
   const existingDepartments = useMemo(() => {
@@ -133,16 +148,20 @@ const CompanyStructure = () => {
 
   // Build Bitrix24 hierarchy structure
   useEffect(() => {
-    setData(buildBitrixOrgStructure(filteredUsers, companyName));
-  }, [filteredUsers, companyName]);
+    setData(buildBitrixOrgStructure(filteredUsers, companyName, departments));
+  }, [filteredUsers, companyName, departments]);
 
-  const buildBitrixOrgStructure = (users, compName) => {
+  const buildBitrixOrgStructure = (users, compName, savedDepartments = []) => {
     const depts = {};
+
+    savedDepartments.forEach((department) => {
+      depts[department.name] = { ...depts[department.name], record: department, head: null, managers: [], members: [] };
+    });
 
     users.forEach((user) => {
       const dept = (user.department || '').trim();
       if (!depts[dept]) {
-        depts[dept] = { head: null, managers: [], members: [] };
+        depts[dept] = { ...depts[dept], head: depts[dept]?.head || null, managers: depts[dept]?.managers || [], members: depts[dept]?.members || [] };
       }
 
       const isMgr = user.role && (user.role.toLowerCase() === 'manager' || user.role.toLowerCase() === 'admin');
@@ -169,26 +188,41 @@ const CompanyStructure = () => {
     );
 
     // Department cards (Bitrix style: Level 2 - second)
-    const departmentCards = Object.keys(depts)
-      .filter((dept) => dept !== '' && dept !== 'Management')
-      .sort((a, b) => a.localeCompare(b))
-      .map((deptName) => {
+    const makeDepartmentCard = (deptName, visited = new Set()) => {
         const d = depts[deptName];
+        const departmentKey = d.record?.id || deptName;
+        if (visited.has(departmentKey)) return null;
+        const nextVisited = new Set(visited);
+        nextVisited.add(departmentKey);
         const allDeptUsers = (d.head ? [d.head] : []).concat(d.managers).concat(d.members);
+        const children = Object.keys(depts)
+          .filter((childName) => d.record?.id && depts[childName].record?.parentId === d.record.id)
+          .sort((a, b) => a.localeCompare(b))
+          .map((childName) => makeDepartmentCard(childName, nextVisited))
+          .filter(Boolean);
         return {
           type: 'bitrix_dept',
-          level: 'second',
+          level: d.record?.parentId ? 'third' : 'second',
           expanded: true,
           data: {
+            id: d.record?.id,
             name: deptName,
             head: d.head,
             additionalManagers: d.managers,
             members: d.members,
             allUsers: allDeptUsers,
             count: allDeptUsers.length,
+            parentId: d.record?.parentId || null,
           },
+          children,
         };
-      });
+      };
+
+    const departmentCards = Object.keys(depts)
+      .filter((dept) => dept !== '' && dept !== 'Management')
+      .filter((dept) => !depts[dept].record?.parentId)
+      .sort((a, b) => a.localeCompare(b))
+      .map((deptName) => makeDepartmentCard(deptName));
 
     // Add unassigned users card if any
     const unassignedGroup = depts[''] || { head: null, managers: [], members: [] };
@@ -264,17 +298,18 @@ const CompanyStructure = () => {
 
   const handleOpenEditDept = (deptData, e) => {
     e && e.stopPropagation();
-    setEditingDept(deptData.name);
+    setEditingDept(deptData);
     setDeptForm({
       name: deptData.name,
       supervisorId: deptData.head?.id || '',
+      parentId: deptData.parentId || '',
     });
     setDeptModalOpen(true);
   };
 
   const handleOpenCreateDept = () => {
     setEditingDept(null);
-    setDeptForm({ name: '', supervisorId: '' });
+    setDeptForm({ name: '', supervisorId: '', parentId: '' });
     setDeptModalOpen(true);
   };
 
@@ -285,10 +320,15 @@ const CompanyStructure = () => {
     }
 
     try {
-      if (editingDept) {
+      if (editingDept?.id) {
+        await axios.put(`/departments/${editingDept.id}`, {
+          name: deptForm.name.trim(),
+          parentId: deptForm.parentId || null,
+          supervisorId: deptForm.supervisorId || null,
+        });
         // If department name changed, update all users with old department name
-        if (editingDept !== deptForm.name.trim()) {
-          const usersInDept = allUsers.filter(u => u.department === editingDept);
+        if (editingDept.name !== deptForm.name.trim()) {
+          const usersInDept = allUsers.filter(u => u.department === editingDept.name);
           for (const u of usersInDept) {
             await axios.patch('/users/update', { id: u.id, department: deptForm.name.trim() });
           }
@@ -302,7 +342,28 @@ const CompanyStructure = () => {
           });
         }
         setSnackbar({ open: true, message: 'Department updated successfully!', severity: 'success' });
+      } else if (editingDept) {
+        if (editingDept.name !== deptForm.name.trim()) {
+          const usersInDept = allUsers.filter(u => u.department === editingDept.name);
+          for (const u of usersInDept) {
+            await axios.patch('/users/update', { id: u.id, department: deptForm.name.trim() });
+          }
+        }
+        if (deptForm.supervisorId) {
+          await axios.patch('/users/update', {
+            id: deptForm.supervisorId,
+            department: deptForm.name.trim(),
+            role: 'Manager',
+          });
+        }
+        setSnackbar({ open: true, message: 'Department updated successfully!', severity: 'success' });
       } else {
+        await axios.post('/departments', {
+          name: deptForm.name.trim(),
+          parentId: deptForm.parentId || null,
+          supervisorId: deptForm.supervisorId || null,
+          companyName,
+        });
         // Assign selected supervisor to newly created department
         if (deptForm.supervisorId) {
           await axios.patch('/users/update', {
@@ -316,6 +377,7 @@ const CompanyStructure = () => {
 
       setDeptModalOpen(false);
       fetchUsers();
+      fetchDepartments();
     } catch (error) {
       console.error('Error saving department:', error);
       setSnackbar({ open: true, message: 'Failed to save department', severity: 'error' });
@@ -984,6 +1046,26 @@ const CompanyStructure = () => {
             placeholder="e.g. Wealth Advisory, Client Strategy"
             sx={{ mb: 2.5 }}
           />
+
+          <TextField
+            select
+            label="Parent Department"
+            fullWidth
+            size="small"
+            value={deptForm.parentId}
+            onChange={(e) => setDeptForm({ ...deptForm, parentId: e.target.value })}
+            helperText="Leave empty for a top-level department"
+            sx={{ mb: 2.5 }}
+          >
+            <MenuItem value=""><em>None (Top-level department)</em></MenuItem>
+            {departments
+              .filter((department) => department.id !== editingDept?.id)
+              .map((department) => (
+                <MenuItem key={department.id} value={department.id}>
+                  {department.parentId ? '- ' : ''}{department.name}
+                </MenuItem>
+              ))}
+          </TextField>
 
           <TextField
             select

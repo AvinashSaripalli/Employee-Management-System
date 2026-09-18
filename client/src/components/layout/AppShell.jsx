@@ -115,6 +115,8 @@ const AppShell = ({
                   <ListItemIcon
                     sx={{
                       minWidth: 0,
+                      width: 22,
+                      flexShrink: 0,
                       mr: open ? 1.6 : 0,
                       color: isActive ? '#FFFFFF' : '#5B6B99',
                       zIndex: 1,
@@ -126,6 +128,8 @@ const AppShell = ({
                   <Box
                     sx={{
                       opacity: open ? 1 : 0,
+                      width: open ? 'auto' : 0,
+                      overflow: 'hidden',
                       transition: 'opacity 200ms',
                       zIndex: 1,
                       color: isActive ? '#FFFFFF' : '#344067',
@@ -183,7 +187,7 @@ const AppShell = ({
           </Tooltip>
 
           <Box sx={{ lineHeight: 1.1, display: { xs: 'none', sm: 'block' }, minWidth: 0 }}>
-            <Typography variant="h6" sx={{ mb: 0.25, fontSize: { sm: '1.05rem' } }} noWrap>
+            <Typography variant="h6" sx={{ mb: 0.25, fontSize: { sm: '1.05rem' }, color: 'primary.main' }} noWrap>
               {active}
             </Typography>
             <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>

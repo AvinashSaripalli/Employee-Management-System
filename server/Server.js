@@ -40,6 +40,9 @@ app.use('/api/workgroups', verifyToken, workRoutes);
 const taskRoutes = require('./routes/taskRoutes');
 app.use('/api/tasks', verifyToken, taskRoutes);
 
+const departmentRoutes = require('./routes/departmentRoutes');
+app.use('/api/departments', departmentRoutes);
+
 const distPath = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
@@ -58,6 +61,7 @@ app.use((err, req, res, next) => {
 
 ensureLeaveSchema()
   .then(() => backfillCompanyMembership())
+  .then(() => require('./models').Department.sync())
   .catch((err) => {
     console.error('Startup data sync failed:', err.message);
   })
