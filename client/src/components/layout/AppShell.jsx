@@ -7,6 +7,7 @@ import {
 import {
   Menu as MenuIcon, SearchNormal1, Notification, ArrowCircleLeft,
   ArrowCircleRight, Refresh, LogoutCurve, ArrowDown2, InfoCircle,
+  TaskSquare, Calendar1, Danger, TickCircle,
 } from 'iconsax-react';
 import axios from '../../api/axios';
 
@@ -43,9 +44,24 @@ const AppShell = ({
   const [notificationAnchor, setNotificationAnchor] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState(() => {
+    const key = `readNotifications:${localStorage.getItem('userId') || 'guest'}`;
+    try {
+      return JSON.parse(localStorage.getItem(key) || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   const handleMenu = (e) => setAnchorEl(e.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
+
+  const readNotificationsKey = `readNotifications:${localStorage.getItem('userId') || 'guest'}`;
+
+  const persistReadNotificationIds = (ids) => {
+    setReadNotificationIds(ids);
+    localStorage.setItem(readNotificationsKey, JSON.stringify(ids.slice(-100)));
+  };
 
   const fetchNotifications = async () => {
     const companyName = localStorage.getItem('companyName');
@@ -57,6 +73,7 @@ const AppShell = ({
     try {
       const requests = [
         axios.get('/tasks', { params: { companyName, myTasks: 'true' } }),
+        axios.get('/leaves/recent'),
       ];
       const canReviewLeaves = ['Admin', 'Manager'].includes(role) || department === 'Human Resources';
       if (canReviewLeaves) {
@@ -65,27 +82,52 @@ const AppShell = ({
 
       const results = await Promise.allSettled(requests);
       const taskResult = results[0];
+      const now = new Date();
       const taskNotifications = taskResult.status === 'fulfilled'
-        ? taskResult.value.data
+        ? (Array.isArray(taskResult.value.data) ? taskResult.value.data : [])
             .filter((task) => task.status !== 5 && task.status !== 7)
             .slice(0, 5)
-            .map((task) => ({
+            .map((task) => {
+              const deadline = task.deadline ? new Date(task.deadline) : null;
+              const overdue = deadline && deadline < now;
+              return {
               id: `task-${task.id}`,
-              icon: 'task',
-              title: task.title || 'Assigned task',
-              detail: task.status === 3 ? 'Task is in progress' : 'Task needs your attention',
-            }))
+                category: overdue ? 'urgent' : 'task',
+                title: overdue ? 'Task overdue' : 'Task assigned to you',
+                detail: `${task.title || 'Untitled task'}${task.status === 3 ? ' · In progress' : ''}`,
+                createdAt: task.updatedAt || task.createdAt,
+                target: currentRoleIsManager(role) ? 'Tasks and Projects' : 'Tasks',
+              };
+            })
         : [];
-      const leaveResult = results[1];
-      const leaveNotifications = leaveResult?.status === 'fulfilled'
-        ? leaveResult.value.data.slice(0, 5).map((leave) => ({
+      const recentLeaveResult = results[1];
+      const leaveNotifications = recentLeaveResult?.status === 'fulfilled'
+        ? (Array.isArray(recentLeaveResult.value.data) ? recentLeaveResult.value.data : [])
+          .filter((leave) => ['Approved', 'Rejected'].includes(leave.status))
+          .slice(0, 5).map((leave) => ({
             id: `leave-${leave.id}`,
-            icon: 'leave',
-            title: 'Leave request pending',
-            detail: leave.employee_name || leave.employee?.firstName || 'Employee request',
+            category: leave.status === 'Approved' ? 'success' : 'leave',
+            title: `Leave request ${String(leave.status).toLowerCase()}`,
+            detail: `${leave.leave_type || 'Leave'} · ${leave.start_date || 'Date pending'}`,
+            createdAt: leave.updated_at || leave.created_at,
+            target: currentRoleIsManager(role) ? 'Manage Leaves' : 'My Leaves',
           }))
         : [];
-      setNotifications([...leaveNotifications, ...taskNotifications]);
+      const pendingLeaveResult = results[2];
+      const pendingLeaveNotifications = pendingLeaveResult?.status === 'fulfilled'
+        ? (Array.isArray(pendingLeaveResult.value.data) ? pendingLeaveResult.value.data : [])
+          .slice(0, 5).map((leave) => ({
+            id: `pending-leave-${leave.id}`,
+            category: 'leave',
+            title: 'Leave request needs review',
+            detail: `${leave.employee_name || 'Employee'} · ${leave.leave_type || 'Leave'}`,
+            createdAt: leave.created_at,
+            target: 'Manage Leaves',
+          }))
+        : [];
+      const nextNotifications = [...pendingLeaveNotifications, ...leaveNotifications, ...taskNotifications]
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      setNotifications(nextNotifications);
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
@@ -95,7 +137,30 @@ const AppShell = ({
 
   React.useEffect(() => {
     fetchNotifications();
+    const interval = window.setInterval(fetchNotifications, 60000);
+    return () => window.clearInterval(interval);
   }, []);
+
+  const currentRoleIsManager = (role) => ['Admin', 'Manager'].includes(role);
+  const unreadNotifications = notifications.filter((notification) => !readNotificationIds.includes(notification.id));
+
+  const formatNotificationTime = (value) => {
+    if (!value) return 'Now';
+    const timestamp = new Date(value).getTime();
+    if (Number.isNaN(timestamp)) return 'Now';
+    const minutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
+
+  const handleNotificationClick = (notification) => {
+    persistReadNotificationIds([...new Set([...readNotificationIds, notification.id])]);
+    setNotificationAnchor(null);
+    if (notification.target && onNavigate) onNavigate(notification.target);
+  };
 
   const drawerWidth = open ? OPEN_WIDTH : CLOSED_WIDTH;
 
@@ -119,13 +184,18 @@ const AppShell = ({
         }}
       >
         {/* Brand */}
-        <Box sx={{ px: open ? 1.6 : 0, pt: 2.2, pb: 1.6, display: 'flex', justifyContent: open ? 'flex-start' : 'center' }}>
+        <Box sx={{ px: open ? 1.6 : 0, pt: 2.2, pb: 1.6, display: 'flex', alignItems: 'center', justifyContent: open ? 'flex-start' : 'center', gap: open ? 1.2 : 0 }}>
           {open ? (
-            <img
-              src="/KN Advisors.png"
-              alt="KN Advisors Logo"
-              style={{ height: 38, width: 'auto', objectFit: 'contain', maxWidth: 210 }}
-            />
+            <>
+              <img
+                src="/KN Advisors.png"
+                alt="KN Advisors Logo"
+                style={{ height: 40, width: 'auto', objectFit: 'contain', maxWidth: 210 }}
+              />
+              <Typography sx={{ color: '#14286D', fontSize: '1.15rem', fontWeight: 800, whiteSpace: 'nowrap' }}>
+                KN Advisors
+              </Typography>
+            </>
           ) : (
             <img
               src="/KN Advisors.png"
@@ -276,7 +346,7 @@ const AppShell = ({
             sx={{ color: 'text.primary', display: { xs: 'none', sm: 'inline-flex' } }}
             aria-label="Notifications"
           >
-            <Badge badgeContent={notifications.length || null} color="secondary" max={9}>
+            <Badge badgeContent={unreadNotifications.length || null} color="secondary" max={9}>
               <Notification size="20" variant="Outline" />
             </Badge>
           </IconButton>
@@ -289,26 +359,54 @@ const AppShell = ({
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             slotProps={{ paper: { sx: { width: 330, maxWidth: 'calc(100vw - 32px)' } } }}
           >
-            <Box sx={{ px: 2, py: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Notifications</Typography>
-              <Tooltip title="Refresh notifications">
-                <IconButton size="small" onClick={fetchNotifications} aria-label="Refresh notifications">
-                  <Refresh size="16" variant="Outline" />
-                </IconButton>
-              </Tooltip>
+            <Box sx={{ px: 2, py: 1.2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Notifications</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {unreadNotifications.length ? `${unreadNotifications.length} unread` : 'All caught up'}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 0.25 }}>
+                {unreadNotifications.length > 0 && (
+                  <Tooltip title="Mark all as read">
+                    <IconButton
+                      size="small"
+                      onClick={() => persistReadNotificationIds(notifications.map((notification) => notification.id))}
+                      aria-label="Mark all notifications as read"
+                    >
+                      <TickCircle size="17" variant="Outline" />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                <Tooltip title="Refresh notifications">
+                  <IconButton size="small" onClick={fetchNotifications} aria-label="Refresh notifications">
+                    <Refresh size="17" variant="Outline" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
             </Box>
             <Divider />
             {notificationsLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}><CircularProgress size={22} /></Box>
             ) : notifications.length > 0 ? (
               notifications.map((notification) => (
-                <MenuItem key={notification.id} onClick={() => setNotificationAnchor(null)} sx={{ py: 1.2, whiteSpace: 'normal' }}>
-                  <ListItemIcon sx={{ minWidth: 34, color: notification.icon === 'leave' ? 'warning.main' : 'primary.main' }}>
-                    {notification.icon === 'leave' ? <InfoCircle size="18" variant="Bold" /> : <Notification size="18" variant="Bold" />}
+                <MenuItem
+                  key={notification.id}
+                  onClick={() => handleNotificationClick(notification)}
+                  sx={{
+                    py: 1.2,
+                    whiteSpace: 'normal',
+                    bgcolor: readNotificationIds.includes(notification.id) ? 'transparent' : '#F6F8FE',
+                    '&:hover': { bgcolor: '#EEF2FF' },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 34, color: notification.category === 'urgent' ? 'error.main' : notification.category === 'leave' ? 'warning.main' : notification.category === 'success' ? 'success.main' : 'primary.main' }}>
+                    {notification.category === 'urgent' ? <Danger size="18" variant="Bold" /> : notification.category === 'leave' ? <InfoCircle size="18" variant="Bold" /> : notification.category === 'success' ? <TickCircle size="18" variant="Bold" /> : <TaskSquare size="18" variant="Bold" />}
                   </ListItemIcon>
-                  <Box>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>{notification.title}</Typography>
-                    <Typography variant="caption" color="text.secondary">{notification.detail}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }} noWrap>{notification.detail}</Typography>
+                    <Typography variant="caption" color="text.disabled">{formatNotificationTime(notification.createdAt)}</Typography>
                   </Box>
                 </MenuItem>
               ))

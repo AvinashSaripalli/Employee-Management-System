@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, TextField, Button, FormControl,
   InputLabel, Select, MenuItem, Typography, Box, Autocomplete, Chip, CircularProgress, Alert
@@ -29,6 +29,7 @@ const AddEmployeeDialog = ({ open, onClose, onSave, employeeId }) => {
   });
 
   const [assign, setAssign] = useState(getInitialAssignState(employeeId));
+  const emailInputRef = useRef(null);
   const [errors, setErrors] = useState({});
   const skillsOption = [
     "JavaScript", "Python", "Java", "React", "Node.js", "HTML", "CSS",
@@ -43,6 +44,7 @@ const AddEmployeeDialog = ({ open, onClose, onSave, employeeId }) => {
       setFoundUser(null);
       setErrors({});
       setAssign(getInitialAssignState(employeeId));
+      setTimeout(() => emailInputRef.current?.focus(), 0);
     }
   }, [open, employeeId]);
 
@@ -209,18 +211,22 @@ const AddEmployeeDialog = ({ open, onClose, onSave, employeeId }) => {
 
   return (
     <Dialog open={open} onClose={handleClose} PaperProps={{ style: { width: "80%", maxWidth: "700px" } }}>
-      <DialogTitle fontWeight="bold">Add Employee to Company</DialogTitle>
-      <DialogContent>
+      <DialogTitle sx={{ fontWeight: 800, fontSize: "1.35rem", color: "#14286D", pb: 1 }}>
+        Add Employee to Company
+      </DialogTitle>
+      <DialogContent sx={{ pt: 1.5 }}>
         {/* Step 1 */}
-        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1, mt: 1 }}>
+        <Typography variant="h6" sx={{ mb: 0.75, mt: 1, fontWeight: 800, fontSize: "1rem", color: "#14286D" }}>
           Step 1 — Find Registered Employee
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, lineHeight: 1.55 }}>
           Enter the employee email. They must have already created an account via the Register page.
         </Typography>
         <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
           <TextField
+            inputRef={emailInputRef}
             label="Employee Email"
+            placeholder="employee@example.com"
             value={emailSearch}
             onChange={(e) => {
               setEmailSearch(e.target.value);
@@ -253,6 +259,16 @@ const AddEmployeeDialog = ({ open, onClose, onSave, employeeId }) => {
         )}
 
         {/* Step 2 — shown only after a user is found */}
+        {!foundUser && !searchError && (
+          <Box sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: "#F6F8FE", border: "1px dashed #C9D3EA" }}>
+            <Typography variant="body1" sx={{ fontWeight: 800, color: "#14286D", mb: 0.4 }}>
+              Next: complete the employee profile
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+              After the registered employee is found, department, designation, location, contact, personal details, skills, and photo fields will appear here.
+            </Typography>
+          </Box>
+        )}
         {foundUser && (
           <>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ mt: 3, mb: 1 }}>
