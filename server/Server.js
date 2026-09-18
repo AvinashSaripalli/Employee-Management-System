@@ -34,7 +34,7 @@ app.use('/api/attendance', verifyToken, attendanceRoutes);
 const workRoutes = require('./routes/workRoutes');
 app.use('/api/workgroups', verifyToken, workRoutes);
 
-const distPath = path.join(__dirname, '..', 'dist');
+const distPath = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
   app.get('*', (req, res, next) => {
