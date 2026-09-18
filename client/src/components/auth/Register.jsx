@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import {
-  TextField, Button, Box, Typography, Container,
-  Snackbar, Alert, Grid, IconButton, InputAdornment
+  TextField, Button, Box, Typography, Snackbar, Alert, Stack,
+  IconButton, InputAdornment
 } from "@mui/material";
 import axios from '../../api/axios';
 import { useNavigate, Link } from "react-router-dom";
-import { keyframes } from '@emotion/react';
 import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { TaskSquare, People, Activity, ArrowLeft2, Lock, Sms, User } from "iconsax-react";
 
 function Register() {
   const [formValues, setFormValues] = useState({
@@ -22,18 +22,6 @@ function Register() {
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  const gradientAnimation = keyframes`
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-`;
 
   const validate = () => {
     const newErrors = {};
@@ -136,36 +124,125 @@ function Register() {
     }
   };
 
+  const features = [
+    { icon: <TaskSquare size="20" variant="Bold" />, text: "Tasks, projects & checklists with live activity" },
+    { icon: <People size="20" variant="Bold" />, text: "Workgroups, attendance & leave management" },
+    { icon: <Activity size="20" variant="Bold" />, text: "Reports and dashboards in one place" },
+  ];
+
   return (
-    <Container maxWidth="100%" disableGutters sx={{
-      minHeight: "100vh",
-      background: "radial-gradient(circle, rgba(63,94,251,1) 0%, rgba(252,70,107,1) 100%)",
-      backgroundSize: "200% 200%",
-      animation: `${gradientAnimation} 6s ease infinite`,
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-    }}>
-      <Grid container sx={{ minHeight: "100vh", maxWidth: "1000px" }}>
+    <Box sx={{ minHeight: "100vh", display: "flex", bgcolor: "#F3F6FB" }}>
+      {/* Left brand panel */}
+      <Box
+        sx={{
+          display: { xs: "none", md: "flex" },
+          width: "46%",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          background: "linear-gradient(150deg, #0B1844 0%, #14286D 55%, #1E3AA8 100%)",
+          color: "#fff",
+          p: 6,
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            width: 420,
+            height: 420,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(254,134,0,0.35) 0%, transparent 65%)",
+            top: -120,
+            right: -120,
+          }}
+        />
+        <Box
+          sx={{
+            position: "absolute",
+            width: 300,
+            height: 300,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%)",
+            bottom: -60,
+            left: -80,
+          }}
+        />
 
-        <Grid item xs={12} md={5} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'white', p: 5 }}>
-          <Box>
-            <Typography variant="h3" fontWeight="bold" gutterBottom>
-              Welcome!
-            </Typography>
-            <Typography variant="h6">
-              Join our platform and get started with your account.
-            </Typography>
+        <Stack spacing={1.5} sx={{ position: "relative" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <img src="/image 25.png" alt="Company Logo" style={{ height: 38, width: "auto" }} />
           </Box>
-        </Grid>
+          <Typography variant="h5" fontWeight={700} sx={{ color: "#FFE2C2" }}>
+            Employee Management System
+          </Typography>
+        </Stack>
 
-        <Grid item xs={12} md={7} sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
-          <Box maxWidth="500px" sx={{ p: 3, borderRadius: 2, boxShadow: 3, background: "white", width: "100%" }}>
-            <Typography variant="h5" sx={{ textAlign: "center", fontWeight: "bold", mb: 2 }}>
-              Register
-            </Typography>
+        <Stack spacing={3} sx={{ position: "relative", maxWidth: 460 }}>
+          <Typography variant="h3" fontWeight={800} sx={{ letterSpacing: "-0.03em", lineHeight: 1.15 }}>
+            Join your team, get started today.
+          </Typography>
+          <Typography sx={{ color: "rgba(255,255,255,0.75)", fontSize: 17 }}>
+            Create your account and step into a modern, connected workplace.
+          </Typography>
+          <Stack spacing={1.4}>
+            {features.map((f, i) => (
+              <Stack key={i} direction="row" spacing={1.5} alignItems="center">
+                <Box
+                  sx={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 2.5,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    bgcolor: "rgba(255,255,255,0.12)",
+                    backdropFilter: "blur(4px)",
+                    color: "#FFAF5C",
+                  }}
+                >
+                  {f.icon}
+                </Box>
+                <Typography sx={{ color: "rgba(255,255,255,0.9)", fontSize: 15 }}>{f.text}</Typography>
+              </Stack>
+            ))}
+          </Stack>
+        </Stack>
 
-            <Box component="form" noValidate autoComplete="off">
+        <Typography sx={{ position: "relative", color: "rgba(255,255,255,0.5)", fontSize: 13 }}>
+          © {new Date().getFullYear()} · Secure & role-based access
+        </Typography>
+      </Box>
+
+      {/* Right form panel */}
+      <Box
+        sx={{
+          flexGrow: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          p: { xs: 3, md: 5 },
+        }}
+      >
+        <Box sx={{ width: "100%", maxWidth: 470 }}>
+          <Box sx={{ textAlign: "center", mb: 3 }}>
+            <Typography variant="h4" sx={{ mb: 1 }}>Create your account</Typography>
+            <Typography color="text.secondary">It only takes a minute to get started</Typography>
+          </Box>
+
+          <Box
+            component="form"
+            noValidate
+            autoComplete="off"
+            sx={{
+              bgcolor: "#fff",
+              borderRadius: 4,
+              p: { xs: 3, md: 4 },
+              boxShadow: "0 12px 40px rgba(17,32,77,0.10)",
+              border: "1px solid #EDF0F7",
+            }}
+          >
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
               <TextField
                 label="First Name"
                 name="firstName"
@@ -176,6 +253,11 @@ function Register() {
                 onChange={handleChange}
                 error={!!errors.firstName}
                 helperText={errors.firstName}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start"><User size="18" color="#8A94B0" /></InputAdornment>
+                  ),
+                }}
               />
               <TextField
                 label="Last Name"
@@ -187,86 +269,106 @@ function Register() {
                 onChange={handleChange}
                 error={!!errors.lastName}
                 helperText={errors.lastName}
-              />
-              <TextField
-                label="Email"
-                name="email"
-                margin="dense"
-                fullWidth
-                value={formValues.email}
-                inputProps={{ maxLength: 50 }}
-                onChange={handleChange}
-                error={!!errors.email}
-                helperText={errors.email}
-              />
-              <TextField
-                label="Password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                margin="dense"
-                fullWidth
-                value={formValues.password}
-                inputProps={{ maxLength: 16 }}
-                onChange={handleChange}
-                error={!!errors.password}
-                helperText={errors.password}
                 InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle password visibility"
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
+                  startAdornment: (
+                    <InputAdornment position="start"><User size="18" color="#8A94B0" /></InputAdornment>
                   ),
                 }}
               />
-              <TextField
-                label="Confirm Password"
-                name="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
-                margin="dense"
-                fullWidth
-                value={formValues.confirmPassword}
-                inputProps={{ maxLength: 16 }}
-                onChange={handleChange}
-                error={!!errors.confirmPassword}
-                helperText={errors.confirmPassword}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label="toggle confirm password visibility"
-                        onClick={() => setShowConfirmPassword((prev) => !prev)}
-                        edge="end"
-                      >
-                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
+            </Stack>
 
-              <Button
-                onClick={handleSubmit}
-                variant="contained"
-                color="primary"
-                fullWidth
-                sx={{ mt: 2 }}
-              >
-                Register
-              </Button>
+            <TextField
+              label="Email address"
+              name="email"
+              margin="dense"
+              fullWidth
+              value={formValues.email}
+              inputProps={{ maxLength: 50 }}
+              onChange={handleChange}
+              error={!!errors.email}
+              helperText={errors.email}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start"><Sms size="18" color="#8A94B0" /></InputAdornment>
+                ),
+              }}
+            />
+            <TextField
+              label="Password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              margin="dense"
+              fullWidth
+              value={formValues.password}
+              inputProps={{ maxLength: 16 }}
+              onChange={handleChange}
+              error={!!errors.password}
+              helperText={errors.password}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start"><Lock size="18" color="#8A94B0" /></InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      edge="end"
+                    >
+                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <TextField
+              label="Confirm Password"
+              name="confirmPassword"
+              type={showConfirmPassword ? "text" : "password"}
+              margin="dense"
+              fullWidth
+              value={formValues.confirmPassword}
+              inputProps={{ maxLength: 16 }}
+              onChange={handleChange}
+              error={!!errors.confirmPassword}
+              helperText={errors.confirmPassword}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start"><Lock size="18" color="#8A94B0" /></InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle confirm password visibility"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
+                      edge="end"
+                    >
+                      {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
 
-              <Typography sx={{ textAlign: "center", mt: 2 }}>
-                Already have an account? <Link to="/login">Login</Link>
+            <Button
+              onClick={handleSubmit}
+              variant="contained"
+              color="primary"
+              fullWidth
+              sx={{ mt: 3, py: 1.4, fontSize: 15, borderRadius: 2.5 }}
+            >
+              Create Account
+            </Button>
+
+            <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ mt: 3 }}>
+              <ArrowLeft2 size="18" color="#8A94B0" />
+              <Typography>
+                Already have an account? <Link to="/login" style={{ color: "#14286D", fontWeight: 700 }}>Login</Link>
               </Typography>
-            </Box>
+            </Stack>
           </Box>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       <Snackbar
         open={snackbar.open}
@@ -277,12 +379,13 @@ function Register() {
         <Alert
           onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
-          sx={{ width: "100%" }}
+          variant="filled"
+          sx={{ borderRadius: 2.5, fontWeight: 600 }}
         >
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Container>
+    </Box>
   );
 }
 

@@ -191,7 +191,7 @@ const CompanyStructure = () => {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       >
-        <Box sx={{ width: 300, p: 2, mt: '64px' }}>
+        <Box sx={{ width: 300, p: 2, mt: '68px' }}>
           {selectedDepartment ? (
             <>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>

@@ -63,7 +63,7 @@ const EmployeesReports = () => {
   }
 
   return (
-    <Box sx={{ pl: 10, pr: 10, mt: '40px' }}>
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
       <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 2 }}>Work Reports</Typography>
       <TableContainer component={Paper} sx={{ maxHeight: '462px', overflowY: 'auto', boxShadow: "rgba(0, 0, 0, 0.1) 0px 2px 12px" }}>
         <Table>

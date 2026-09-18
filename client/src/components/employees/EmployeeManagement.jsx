@@ -211,7 +211,7 @@ const EmployeeManagement = ({ onClose }) => {
   };
 
   return (
-    <Box sx={{ pl: 10 ,pr:10,mt:'30px'}}>
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Employees List</Typography>
         <TextField

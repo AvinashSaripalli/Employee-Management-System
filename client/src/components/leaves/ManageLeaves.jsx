@@ -49,7 +49,7 @@ const ManageLeaves = () => {
   };
 
   return (
-    <Box sx={{ pl: 6, pr: 6, mt: '60px' }}>
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
       <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 2 }}>Leave Management</Typography>
 
       <TableContainer component={Paper} sx={{

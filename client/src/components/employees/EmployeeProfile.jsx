@@ -315,7 +315,7 @@ const EmployeeProfile = () => {
   };
 
   return (
-    <Box sx={{  mt: 6, display: "flex", justifyContent: "center", p: 3, flexDirection: "column", alignItems: "center" }}>
+    <Box sx={{ mt: 2, display: "flex", justifyContent: "center", p: 3, flexDirection: "column", alignItems: "center" }}>
       {!userData.userDepartment && (
         <Box sx={{
           width: "100%", maxWidth: 900, mb: 2,

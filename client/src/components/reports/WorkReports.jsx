@@ -96,7 +96,7 @@ const WorkReports = () => {
   const paginatedReports = reports.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
-    <Box sx={{ pl: 10, pr: 10, mt: 8 }}>
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
       <Grid container spacing={3} justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography variant="h5" sx={{ fontWeight: 'bold' }} align="center" gutterBottom>
           My Work Reports

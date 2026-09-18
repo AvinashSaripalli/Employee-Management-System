@@ -35,9 +35,9 @@ const PRIORITY_META = {
 };
 
 const STATUS_ACTIONS = {
-  1: ['accept', 'start', 'defer', 'deny'],
-  2: ['start', 'complete', 'defer', 'deny'],
-  3: ['pause', 'complete', 'defer', 'deny'],
+  1: ['accept', 'start'],
+  2: ['start', 'complete'],
+  3: ['pause', 'complete'],
   4: ['approve', 'disapprove'],
   5: [],
   6: ['renew'],
@@ -51,9 +51,7 @@ const ACTION_LABELS = {
   complete: 'Complete',
   approve: 'Approve',
   disapprove: 'Disapprove',
-  defer: 'Defer',
   renew: 'Renew',
-  deny: 'Deny',
 };
 
 const FIELD_LABELS = {
@@ -445,11 +443,16 @@ const TasksProjects = () => {
   };
 
   return (
-    <Box sx={{ pl: 6, pr: 6, mt: '50px' }}>
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
       <Grid container spacing={3} justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 'bold' }} gutterBottom>
-          Tasks &amp; Projects
-        </Typography>
+        <Grid item>
+          <Typography variant="h5" sx={{ fontWeight: 'bold' }} gutterBottom>
+            Tasks &amp; Projects
+          </Typography>
+          <Typography color="text.secondary" sx={{ fontSize: '0.88rem' }}>
+            Plan, assign and track work across your team
+          </Typography>
+        </Grid>
         <Grid item>
           <Button
             variant="contained"
@@ -462,7 +465,7 @@ const TasksProjects = () => {
         </Grid>
       </Grid>
 
-      <Paper sx={{ p: 2, mb: 2, boxShadow: 'rgba(0, 0, 0, 0.1) 0px 2px 12px' }}>
+      <Paper sx={{ p: 2.5, mb: 3 }}>
         <Grid container spacing={2} alignItems="center">
           <Grid item xs={12} sm={3}>
             <TextField
@@ -505,7 +508,7 @@ const TasksProjects = () => {
         sx={{
           maxHeight: '462px',
           overflowY: 'auto',
-          boxShadow: 'rgba(0, 0, 0, 0.1) 0px 2px 12px',
+          borderRadius: 3,
         }}
       >
         <Table stickyHeader aria-label="tasks table">
@@ -1064,7 +1067,7 @@ const TasksProjects = () => {
                     variant={action === 'complete' || action === 'approve' ? 'contained' : 'outlined'}
                     color={
                       ['complete', 'approve'].includes(action) ? 'primary'
-                        : ['deny', 'disapprove'].includes(action) ? 'error'
+                        : action === 'disapprove' ? 'error'
                           : 'inherit'
                     }
                     onClick={() => handleStatusAction(viewTask, action)}

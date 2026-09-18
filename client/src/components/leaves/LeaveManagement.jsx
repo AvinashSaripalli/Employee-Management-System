@@ -56,7 +56,7 @@ const LeaveManagement = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex',gap: 3, pl: 6, pr:6, mt: '60px' }}>
+    <Box sx={{ display: 'flex', gap: 3, p: { xs: 2, md: 4 } }}>
       <Box sx={{ flex: 1 ,}}>
         <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 2 }}>Leave Management</Typography>
 

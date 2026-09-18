@@ -206,7 +206,7 @@ const Workgroups = () => {
   };
 
   return (
-    <Box sx={{ pl: 6, pr: 6, mt: '50px' }}>
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
       <Grid container spacing={3} justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Typography variant="h5" sx={{ fontWeight: 'bold' }} align="center" gutterBottom>
           Work Groups

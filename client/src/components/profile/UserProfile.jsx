@@ -315,7 +315,7 @@ const UserProfile = () => {
   };
 
   return (
-    <Box sx={{  mt: 6, display: "flex", justifyContent: "center",p: 3 }}>
+    <Box sx={{ mt: 2, display: "flex", justifyContent: "center", p: 3 }}>
       <Box
         elevation={6}
           sx={{ 
