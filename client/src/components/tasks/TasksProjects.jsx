@@ -8,9 +8,6 @@ import {
 } from '@mui/material';
 import {
   Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  Visibility as VisibilityIcon,
   Close as CloseIcon,
   AddCircleOutline as AddCircleOutlineIcon,
   DeleteOutline as DeleteOutlineIcon,
@@ -24,6 +21,7 @@ import {
 } from 'recharts';
 import {
   TaskSquare, TickCircle, Clock, Timer1, NoteRemove, Ranking, UserSquare, ChartSquare,
+  Eye, Edit, Trash,
 } from 'iconsax-react';
 import axios from '../../api/axios';
 
@@ -724,19 +722,34 @@ const TasksProjects = () => {
                     </TableCell>
                     <TableCell align="center">
                       <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Tooltip title="View">
-                          <IconButton size="small" onClick={() => handleView(task)}>
-                            <VisibilityIcon fontSize="small" />
+                        <Tooltip title="View task">
+                          <IconButton
+                            size="small"
+                            aria-label="View task"
+                            onClick={() => handleView(task)}
+                            sx={{ color: '#2067B0', '&:hover': { bgcolor: '#EAF4FC' } }}
+                          >
+                            <Eye size="18" variant="Outline" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Edit">
-                          <IconButton size="small" onClick={() => handleEdit(task)}>
-                            <EditIcon fontSize="small" />
+                        <Tooltip title="Edit task">
+                          <IconButton
+                            size="small"
+                            aria-label="Edit task"
+                            onClick={() => handleEdit(task)}
+                            sx={{ color: '#14286D', '&:hover': { bgcolor: '#EEF2FF' } }}
+                          >
+                            <Edit size="18" variant="Outline" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Delete">
-                          <IconButton size="small" onClick={() => handleDelete(task)}>
-                            <DeleteIcon fontSize="small" />
+                        <Tooltip title="Delete task">
+                          <IconButton
+                            size="small"
+                            aria-label="Delete task"
+                            onClick={() => handleDelete(task)}
+                            sx={{ color: '#D64545', '&:hover': { bgcolor: '#FDECEC' } }}
+                          >
+                            <Trash size="18" variant="Outline" />
                           </IconButton>
                         </Tooltip>
                       </Box>
