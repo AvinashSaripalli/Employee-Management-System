@@ -1,23 +1,93 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { OrganizationChart } from 'primereact/organizationchart';
 import {
   Box, Typography, Chip, Drawer, List, ListItem, ListItemAvatar, ListItemText, Avatar,
-  ListItemButton, Snackbar, Alert, Stack,
+  ListItemButton, Snackbar, Alert, Stack, IconButton, Tooltip, TextField, InputAdornment,
+  Button, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Divider, Paper
 } from '@mui/material';
+import {
+  SearchNormal1, Add, Edit2, UserAdd, Crown, People, HierarchySquare2,
+  CloseCircle, Refresh, ArrowRight2, Building
+} from 'iconsax-react';
 import axios from '../../api/axios';
 import AssignEmployeeDialog from './AssignEmployeeDialog';
 
+const BITRIX_LEVEL_STYLES = {
+  // Level 1: Root / Company
+  first: {
+    bg: '#F5F9FC',
+    border: '#C8D7E4',
+    titleColor: '#14286D',
+    titleBorder: '#B5D5E3',
+    headerBg: '#EAF1F8',
+    headLabel: '#14286D',
+    empTitle: '#14286D',
+    badgeBg: '#14286D',
+    badgeColor: '#FFFFFF',
+  },
+  // Level 2: Main Departments
+  second: {
+    bg: '#F8EFE8',
+    border: '#E8CEBD',
+    titleColor: '#B3560F',
+    titleBorder: '#EFC2A1',
+    headerBg: '#F3E5DC',
+    headLabel: '#A34E0C',
+    empTitle: '#D4650B',
+    badgeBg: '#FE8600',
+    badgeColor: '#FFFFFF',
+  },
+  // Level 3: Sub-teams / Units
+  third: {
+    bg: '#F1F5DE',
+    border: '#D5E1A6',
+    titleColor: '#53750C',
+    titleBorder: '#C4DA86',
+    headerBg: '#E7EFC9',
+    headLabel: '#53750C',
+    empTitle: '#53750C',
+    badgeBg: '#7EA510',
+    badgeColor: '#FFFFFF',
+  },
+  // Unassigned pool
+  unassigned: {
+    bg: '#FFF7ED',
+    border: '#FDBA74',
+    titleColor: '#C2410C',
+    titleBorder: '#FDBA74',
+    headerBg: '#FFEDD5',
+    headLabel: '#C2410C',
+    empTitle: '#EA580C',
+    badgeBg: '#EA580C',
+    badgeColor: '#FFFFFF',
+  },
+};
+
 const CompanyStructure = () => {
   const [data, setData] = useState([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [allUsers, setAllUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedDeptInfo, setSelectedDeptInfo] = useState(null);
+
+  // Assign employee modal
   const [assignUser, setAssignUser] = useState(null);
   const [assignOpen, setAssignOpen] = useState(false);
+
+  // Add / Edit Department modal
+  const [deptModalOpen, setDeptModalOpen] = useState(false);
+  const [editingDept, setEditingDept] = useState(null);
+  const [deptForm, setDeptForm] = useState({ name: '', supervisorId: '' });
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
+  const companyName = localStorage.getItem('companyName') || 'KN Advisors';
+
   const fetchUsers = async () => {
-    const companyName = localStorage.getItem('companyName');
+    setLoading(true);
     const token = localStorage.getItem('token');
     try {
       const response = await axios.get('/users', {
@@ -26,79 +96,140 @@ const CompanyStructure = () => {
       });
       const activeUsers = response.data.filter((user) => user.exists === 1);
       setAllUsers(activeUsers);
-      setData(transformToOrgStructure(activeUsers));
     } catch (error) {
       console.error('Error fetching users:', error);
+      setSnackbar({ open: true, message: 'Failed to load employees', severity: 'error' });
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const transformToOrgStructure = (users) => {
-    const departments = {};
+  // Distinct department names in current company
+  const existingDepartments = useMemo(() => {
+    const set = new Set();
+    allUsers.forEach((u) => {
+      const dept = (u.department || '').trim();
+      if (dept) set.add(dept);
+    });
+    return Array.from(set).sort();
+  }, [allUsers]);
+
+  // Filter users by search term
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim()) return allUsers;
+    const q = searchQuery.toLowerCase();
+    return allUsers.filter(
+      (u) =>
+        `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) ||
+        (u.department && u.department.toLowerCase().includes(q)) ||
+        (u.designation && u.designation.toLowerCase().includes(q)) ||
+        (u.email && u.email.toLowerCase().includes(q))
+    );
+  }, [allUsers, searchQuery]);
+
+  // Build Bitrix24 hierarchy structure
+  useEffect(() => {
+    setData(buildBitrixOrgStructure(filteredUsers, companyName));
+  }, [filteredUsers, companyName]);
+
+  const buildBitrixOrgStructure = (users, compName) => {
+    const depts = {};
 
     users.forEach((user) => {
       const dept = (user.department || '').trim();
-
-      if (!departments[dept]) {
-        departments[dept] = { managers: [], employees: [] };
+      if (!depts[dept]) {
+        depts[dept] = { head: null, managers: [], members: [] };
       }
 
-      const node = {
-        type: 'person',
-        data: {
-          id: user.id,
-          photo: user.photo,
-          name: `${user.firstName} ${user.lastName}`,
-          title: `${user.designation || user.role || 'Employee'}${user.role === 'Manager' ? ' · Manager' : ''}`,
-          department: dept,
-        },
-      };
+      const isMgr = user.role && (user.role.toLowerCase() === 'manager' || user.role.toLowerCase() === 'admin');
 
-      if (user.role && user.role.toLowerCase() === 'manager') {
-        departments[dept].managers.push(node);
+      if (isMgr) {
+        if (!depts[dept].head) {
+          depts[dept].head = user;
+        } else {
+          depts[dept].managers.push(user);
+        }
       } else {
-        departments[dept].employees.push(node);
+        depts[dept].members.push(user);
       }
     });
 
-    const departmentNodes = Object.keys(departments)
-      .sort((a, b) => (a === 'Unassigned' ? 1 : b === 'Unassigned' ? -1 : a.localeCompare(b)))
-      .filter((dept) => dept !== '' || departments[dept].managers.length + departments[dept].employees.length > 0)
-      .map((dept) => {
-        const label = dept || 'Unassigned';
+    // Root Company card (Bitrix style: Level 1 - first)
+    const rootSupervisors = (depts['Management']?.head ? [depts['Management'].head] : [])
+      .concat(depts['Management']?.managers || [])
+      .concat(users.filter(u => u.role === 'Admin' || (u.role === 'Manager' && !u.department)));
+
+    const rootHead = rootSupervisors[0] || users.find(u => u.role === 'Admin') || null;
+    const rootEmployees = (depts['Management']?.members || []).concat(
+      rootSupervisors.slice(1)
+    );
+
+    // Department cards (Bitrix style: Level 2 - second)
+    const departmentCards = Object.keys(depts)
+      .filter((dept) => dept !== '' && dept !== 'Management')
+      .sort((a, b) => a.localeCompare(b))
+      .map((deptName) => {
+        const d = depts[deptName];
+        const allDeptUsers = (d.head ? [d.head] : []).concat(d.managers).concat(d.members);
         return {
-          type: 'department',
-          data: { name: label, count: departments[dept].managers.length + departments[dept].employees.length },
+          type: 'bitrix_dept',
+          level: 'second',
           expanded: true,
-          children: departments[dept].managers,
-          employees: departments[dept].employees,
+          data: {
+            name: deptName,
+            head: d.head,
+            additionalManagers: d.managers,
+            members: d.members,
+            allUsers: allDeptUsers,
+            count: allDeptUsers.length,
+          },
         };
       });
 
-    const unassigned = departments[''] || { managers: [], employees: [] };
-    if (unassigned.managers.length + unassigned.employees.length > 0) {
-      departmentNodes.unshift({
-        type: 'department',
-        data: { name: 'Unassigned', count: unassigned.managers.length + unassigned.employees.length },
+    // Add unassigned users card if any
+    const unassignedGroup = depts[''] || { head: null, managers: [], members: [] };
+    const unassignedList = (unassignedGroup.head ? [unassignedGroup.head] : [])
+      .concat(unassignedGroup.managers)
+      .concat(unassignedGroup.members);
+
+    if (unassignedList.length > 0) {
+      departmentCards.unshift({
+        type: 'bitrix_dept',
+        level: 'unassigned',
         expanded: true,
-        isUnassigned: true,
-        children: unassigned.managers,
-        employees: unassigned.employees,
+        data: {
+          name: 'Unassigned',
+          head: null,
+          additionalManagers: [],
+          members: unassignedList,
+          allUsers: unassignedList,
+          count: unassignedList.length,
+          isUnassigned: true,
+        },
       });
     }
 
-    return [
-      {
-        type: 'company',
-        data: { name: (localStorage.getItem('companyName') || 'Company').split(' ')[0].toUpperCase() },
-        expanded: true,
-        children: departmentNodes,
+    const rootNode = {
+      type: 'bitrix_dept',
+      level: 'first',
+      expanded: true,
+      data: {
+        name: compName,
+        isRoot: true,
+        head: rootHead,
+        additionalManagers: rootSupervisors.slice(1),
+        members: rootEmployees,
+        allUsers: users,
+        count: users.length,
       },
-    ];
+      children: departmentCards,
+    };
+
+    return [rootNode];
   };
 
   const getInitials = (name = '') =>
@@ -109,219 +240,817 @@ const CompanyStructure = () => {
       .map((n) => n[0]?.toUpperCase())
       .join('');
 
-  const nodeTemplate = (node) => {
-    if (node.type === 'person') {
-      return (
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            bgcolor: 'white',
-            color: 'black',
-            borderRadius: 3,
-            p: 1.4,
-            boxShadow: 4,
-            width: 168,
-            border: '1px solid #E8EEF9',
-          }}
-        >
-          <Avatar
-            src={node.data.photo}
-            sx={{ width: 46, height: 46, mb: 0.75, bgcolor: '#14286D', color: '#fff', fontWeight: 'bold', fontSize: 16 }}
-          >
-            {getInitials(node.data.name)}
-          </Avatar>
-          <Typography sx={{ fontWeight: 'bold', textAlign: 'center', fontSize: 13, lineHeight: 1.25 }}>
-            {node.data.name}
-          </Typography>
-          <Typography sx={{ fontSize: 11, color: '#8A94B0', textAlign: 'center', mt: 0.3 }}>
-            {node.data.title}
-          </Typography>
-        </Box>
-      );
-    }
-
-    return (
-      <Box
-        onClick={() => handleChipClick(node.data.name)}
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          bgcolor: node.data.name === 'Unassigned' ? '#FFF5EC' : '#14286D',
-          color: node.data.name === 'Unassigned' ? '#E8590C' : '#fff',
-          borderRadius: 2.5,
-          px: 2,
-          py: 1,
-          cursor: 'pointer',
-          transition: 'all 0.2s',
-          boxShadow: node.data.name === 'Unassigned' ? '0 4px 12px rgba(232,89,12,0.18)' : '0 6px 16px rgba(20,40,109,0.22)',
-          '&:hover': { transform: 'translateY(-1px)', opacity: 0.94 },
-        }}
-      >
-        <Typography sx={{ fontWeight: 'bold', fontSize: 14 }}>{node.data.name}</Typography>
-        <Box
-          sx={{
-            bgcolor: 'rgba(255,255,255,0.9)',
-            color: node.data.name === 'Unassigned' ? '#E8590C' : '#14286D',
-            borderRadius: 2,
-            px: 1,
-            minWidth: 24,
-            textAlign: 'center',
-            fontWeight: 700,
-            fontSize: 12,
-          }}
-        >
-          {node.data.count}
-        </Box>
-      </Box>
-    );
-  };
-
-  const handleChipClick = (department) => {
-    setSelectedDepartment(department);
+  // Handle department action click
+  const handleOpenDepartmentDrawer = (deptData) => {
+    setSelectedDeptInfo(deptData);
     setDrawerOpen(true);
   };
-
-  const drawerUsers = selectedDepartment
-    ? allUsers
-        .filter((user) => (user.department || '').trim() === selectedDepartment)
-        .sort((a, b) => {
-          const ra = (a.role || '').toLowerCase();
-          const rb = (b.role || '').toLowerCase();
-          if (ra === 'manager' && rb !== 'manager') return -1;
-          if (rb === 'manager' && ra !== 'manager') return 1;
-          return 0;
-        })
-    : [];
 
   const handleAssignOpen = (user) => {
     setAssignUser(user);
     setAssignOpen(true);
   };
 
-  const handleAssigned = () => {
-    setAssignOpen(false);
-    fetchUsers();
+  const handleQuickAddEmployee = (deptName) => {
+    // Pick first unassigned user or open blank
+    const unassignedUser = allUsers.find(u => !u.department || u.department.trim() === '');
+    if (unassignedUser) {
+      setAssignUser({ ...unassignedUser, department: deptName === 'Unassigned' ? '' : deptName });
+    } else {
+      setAssignUser({ id: null, firstName: 'Select an', lastName: 'employee in list', department: deptName });
+    }
+    setAssignOpen(true);
   };
 
-  return (
-    <Box sx={{ p: { xs: 2, md: 4 } }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 'bold', letterSpacing: '-0.02em' }}>
-            Company Structure
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 0.5, fontSize: 14 }}>
-            Visualize your organization and keep every teammate assigned to a department.
-          </Typography>
-        </Box>
-        <Chip
-          label={`${allUsers.length} employees`}
-          sx={{ bgcolor: '#E8EEF9', color: '#14286D', fontWeight: 700, display: { xs: 'none', sm: 'flex' } }}
-        />
-      </Stack>
+  const handleOpenEditDept = (deptData, e) => {
+    e && e.stopPropagation();
+    setEditingDept(deptData.name);
+    setDeptForm({
+      name: deptData.name,
+      supervisorId: deptData.head?.id || '',
+    });
+    setDeptModalOpen(true);
+  };
 
-      {data.length > 0 ? (
+  const handleOpenCreateDept = () => {
+    setEditingDept(null);
+    setDeptForm({ name: '', supervisorId: '' });
+    setDeptModalOpen(true);
+  };
+
+  const handleSaveDeptForm = async () => {
+    if (!deptForm.name.trim()) {
+      setSnackbar({ open: true, message: 'Department name is required', severity: 'warning' });
+      return;
+    }
+
+    try {
+      if (editingDept) {
+        // If department name changed, update all users with old department name
+        if (editingDept !== deptForm.name.trim()) {
+          const usersInDept = allUsers.filter(u => u.department === editingDept);
+          for (const u of usersInDept) {
+            await axios.patch('/users/update', { id: u.id, department: deptForm.name.trim() });
+          }
+        }
+        // If new supervisor selected
+        if (deptForm.supervisorId) {
+          await axios.patch('/users/update', {
+            id: deptForm.supervisorId,
+            department: deptForm.name.trim(),
+            role: 'Manager',
+          });
+        }
+        setSnackbar({ open: true, message: 'Department updated successfully!', severity: 'success' });
+      } else {
+        // Assign selected supervisor to newly created department
+        if (deptForm.supervisorId) {
+          await axios.patch('/users/update', {
+            id: deptForm.supervisorId,
+            department: deptForm.name.trim(),
+            role: 'Manager',
+          });
+        }
+        setSnackbar({ open: true, message: `Department '${deptForm.name.trim()}' created!`, severity: 'success' });
+      }
+
+      setDeptModalOpen(false);
+      fetchUsers();
+    } catch (error) {
+      console.error('Error saving department:', error);
+      setSnackbar({ open: true, message: 'Failed to save department', severity: 'error' });
+    }
+  };
+
+  // Render Bitrix24 Department Node (.structure-dept-block)
+  const renderBitrixDeptNode = (node) => {
+    const { data: deptData, level = 'second' } = node;
+    const style = BITRIX_LEVEL_STYLES[level] || BITRIX_LEVEL_STYLES.second;
+    const isUnassigned = deptData.isUnassigned;
+    const head = deptData.head;
+    const members = deptData.members || [];
+    const previewMembers = members.slice(0, 4);
+    const extraCount = members.length - previewMembers.length;
+
+    return (
+      <Box
+        sx={{
+          width: 220,
+          minHeight: 146,
+          bgcolor: style.bg,
+          border: `1px solid ${style.border}`,
+          borderRadius: 2,
+          boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          textAlign: 'left',
+          overflow: 'hidden',
+          '&:hover': {
+            boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
+            transform: 'translateY(-2px)',
+            '& .bitrix-actions': { opacity: 1 },
+          },
+        }}
+      >
+        {/* Bitrix Department Title Header */}
         <Box
           sx={{
-            width: '100%',
-            overflowX: 'auto',
-            '& .p-organizationchart': { width: '100%', display: 'flex', justifyContent: 'center' },
-            '& .p-organizationchart-table': {
-              borderSpacing: '0 10px',
-              width: '100%',
-              maxWidth: '100vw',
-            },
-            '& .p-organizationchart-line-down': { backgroundColor: '#B9C6E8', height: '18px' },
-            '& .p-organizationchart-line-left': { borderRight: '2px solid #B9C6E8' },
-            '& .p-organizationchart-line-right': { borderLeft: '2px solid #B9C6E8' },
-            '& .p-organizationchart-line-top': { borderTop: '2px solid #B9C6E8' },
-            '& .p-organizationchart-node-content': { margin: '0 10px' },
+            px: 1.4,
+            py: 0.9,
+            borderBottom: `1px solid ${style.titleBorder}`,
+            bgcolor: style.headerBg,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            position: 'relative',
           }}
         >
-          <OrganizationChart value={data} nodeTemplate={nodeTemplate} />
+          <Box
+            onClick={() => handleOpenDepartmentDrawer(deptData)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.8,
+              cursor: 'pointer',
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
+            {deptData.isRoot ? (
+              <Building size="16" color={style.titleColor} variant="Bold" />
+            ) : (
+              <HierarchySquare2 size="15" color={style.titleColor} variant="Bold" />
+            )}
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: style.titleColor,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title={deptData.name}
+            >
+              {deptData.name}
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Chip
+              label={deptData.count}
+              size="small"
+              sx={{
+                height: 20,
+                minWidth: 20,
+                fontSize: 11,
+                fontWeight: 700,
+                bgcolor: style.badgeBg,
+                color: style.badgeColor,
+                '& .MuiChip-label': { px: 0.8 },
+              }}
+            />
+
+            {!deptData.isRoot && !isUnassigned && (
+              <Box
+                className="bitrix-actions"
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  opacity: 0,
+                  transition: 'opacity 0.2s',
+                }}
+              >
+                <Tooltip title="Edit Department">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => handleOpenEditDept(deptData, e)}
+                    sx={{ p: 0.25, color: style.titleColor }}
+                  >
+                    <Edit2 size="13" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            )}
+          </Box>
         </Box>
-      ) : (
-        <Typography textAlign="center" color="text.secondary" sx={{ py: 4 }}>
-          No employees yet — register team members and they&apos;ll appear here.
-        </Typography>
-      )}
 
-      <Drawer anchor="right" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
-        <Box sx={{ width: 340, p: 2, mt: '68px' }}>
-          {selectedDepartment ? (
+        {/* Bitrix Department Boss / Head (.structure-boss-block) */}
+        <Box
+          sx={{
+            p: 1.2,
+            minHeight: 46,
+            borderBottom: '1px dashed rgba(0,0,0,0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.2,
+            position: 'relative',
+          }}
+        >
+          {head ? (
             <>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                  {selectedDepartment}
+              <Tooltip title={`${head.firstName} ${head.lastName} (${head.role || 'Manager'})`}>
+                <Avatar
+                  src={head.photo}
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    bgcolor: style.badgeBg,
+                    color: '#fff',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    border: '2px solid #FFFFFF',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+                  }}
+                >
+                  {getInitials(`${head.firstName} ${head.lastName}`)}
+                </Avatar>
+              </Tooltip>
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#1B2A5B',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {head.firstName} {head.lastName}
+                  </Typography>
+                  <Crown size="12" color="#FE8600" variant="Bold" />
+                </Box>
+                <Typography
+                  sx={{
+                    fontSize: 10,
+                    color: 'text.secondary',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {head.designation || (head.role === 'Admin' ? 'Administrator' : 'Department Head')}
                 </Typography>
-                <Chip label={`${drawerUsers.length}`} size="small" sx={{ bgcolor: '#14286D', color: '#fff', fontWeight: 700 }} />
-              </Stack>
+              </Box>
+            </>
+          ) : (
+            <Box
+              onClick={() => handleQuickAddEmployee(deptData.name)}
+              sx={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0.8,
+                py: 0.6,
+                border: '1px dashed #CBD5E1',
+                borderRadius: 1.5,
+                bgcolor: '#FFFFFF',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  borderColor: style.badgeBg,
+                  bgcolor: 'rgba(255,255,255,0.8)',
+                },
+              }}
+            >
+              <UserAdd size="14" color={style.headLabel} />
+              <Typography sx={{ fontSize: 11, fontWeight: 600, color: style.headLabel }}>
+                {isUnassigned ? 'Unassigned Pool' : '+ Assign Supervisor'}
+              </Typography>
+            </Box>
+          )}
+        </Box>
 
-              {selectedDepartment === 'Unassigned' && (
-                <Typography sx={{ fontSize: 13, color: '#B3560F', bgcolor: '#FFF5EC', p: 1.5, borderRadius: 2, mb: 2 }}>
-                  These employees registered but haven&apos;t been placed in a department. Assign them to a team.
+        {/* Bitrix Employees Block (.structure-employee-block) */}
+        <Box sx={{ p: 1.2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.8 }}>
+            <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: style.empTitle, letterSpacing: '0.04em' }}>
+              EMPLOYEES ({members.length})
+            </Typography>
+
+            <Typography
+              component="span"
+              onClick={() => handleOpenDepartmentDrawer(deptData)}
+              sx={{
+                fontSize: 10.5,
+                fontWeight: 600,
+                color: '#2067B0',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                '&:hover': { textDecoration: 'underline' },
+              }}
+            >
+              View all
+            </Typography>
+          </Box>
+
+          {/* Avatars Rack */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minHeight: 28, mb: 0.5 }}>
+            {previewMembers.length > 0 ? (
+              <>
+                {previewMembers.map((m) => (
+                  <Tooltip key={m.id} title={`${m.firstName} ${m.lastName} • ${m.designation || 'Employee'}`}>
+                    <Avatar
+                      src={m.photo}
+                      sx={{
+                        width: 24,
+                        height: 24,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        bgcolor: '#14286D',
+                        color: '#fff',
+                        border: '1px solid #FFFFFF',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => handleAssignOpen(m)}
+                    >
+                      {getInitials(`${m.firstName} ${m.lastName}`)}
+                    </Avatar>
+                  </Tooltip>
+                ))}
+
+                {extraCount > 0 && (
+                  <Box
+                    onClick={() => handleOpenDepartmentDrawer(deptData)}
+                    sx={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      bgcolor: '#E2E8F0',
+                      color: '#475569',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      border: '1px solid #CBD5E1',
+                    }}
+                  >
+                    +{extraCount}
+                  </Box>
+                )}
+              </>
+            ) : (
+              <Typography sx={{ fontSize: 10.5, color: '#94A3B8', fontStyle: 'italic' }}>
+                No additional employees
+              </Typography>
+            )}
+          </Box>
+
+          {/* Action footer */}
+          <Button
+            size="small"
+            startIcon={<UserAdd size="12" />}
+            onClick={() => handleQuickAddEmployee(deptData.name)}
+            sx={{
+              py: 0.2,
+              px: 1,
+              fontSize: 10.5,
+              textTransform: 'none',
+              fontWeight: 600,
+              color: style.titleColor,
+              borderRadius: 1.5,
+              alignSelf: 'flex-start',
+              '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' },
+            }}
+          >
+            + Add employee
+          </Button>
+        </Box>
+      </Box>
+    );
+  };
+
+  const nodeTemplate = (node) => {
+    return renderBitrixDeptNode(node);
+  };
+
+  const drawerMembers = selectedDeptInfo ? selectedDeptInfo.allUsers : [];
+
+  return (
+    <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: '#F8FAFD', minHeight: 'calc(100vh - 68px)' }}>
+      {/* Top Bitrix Control Header */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 2,
+          mb: 3,
+          borderRadius: 3,
+          border: '1px solid #E8ECF5',
+          bgcolor: '#FFFFFF',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 2,
+        }}
+      >
+        <Box>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Box
+              sx={{
+                width: 38,
+                height: 38,
+                borderRadius: 2.5,
+                bgcolor: '#EEF2FF',
+                color: '#14286D',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <HierarchySquare2 size="22" variant="Bold" />
+            </Box>
+            <Box>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: '#14286D', lineHeight: 1.2 }}>
+                Company Structure
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {companyName} • Visual organization tree, department divisions & staff assignments
+              </Typography>
+            </Box>
+          </Stack>
+        </Box>
+
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexWrap: 'wrap' }}>
+          <TextField
+            size="small"
+            placeholder="Search employee or department..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchNormal1 size="16" color="#8A94B0" />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchQuery('')}>
+                    <CloseCircle size="14" />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+            }}
+            sx={{ width: { xs: '100%', sm: 260 } }}
+          />
+
+          <Tooltip title="Reload structure">
+            <IconButton
+              onClick={fetchUsers}
+              sx={{ border: '1px solid #E8ECF5', bgcolor: '#FFFFFF', borderRadius: 2 }}
+            >
+              <Refresh size="18" color="#14286D" />
+            </IconButton>
+          </Tooltip>
+
+          <Button
+            variant="contained"
+            startIcon={<Add size="18" />}
+            onClick={handleOpenCreateDept}
+            sx={{
+              bgcolor: '#14286D',
+              '&:hover': { bgcolor: '#0B1844' },
+              borderRadius: 2.5,
+              textTransform: 'none',
+              fontWeight: 700,
+              px: 2.2,
+            }}
+          >
+            Add Department
+          </Button>
+        </Stack>
+      </Paper>
+
+      {/* Bitrix Structure Legend */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', px: 1 }}>
+        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>
+          Structure Legend:
+        </Typography>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Box sx={{ width: 12, height: 12, borderRadius: '3px', bgcolor: '#C8D7E4', border: '1px solid #B5D5E3' }} />
+          <Typography variant="caption" sx={{ color: '#14286D', fontWeight: 600 }}>Head Office (Level 1)</Typography>
+        </Stack>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Box sx={{ width: 12, height: 12, borderRadius: '3px', bgcolor: '#E8CEBD', border: '1px solid #EFC2A1' }} />
+          <Typography variant="caption" sx={{ color: '#B3560F', fontWeight: 600 }}>Department Division (Level 2)</Typography>
+        </Stack>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Box sx={{ width: 12, height: 12, borderRadius: '3px', bgcolor: '#D5E1A6', border: '1px solid #C4DA86' }} />
+          <Typography variant="caption" sx={{ color: '#53750C', fontWeight: 600 }}>Teams & Units (Level 3)</Typography>
+        </Stack>
+        <Chip
+          label={`${allUsers.length} total employees`}
+          size="small"
+          sx={{ ml: 'auto', bgcolor: '#E8EEF9', color: '#14286D', fontWeight: 700 }}
+        />
+      </Box>
+
+      {/* Main Interactive Bitrix Organization Chart */}
+      <Paper
+        elevation={0}
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          border: '1px solid #E8ECF5',
+          bgcolor: '#FFFFFF',
+          minHeight: 520,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'flex-start',
+          overflowX: 'auto',
+          '& .p-organizationchart': {
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'center',
+          },
+          '& .p-organizationchart-table': {
+            borderSpacing: '0 12px',
+            margin: '0 auto',
+          },
+          '& .p-organizationchart-line-down': {
+            backgroundColor: '#9FB3D8',
+            height: '24px',
+            width: '2px',
+          },
+          '& .p-organizationchart-line-left': {
+            borderRight: '2px solid #9FB3D8',
+          },
+          '& .p-organizationchart-line-right': {
+            borderLeft: '2px solid #9FB3D8',
+          },
+          '& .p-organizationchart-line-top': {
+            borderTop: '2px solid #9FB3D8',
+          },
+          '& .p-organizationchart-node-content': {
+            padding: '0 12px',
+            border: 'none',
+            background: 'transparent',
+          },
+        }}
+      >
+        {data.length > 0 ? (
+          <OrganizationChart value={data} nodeTemplate={nodeTemplate} />
+        ) : (
+          <Box sx={{ textAlign: 'center', py: 8 }}>
+            <Typography color="text.secondary">Loading organization structure...</Typography>
+          </Box>
+        )}
+      </Paper>
+
+      {/* Department Staff Roster Slide-out Drawer */}
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        PaperProps={{ sx: { width: { xs: '100%', sm: 400 }, p: 3, mt: '68px' } }}
+      >
+        {selectedDeptInfo && (
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 2, borderBottom: '1px solid #E8ECF5' }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 800, color: '#14286D' }}>
+                  {selectedDeptInfo.name}
                 </Typography>
-              )}
+                <Typography variant="caption" color="text.secondary">
+                  {drawerMembers.length} active employee(s) in department
+                </Typography>
+              </Box>
+              <IconButton onClick={() => setDrawerOpen(false)} size="small">
+                <CloseCircle size="20" />
+              </IconButton>
+            </Box>
 
-              <List>
-                {drawerUsers.map((user) => (
+            {/* Department Head Card in Drawer */}
+            {selectedDeptInfo.head && (
+              <Box sx={{ my: 2, p: 2, bgcolor: '#F5F9FC', borderRadius: 2.5, border: '1px solid #C8D7E4' }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#14286D', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Crown size="14" color="#FE8600" variant="Bold" /> Department Head / Supervisor
+                </Typography>
+                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1.5 }}>
+                  <Avatar
+                    src={selectedDeptInfo.head.photo}
+                    sx={{ width: 44, height: 44, bgcolor: '#14286D', color: '#fff', fontWeight: 700 }}
+                  >
+                    {getInitials(`${selectedDeptInfo.head.firstName} ${selectedDeptInfo.head.lastName}`)}
+                  </Avatar>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: 14 }} noWrap>
+                      {selectedDeptInfo.head.firstName} {selectedDeptInfo.head.lastName}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: 'text.secondary' }} noWrap>
+                      {selectedDeptInfo.head.designation || 'Manager'}
+                    </Typography>
+                    <Typography sx={{ fontSize: 11, color: '#14286D' }} noWrap>
+                      {selectedDeptInfo.head.email}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+            )}
+
+            {/* Employee List */}
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mt: 1, mb: 1.5, color: '#475569' }}>
+              Department Members ({drawerMembers.length})
+            </Typography>
+
+            <List sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
+              {drawerMembers.map((user) => {
+                const isHead = user.id === selectedDeptInfo.head?.id;
+                return (
                   <ListItem
                     key={user.id}
                     secondaryAction={
-                      <ListItemButton
+                      <Button
+                        size="small"
                         onClick={() => handleAssignOpen(user)}
                         sx={{
-                          minWidth: 'auto',
-                          borderRadius: 2,
-                          px: 1.5,
-                          py: 0.5,
-                          bgcolor: '#14286D',
-                          color: '#fff',
-                          '&:hover': { bgcolor: '#1D359B' },
+                          fontSize: 11,
+                          textTransform: 'none',
+                          fontWeight: 700,
+                          bgcolor: '#EEF2FF',
+                          color: '#14286D',
+                          borderRadius: 1.5,
+                          '&:hover': { bgcolor: '#14286D', color: '#FFFFFF' },
                         }}
                       >
-                        <Typography sx={{ fontSize: 12, fontWeight: 700 }}>Assign</Typography>
-                      </ListItemButton>
+                        Transfer
+                      </Button>
                     }
-                    sx={{ mb: 1, bgcolor: '#F7F9FE', borderRadius: 2.5, border: '1px solid #E8EEF9' }}
+                    sx={{
+                      mb: 1.2,
+                      bgcolor: '#FFFFFF',
+                      borderRadius: 2,
+                      border: '1px solid #E8ECF5',
+                      p: 1.2,
+                      '&:hover': { bgcolor: '#F8FAFD' },
+                    }}
                   >
                     <ListItemAvatar>
-                      <Avatar src={user.photo} sx={{ width: 40, height: 40, bgcolor: '#14286D', color: '#fff', fontSize: 14 }}>
+                      <Avatar
+                        src={user.photo}
+                        sx={{
+                          width: 38,
+                          height: 38,
+                          bgcolor: '#14286D',
+                          color: '#fff',
+                          fontSize: 13,
+                          fontWeight: 700,
+                        }}
+                      >
                         {getInitials(`${user.firstName} ${user.lastName}`)}
                       </Avatar>
                     </ListItemAvatar>
                     <ListItemText
-                      primary={`${user.firstName} ${user.lastName}`}
-                      secondary={user.designation || user.role || 'Employee'}
-                      primaryTypographyProps={{ fontWeight: 'bold', fontSize: 14 }}
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+                          <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>
+                            {user.firstName} {user.lastName}
+                          </Typography>
+                          {isHead && <Crown size="12" color="#FE8600" variant="Bold" />}
+                        </Box>
+                      }
+                      secondary={
+                        <Box component="span">
+                          <Typography component="span" sx={{ fontSize: 11.5, color: 'text.secondary', display: 'block' }}>
+                            {user.designation || user.role || 'Employee'}
+                          </Typography>
+                          <Typography component="span" sx={{ fontSize: 10.5, color: '#64748B', display: 'block' }}>
+                            {user.email}
+                          </Typography>
+                        </Box>
+                      }
                     />
                   </ListItem>
-                ))}
-              </List>
+                );
+              })}
 
-              {drawerUsers.length === 0 && (
-                <Typography color="text.secondary" variant="body2">
-                  No employees in this department.
-                </Typography>
+              {drawerMembers.length === 0 && (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    No employees currently assigned to this department.
+                  </Typography>
+                </Box>
               )}
-            </>
-          ) : (
-            <Typography>No department selected</Typography>
-          )}
-        </Box>
+            </List>
+
+            <Box sx={{ pt: 2, borderTop: '1px solid #E8ECF5' }}>
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={<UserAdd size="16" />}
+                onClick={() => handleQuickAddEmployee(selectedDeptInfo.name)}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  color: '#14286D',
+                  borderColor: '#14286D',
+                }}
+              >
+                + Assign Employee to Department
+              </Button>
+            </Box>
+          </Box>
+        )}
       </Drawer>
 
+      {/* Add / Edit Department Dialog */}
+      <Dialog
+        open={deptModalOpen}
+        onClose={() => setDeptModalOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, pb: 1, borderBottom: '1px solid #E8ECF5' }}>
+          {editingDept ? 'Edit Department' : 'Create Department'}
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2.5 }}>
+          <TextField
+            label="Department Name"
+            fullWidth
+            size="small"
+            value={deptForm.name}
+            onChange={(e) => setDeptForm({ ...deptForm, name: e.target.value })}
+            placeholder="e.g. Wealth Advisory, Client Strategy"
+            sx={{ mb: 2.5 }}
+          />
+
+          <TextField
+            select
+            label="Assign Department Supervisor"
+            fullWidth
+            size="small"
+            value={deptForm.supervisorId}
+            onChange={(e) => setDeptForm({ ...deptForm, supervisorId: e.target.value })}
+            helperText="Designates this employee as the supervisor/head of department"
+          >
+            <MenuItem value="">
+              <em>None (Vacant)</em>
+            </MenuItem>
+            {allUsers.map((u) => (
+              <MenuItem key={u.id} value={u.id}>
+                {u.firstName} {u.lastName} ({u.department || 'Unassigned'} • {u.designation || u.role})
+              </MenuItem>
+            ))}
+          </TextField>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, borderTop: '1px solid #E8ECF5' }}>
+          <Button onClick={() => setDeptModalOpen(false)} color="inherit" sx={{ textTransform: 'none', fontWeight: 600 }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveDeptForm}
+            variant="contained"
+            sx={{
+              bgcolor: '#14286D',
+              '&:hover': { bgcolor: '#0B1844' },
+              borderRadius: 2,
+              textTransform: 'none',
+              fontWeight: 700,
+              px: 2.5,
+            }}
+          >
+            {editingDept ? 'Save Changes' : 'Create Department'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Assign / Move Employee Dialog */}
       <AssignEmployeeDialog
         open={assignOpen}
         onClose={() => setAssignOpen(false)}
         user={assignUser}
-        onAssigned={handleAssigned}
+        existingDepartments={existingDepartments}
+        onAssigned={() => {
+          setAssignOpen(false);
+          fetchUsers();
+        }}
       />
+
+      {/* Toast Notification */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} variant="filled" sx={{ borderRadius: 2 }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
 
 export default CompanyStructure;
+

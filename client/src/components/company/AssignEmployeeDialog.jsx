@@ -1,28 +1,53 @@
 import React, { useEffect, useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem,
-  Box, Typography, Stack, Avatar, Snackbar, Alert, CircularProgress,
+  Box, Typography, Stack, Avatar, Snackbar, Alert, CircularProgress, FormControlLabel,
+  Switch, Divider
 } from '@mui/material';
 import axios from '../../api/axios';
 
-const DEPARTMENTS = ['Engineering', 'Design', 'Marketing', 'Sales', 'Human Resources', 'Finance', 'Operations'];
+const DEFAULT_DEPARTMENTS = [
+  'Management',
+  'Engineering',
+  'Design',
+  'Marketing',
+  'Sales',
+  'Human Resources',
+  'Finance',
+  'Operations',
+  'Legal & Compliance'
+];
 
-const AssignEmployeeDialog = ({ open, onClose, user, onAssigned }) => {
+const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], onAssigned }) => {
   const [department, setDepartment] = useState('');
+  const [customDept, setCustomDept] = useState('');
   const [designation, setDesignation] = useState('');
+  const [isManager, setIsManager] = useState(false);
   const [saving, setSaving] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
+  // Merge default + existing departments
+  const departmentOptions = Array.from(
+    new Set([
+      ...DEFAULT_DEPARTMENTS,
+      ...(existingDepartments || []).filter((d) => d && d !== 'Unassigned' && d !== 'KN Advisors')
+    ])
+  ).sort();
+
   useEffect(() => {
     if (open && user) {
-      setDepartment(user.department || '');
+      const currentDept = user.department || '';
+      setDepartment(currentDept);
+      setCustomDept('');
       setDesignation(user.designation || '');
+      setIsManager(user.role?.toLowerCase() === 'manager' || user.role?.toLowerCase() === 'admin');
     }
   }, [open, user]);
 
   const handleSave = async () => {
-    if (!department) {
-      setSnackbar({ open: true, message: 'Please select a department.', severity: 'warning' });
+    const finalDept = (department === '__custom__' ? customDept.trim() : department.trim());
+    if (!finalDept) {
+      setSnackbar({ open: true, message: 'Please select or enter a department.', severity: 'warning' });
       return;
     }
     if (!designation.trim()) {
@@ -32,16 +57,20 @@ const AssignEmployeeDialog = ({ open, onClose, user, onAssigned }) => {
 
     setSaving(true);
     try {
-      await axios.patch(`/users/${user.id}`, {
-        department,
+      await axios.patch('/users/update', {
+        id: user.id,
+        department: finalDept,
         designation: designation.trim(),
+        role: isManager ? 'Manager' : 'Employee',
       });
-      setSnackbar({ open: true, message: 'Employee assigned successfully!', severity: 'success' });
-      onAssigned && onAssigned();
+      setSnackbar({ open: true, message: 'Employee updated successfully!', severity: 'success' });
+      setTimeout(() => {
+        onAssigned && onAssigned();
+      }, 500);
     } catch (error) {
       setSnackbar({
         open: true,
-        message: error.response?.data?.error || 'Failed to assign. Please try again.',
+        message: error.response?.data?.error || error.response?.data?.message || 'Failed to update employee.',
         severity: 'error',
       });
     } finally {
@@ -51,24 +80,31 @@ const AssignEmployeeDialog = ({ open, onClose, user, onAssigned }) => {
 
   if (!user) return null;
 
+  const initials = `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
+
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold', pb: 1 }}>Assign Employee</DialogTitle>
-        <DialogContent>
-          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
+      <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle sx={{ fontWeight: 700, pb: 1, borderBottom: '1px solid #E8ECF5' }}>
+          Assign / Move Employee
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2.5 }}>
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2.5, p: 1.5, bgcolor: '#F5F9FC', borderRadius: 2 }}>
             <Avatar
               src={user.photo}
-              sx={{ width: 52, height: 52, bgcolor: '#14286D', color: '#fff', fontWeight: 'bold' }}
+              sx={{ width: 48, height: 48, bgcolor: '#14286D', color: '#fff', fontWeight: 'bold' }}
             >
-              {`${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase()}
+              {initials}
             </Avatar>
-            <Box>
-              <Typography sx={{ fontWeight: 'bold' }}>
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: 15 }} noWrap>
                 {user.firstName} {user.lastName}
               </Typography>
-              <Typography color="text.secondary" sx={{ fontSize: 13 }}>
-                {user.designation || user.role || 'Employee'}
+              <Typography color="text.secondary" sx={{ fontSize: 12 }} noWrap>
+                {user.email}
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: '#FE8600', fontWeight: 600 }}>
+                Current: {user.department || 'Unassigned'} • {user.designation || user.role || 'Employee'}
               </Typography>
             </Box>
           </Stack>
@@ -82,24 +118,64 @@ const AssignEmployeeDialog = ({ open, onClose, user, onAssigned }) => {
             onChange={(e) => setDepartment(e.target.value)}
             sx={{ mb: 2 }}
           >
-            {DEPARTMENTS.map((dept) => (
+            {departmentOptions.map((dept) => (
               <MenuItem key={dept} value={dept}>
                 {dept}
               </MenuItem>
             ))}
+            <MenuItem value="__custom__">
+              <em>+ New Department...</em>
+            </MenuItem>
           </TextField>
 
+          {department === '__custom__' && (
+            <TextField
+              label="New Department Name"
+              size="small"
+              fullWidth
+              value={customDept}
+              onChange={(e) => setCustomDept(e.target.value)}
+              placeholder="e.g. Risk Assessment"
+              sx={{ mb: 2 }}
+              autoFocus
+            />
+          )}
+
           <TextField
-            label="Designation"
+            label="Designation / Position"
             size="small"
             fullWidth
             value={designation}
             onChange={(e) => setDesignation(e.target.value)}
-            placeholder="e.g. Senior Developer"
+            placeholder="e.g. Financial Consultant, Senior Analyst"
+            sx={{ mb: 2 }}
+          />
+
+          <Divider sx={{ my: 1.5 }} />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={isManager}
+                onChange={(e) => setIsManager(e.target.checked)}
+                color="primary"
+              />
+            }
+            label={
+              <Box>
+                <Typography sx={{ fontSize: 13, fontWeight: 700, color: '#14286D' }}>
+                  Designate as Department Head / Manager
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: 'text.secondary' }}>
+                  Position user at the top supervisor slot for this department
+                </Typography>
+              </Box>
+            }
+            sx={{ alignItems: 'flex-start', ml: 0.2 }}
           />
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={onClose} color="inherit">
+        <DialogActions sx={{ px: 3, pb: 2.5, borderTop: '1px solid #E8ECF5' }}>
+          <Button onClick={onClose} color="inherit" sx={{ textTransform: 'none', fontWeight: 600 }}>
             Cancel
           </Button>
           <Button
@@ -107,9 +183,16 @@ const AssignEmployeeDialog = ({ open, onClose, user, onAssigned }) => {
             variant="contained"
             disabled={saving}
             startIcon={saving && <CircularProgress size={16} color="inherit" />}
-            sx={{ bgcolor: '#FE6800', '&:hover': { bgcolor: '#E8590C' }, textTransform: 'none' }}
+            sx={{
+              bgcolor: '#14286D',
+              '&:hover': { bgcolor: '#0B1844' },
+              textTransform: 'none',
+              fontWeight: 700,
+              borderRadius: 2,
+              px: 3,
+            }}
           >
-            {saving ? 'Saving...' : 'Assign'}
+            {saving ? 'Saving...' : 'Confirm Assignment'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -129,3 +212,4 @@ const AssignEmployeeDialog = ({ open, onClose, user, onAssigned }) => {
 };
 
 export default AssignEmployeeDialog;
+

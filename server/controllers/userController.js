@@ -188,14 +188,15 @@ exports.loginUser = async (req, res) => {
 };
 
 exports.updateUser = async (req, res) => {
-  const { id, designation, department, jobLocation, technicalSkills, phoneNumber, dateOfBirth, bloodGroup, gender } = req.body;
-  const skillsString = technicalSkills ? technicalSkills.join(",") : null;
+  const { id, designation, department, role, jobLocation, technicalSkills, phoneNumber, dateOfBirth, bloodGroup, gender } = req.body;
+  const skillsString = technicalSkills ? (Array.isArray(technicalSkills) ? technicalSkills.join(",") : technicalSkills) : null;
 
   try {
-    const result = await User.update(
-      { designation, department, jobLocation, technicalSkills: skillsString, phoneNumber, dateOfBirth, bloodGroup, gender },
-      { where: { id } }
-    );
+    const updatePayload = { designation, department, jobLocation, phoneNumber, dateOfBirth, bloodGroup, gender };
+    if (skillsString !== null) updatePayload.technicalSkills = skillsString;
+    if (role) updatePayload.role = role;
+
+    const result = await User.update(updatePayload, { where: { id } });
     if (result[0] === 0) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
