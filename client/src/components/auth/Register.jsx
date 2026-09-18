@@ -177,8 +177,13 @@ function Register() {
         />
 
         <Stack spacing={1.5} sx={{ position: "relative" }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <img src="/KN Advisors.png" alt="KN Advisors Logo" style={{ height: 42, width: "auto", objectFit: "contain" }} />
+          <Box sx={{ width: "100%", maxWidth: 460, display: "flex", alignItems: "flex-start" }}>
+            <Box
+              component="img"
+              src="/KN Advisors.png"
+              alt="KN Advisors Logo"
+              sx={{ display: "block", width: 64, height: 64, objectFit: "contain", objectPosition: "left center" }}
+            />
           </Box>
           <Typography variant="h5" fontWeight={700} sx={{ color: "#FFE2C2" }}>
             Employee Management System
