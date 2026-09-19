@@ -5,10 +5,8 @@ import {
   ListItemButton, Snackbar, Alert, Stack, IconButton, Tooltip, TextField, InputAdornment,
   Button, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Divider, Paper
 } from '@mui/material';
-import {
-  SearchNormal1, Add, Edit2, UserAdd, Crown, People, HierarchySquare2,
-  CloseCircle, Refresh, ArrowRight2, Building
-} from 'iconsax-react';
+import { FiSearch, FiPlus, FiEdit2, FiUserPlus, FiAward, FiUsers, FiGitBranch, FiXCircle, FiRefreshCw, FiBriefcase, FiChevronRight, FiGrid } from 'react-icons/fi';
+import { HiOutlineBuildingOffice2, HiOutlineMagnifyingGlass } from 'react-icons/hi2';
 import axios from '../../api/axios';
 import AssignEmployeeDialog from './AssignEmployeeDialog';
 
@@ -441,9 +439,9 @@ const CompanyStructure = () => {
             }}
           >
             {deptData.isRoot ? (
-              <Building size="16" color={style.titleColor} variant="Bold" />
+              <FiBriefcase size="16" color={style.titleColor} />
             ) : (
-              <HierarchySquare2 size="15" color={style.titleColor} variant="Bold" />
+              <FiGitBranch size="15" color={style.titleColor} />
             )}
             <Typography
               sx={{
@@ -491,7 +489,7 @@ const CompanyStructure = () => {
                     onClick={(e) => handleOpenEditDept(deptData, e)}
                     sx={{ p: 0.25, color: style.titleColor }}
                   >
-                    <Edit2 size="13" />
+                    <FiEdit2 size="13" />
                   </IconButton>
                 </Tooltip>
               </Box>
@@ -544,7 +542,7 @@ const CompanyStructure = () => {
                   >
                     {head.firstName} {head.lastName}
                   </Typography>
-                  <Crown size="12" color="#FE8600" variant="Bold" />
+                  <FiAward size="12" color="#FE8600" />
                 </Box>
                 <Typography
                   sx={{
@@ -581,7 +579,7 @@ const CompanyStructure = () => {
                 },
               }}
             >
-              <UserAdd size="14" color={style.headLabel} />
+              <FiUserPlus size="14" color={style.headLabel} />
               <Typography sx={{ fontSize: 11, fontWeight: 600, color: style.headLabel }}>
                 {isUnassigned ? 'Unassigned Pool' : '+ Assign Supervisor'}
               </Typography>
@@ -670,7 +668,7 @@ const CompanyStructure = () => {
           {/* Action footer */}
           <Button
             size="small"
-            startIcon={<UserAdd size="12" />}
+            startIcon={<FiUserPlus size="12" />}
             onClick={() => handleQuickAddEmployee(deptData.name)}
             sx={{
               py: 0.2,
@@ -729,7 +727,7 @@ const CompanyStructure = () => {
                 justifyContent: 'center',
               }}
             >
-              <HierarchySquare2 size="22" variant="Bold" />
+              <FiGitBranch size="22" />
             </Box>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 800, color: '#14286D', lineHeight: 1.2 }}>
@@ -751,13 +749,13 @@ const CompanyStructure = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchNormal1 size="16" color="#8A94B0" />
+                  <FiSearch size="16" color="#8A94B0" />
                 </InputAdornment>
               ),
               endAdornment: searchQuery ? (
                 <InputAdornment position="end">
                   <IconButton size="small" onClick={() => setSearchQuery('')}>
-                    <CloseCircle size="14" />
+                    <FiXCircle size="14" />
                   </IconButton>
                 </InputAdornment>
               ) : null,
@@ -770,13 +768,13 @@ const CompanyStructure = () => {
               onClick={fetchUsers}
               sx={{ border: '1px solid #E8ECF5', bgcolor: '#FFFFFF', borderRadius: 2 }}
             >
-              <Refresh size="18" color="#14286D" />
+              <FiRefreshCw size="18" color="#14286D" />
             </IconButton>
           </Tooltip>
 
           <Button
             variant="contained"
-            startIcon={<Add size="18" />}
+            startIcon={<FiPlus size="18" />}
             onClick={handleOpenCreateDept}
             sx={{
               bgcolor: '#14286D',
@@ -887,7 +885,7 @@ const CompanyStructure = () => {
                 </Typography>
               </Box>
               <IconButton onClick={() => setDrawerOpen(false)} size="small">
-                <CloseCircle size="20" />
+                <FiXCircle size="20" />
               </IconButton>
             </Box>
 
@@ -895,7 +893,7 @@ const CompanyStructure = () => {
             {selectedDeptInfo.head && (
               <Box sx={{ my: 2, p: 2, bgcolor: '#F5F9FC', borderRadius: 2.5, border: '1px solid #C8D7E4' }}>
                 <Typography variant="caption" sx={{ fontWeight: 700, color: '#14286D', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Crown size="14" color="#FE8600" variant="Bold" /> Department Head / Supervisor
+                  <FiAward size="14" color="#FE8600" /> Department Head / Supervisor
                 </Typography>
                 <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 1.5 }}>
                   <Avatar
@@ -977,7 +975,7 @@ const CompanyStructure = () => {
                           <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>
                             {user.firstName} {user.lastName}
                           </Typography>
-                          {isHead && <Crown size="12" color="#FE8600" variant="Bold" />}
+                          {isHead && <FiAward size="12" color="#FE8600" />}
                         </Box>
                       }
                       secondary={
@@ -1008,7 +1006,7 @@ const CompanyStructure = () => {
               <Button
                 variant="outlined"
                 fullWidth
-                startIcon={<UserAdd size="16" />}
+                startIcon={<FiUserPlus size="16" />}
                 onClick={() => handleQuickAddEmployee(selectedDeptInfo.name)}
                 sx={{
                   borderRadius: 2,

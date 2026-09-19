@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Element4, RowVertical, HierarchySquare2, People, TaskSquare, Notepad2, Activity } from 'iconsax-react';
+import { HiOutlineSquares2X2, HiOutlineClipboardDocumentCheck, HiOutlineUsers, HiOutlineBuildingOffice2, HiOutlineUserGroup, HiOutlineCalendarDays, HiOutlineChartBar } from 'react-icons/hi2';
 import AppShell from './AppShell';
 import Dashboard from '../dashboard/Dashboard';
 import TasksProjects from '../tasks/TasksProjects';
@@ -53,37 +53,36 @@ const Sidebar = () => {
     }
   };
 
-  const iconProps = (size = 22) => ({ size, variant: 'Outline' });
-  const activeProps = (size = 22) => ({ size, variant: 'Bold' });
+  const iconStyle = (active) => ({ size: 22, color: active ? '#fff' : undefined });
 
   const navItems = [
     {
       text: 'Dashboard',
-      icon: selectedComponent === 'Dashboard' ? <Element4 {...activeProps(22)} /> : <Element4 {...iconProps(22)} />,
+      icon: <HiOutlineSquares2X2 {...iconStyle(selectedComponent === 'Dashboard')} />,
     },
     {
       text: 'Tasks and Projects',
-      icon: selectedComponent === 'Tasks and Projects' ? <TaskSquare {...activeProps(22)} /> : <TaskSquare {...iconProps(22)} />,
+      icon: <HiOutlineClipboardDocumentCheck {...iconStyle(selectedComponent === 'Tasks and Projects')} />,
     },
     {
       text: 'Employees List',
-      icon: selectedComponent === 'Employees List' ? <RowVertical {...activeProps(22)} /> : <RowVertical {...iconProps(22)} />,
+      icon: <HiOutlineUsers {...iconStyle(selectedComponent === 'Employees List')} />,
     },
     {
       text: 'Company Structure',
-      icon: selectedComponent === 'Company Structure' ? <HierarchySquare2 {...activeProps(22)} /> : <HierarchySquare2 {...iconProps(22)} />,
+      icon: <HiOutlineBuildingOffice2 {...iconStyle(selectedComponent === 'Company Structure')} />,
     },
     {
       text: 'Work Groups',
-      icon: selectedComponent === 'Work Groups' ? <People {...activeProps(22)} /> : <People {...iconProps(22)} />,
+      icon: <HiOutlineUserGroup {...iconStyle(selectedComponent === 'Work Groups')} />,
     },
     {
       text: 'Manage Leaves',
-      icon: selectedComponent === 'Manage Leaves' ? <Notepad2 {...activeProps(22)} /> : <Notepad2 {...iconProps(22)} />,
+      icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves')} />,
     },
     {
       text: 'Reports',
-      icon: selectedComponent === 'Reports' ? <Activity {...activeProps(22)} /> : <Activity {...iconProps(22)} />,
+      icon: <HiOutlineChartBar {...iconStyle(selectedComponent === 'Reports')} />,
     },
   ];
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart, CartesianGrid, PieChart, Pie, Cell, BarChart, Bar, Legend, Sector } from 'recharts';
 import { Box, Typography, Select, MenuItem, FormControl, Card, CardContent, Grid } from '@mui/material';
-import { People, EmojiHappy, UserRemove, Calendar1, UserAdd } from 'iconsax-react';
+import { HiOutlineUsers, HiOutlineFaceSmile, HiOutlineUserMinus, HiOutlineCalendarDays, HiOutlineUserPlus } from 'react-icons/hi2';
 import axios from '../../api/axios';
 
 const StatCard = ({ title, value, subtitle, icon, color }) => (
@@ -231,11 +231,11 @@ const Dashboard = () => {
   };
 
   const cardMeta = [
-    { icon: <People size="24" variant="Bold" />, color: '#14286D' },
-    { icon: <EmojiHappy size="24" variant="Bold" />, color: '#16A34A' },
-    { icon: <UserRemove size="24" variant="Bold" />, color: '#E11D48' },
-    { icon: <Calendar1 size="24" variant="Bold" />, color: '#F59E0B' },
-    { icon: <UserAdd size="24" variant="Bold" />, color: '#7C3AED' },
+    { icon: <HiOutlineUsers size={24} />, color: '#14286D' },
+    { icon: <HiOutlineFaceSmile size={24} />, color: '#16A34A' },
+    { icon: <HiOutlineUserMinus size={24} />, color: '#E11D48' },
+    { icon: <HiOutlineCalendarDays size={24} />, color: '#F59E0B' },
+    { icon: <HiOutlineUserPlus size={24} />, color: '#7C3AED' },
   ];
 
   return (

@@ -9,7 +9,7 @@ import EditEmployeeDialog from './EditEmployeeDialog';
 import AddEmployeeDialog from './AddEmployeeDialog';
 import DeleteDialog from './DeleteDialog';
 import ViewEmployeeDialog from './ViewEmployeeDialog';
-import { More, ArrowUp2, ArrowDown2 } from 'iconsax-react';
+import { FiMoreHorizontal, FiChevronUp, FiChevronDown } from 'react-icons/fi';
 
 const EmployeeManagement = ({ onClose }) => {
   const [openAddUser, setOpenAddUser] = useState(false);
@@ -258,7 +258,7 @@ const EmployeeManagement = ({ onClose }) => {
                 </TableCell>
               <TableCell align='center' sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Photo</TableCell>
               <TableCell align='center' sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' ,cursor: 'pointer', alignItems: 'center',justifyContent: 'center' }} onClick={handleSortByEmployeeId}>
-                Employee ID  {sortOrder === 'asc' ? <ArrowDown2 size="16" /> : <ArrowUp2 size="16" />}
+                Employee ID  {sortOrder === 'asc' ? <FiChevronDown size="16" /> : <FiChevronUp size="16" />}
               </TableCell>
               <TableCell align='left' sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Name</TableCell>
               <TableCell align='left' sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Designation</TableCell>
@@ -300,7 +300,7 @@ const EmployeeManagement = ({ onClose }) => {
                   </TableCell>
                 <TableCell align='left'>  
                 <IconButton onClick={(event) => handleMenuOpen(event, user)}>
-                  <More size="18" variant="Outline" />
+                  <FiMoreHorizontal size="18" />
                 </IconButton>
                 <Menu
                 anchorEl={anchorEl}

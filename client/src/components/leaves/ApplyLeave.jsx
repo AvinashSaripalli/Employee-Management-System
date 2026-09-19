@@ -27,7 +27,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { PickersDay } from '@mui/x-date-pickers/PickersDay';
 import dayjs from 'dayjs';
-import { Calendar, TickCircle, Clock, InfoCircle } from 'iconsax-react';
+import { FiCalendar, FiCheckCircle, FiClock, FiInfo } from 'react-icons/fi';
 import { LEAVE_TYPE_META, statusColor, formatLeaveDate, leaveIdentityParams } from '../../utils/leaveConfig';
 
 const isWeekend = (date) => {
@@ -278,10 +278,10 @@ const ApplyLeave = () => {
   };
 
   const summaryCards = [
-    { label: 'Annual quota', value: balance?.allocated ?? '—', icon: <Calendar size={18} color="#14286D" /> },
-    { label: 'Available', value: balance?.available ?? '—', icon: <TickCircle size={18} color="#16A34A" /> },
-    { label: 'Pending', value: balance?.pending ?? '—', icon: <Clock size={18} color="#F59E0B" /> },
-    { label: 'Public holidays', value: balance?.holidays ?? upcomingHolidays.length, icon: <InfoCircle size={18} color="#FE8600" /> },
+    { label: 'Annual quota', value: balance?.allocated ?? '—', icon: <FiCalendar size={18} color="#14286D" /> },
+    { label: 'Available', value: balance?.available ?? '—', icon: <FiCheckCircle size={18} color="#16A34A" /> },
+    { label: 'Pending', value: balance?.pending ?? '—', icon: <FiClock size={18} color="#F59E0B" /> },
+    { label: 'Public holidays', value: balance?.holidays ?? upcomingHolidays.length, icon: <FiInfo size={18} color="#FE8600" /> },
   ];
 
   return (
@@ -498,7 +498,7 @@ const ApplyLeave = () => {
 
                 <Grid item xs={12} md={6}>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DateCalendar slots={{ day: CustomDay }} />
+                    <DateFiCalendar slots={{ day: CustomDay }} />
                   </LocalizationProvider>
                   <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
                     <Chip size="small" label="Holiday" sx={{ bgcolor: 'secondary.light' }} />

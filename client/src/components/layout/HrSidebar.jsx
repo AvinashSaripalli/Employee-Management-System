@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Element4, Profile2User, ArchiveBook, Notepad2, Activity } from 'iconsax-react';
+import { HiOutlineSquares2X2, HiOutlineUsers, HiOutlineClipboardDocumentList, HiOutlineCalendarDays, HiOutlineChartBar } from 'react-icons/hi2';
 import AppShell from './AppShell';
 import HrDashboard from '../dashboard/HrDashboard';
 import EmployeeManagement from '../employees/EmployeeManagement';
@@ -48,29 +48,28 @@ const HrSidebar = () => {
     }
   };
 
-  const iconProps = (size = 22) => ({ size, variant: 'Outline' });
-  const activeProps = (size = 22) => ({ size, variant: 'Bold' });
+  const iconStyle = (active) => ({ size: 22, color: active ? '#fff' : undefined });
 
   const navItems = [
     {
       text: 'Dashboard',
-      icon: selectedComponent === 'Dashboard' ? <Element4 {...activeProps(22)} /> : <Element4 {...iconProps(22)} />,
+      icon: <HiOutlineSquares2X2 {...iconStyle(selectedComponent === 'Dashboard')} />,
     },
     {
       text: 'Employee',
-      icon: selectedComponent === 'Employee' ? <Profile2User {...activeProps(22)} /> : <Profile2User {...iconProps(22)} />,
+      icon: <HiOutlineUsers {...iconStyle(selectedComponent === 'Employee')} />,
     },
     {
       text: 'Attendance',
-      icon: selectedComponent === 'Attendance' ? <ArchiveBook {...activeProps(22)} /> : <ArchiveBook {...iconProps(22)} />,
+      icon: <HiOutlineClipboardDocumentList {...iconStyle(selectedComponent === 'Attendance')} />,
     },
     {
       text: 'Leaves',
-      icon: selectedComponent === 'Leaves' ? <Notepad2 {...activeProps(22)} /> : <Notepad2 {...iconProps(22)} />,
+      icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Leaves')} />,
     },
     {
       text: 'Employees Reports',
-      icon: selectedComponent === 'Employees Reports' ? <Activity {...activeProps(22)} /> : <Activity {...iconProps(22)} />,
+      icon: <HiOutlineChartBar {...iconStyle(selectedComponent === 'Employees Reports')} />,
     },
   ];
 

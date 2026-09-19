@@ -1,9 +1,8 @@
 import React from 'react';
 import { Box, Typography, List, ListItem, ListItemText, TextField, Button } from '@mui/material';
-import { Send } from 'iconsax-react';
+import { FiSend } from 'react-icons/fi';
 
 const Messenger = () => {
-  // Sample chat data (replace with actual data fetching logic)
   const [messages, setMessages] = React.useState([
     { id: 1, sender: 'John Doe', text: 'Hello, how can I help you today?', timestamp: '10:30 AM' },
     { id: 2, sender: 'You', text: 'Hi, I have a question about the project.', timestamp: '10:32 AM' },
@@ -63,7 +62,7 @@ const Messenger = () => {
           variant="contained"
           sx={{ backgroundColor: '#14286d', color: '#fff' }}
           onClick={handleSendMessage}
-          startIcon={<Send size="24" />}
+          startIcon={<FiSend size={18} />}
         >
           Send
         </Button>

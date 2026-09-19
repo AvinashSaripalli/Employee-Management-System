@@ -5,7 +5,7 @@ import {
 } from "@mui/material";
 import axios from '../../api/axios';
 import { useNavigate, Link } from "react-router-dom";
-import { TaskSquare, People, Activity, ArrowLeft2, Lock, Sms, User, Eye, EyeSlash } from "iconsax-react";
+import { FiClipboard, FiUsers, FiActivity, FiArrowLeft, FiLock, FiMail, FiUser, FiEye, FiEyeOff } from "react-icons/fi";
 
 function Register() {
   const [formValues, setFormValues] = useState({
@@ -131,9 +131,9 @@ function Register() {
   };
 
   const features = [
-    { icon: <TaskSquare size="20" variant="Bold" />, text: "Tasks, projects & checklists with live activity" },
-    { icon: <People size="20" variant="Bold" />, text: "Workgroups, attendance & leave management" },
-    { icon: <Activity size="20" variant="Bold" />, text: "Reports and dashboards in one place" },
+    { icon: <FiClipboard size={20} />, text: "Tasks, projects & checklists with live activity" },
+    { icon: <FiUsers size={20} />, text: "Workgroups, attendance & leave management" },
+    { icon: <FiActivity size={20} />, text: "Reports and dashboards in one place" },
   ];
 
   return (
@@ -266,7 +266,7 @@ function Register() {
                 helperText={errors.firstName}
                 InputProps={{
                   startAdornment: (
-                    <InputAdornment position="start"><User size="18" color="#8A94B0" /></InputAdornment>
+                    <InputAdornment position="start"><FiUser size={18} color="#8A94B0" /></InputAdornment>
                   ),
                 }}
               />
@@ -282,7 +282,7 @@ function Register() {
                 helperText={errors.lastName}
                 InputProps={{
                   startAdornment: (
-                    <InputAdornment position="start"><User size="18" color="#8A94B0" /></InputAdornment>
+                    <InputAdornment position="start"><FiUser size={18} color="#8A94B0" /></InputAdornment>
                   ),
                 }}
               />
@@ -300,7 +300,7 @@ function Register() {
               helperText={errors.email}
               InputProps={{
                 startAdornment: (
-                  <InputAdornment position="start"><Sms size="18" color="#8A94B0" /></InputAdornment>
+                  <InputAdornment position="start"><FiMail size={18} color="#8A94B0" /></InputAdornment>
                 ),
               }}
             />
@@ -317,7 +317,7 @@ function Register() {
               helperText={errors.password}
               InputProps={{
                 startAdornment: (
-                  <InputAdornment position="start"><Lock size="18" color="#8A94B0" /></InputAdornment>
+                  <InputAdornment position="start"><FiLock size={18} color="#8A94B0" /></InputAdornment>
                 ),
                 endAdornment: (
                   <InputAdornment position="end">
@@ -326,7 +326,7 @@ function Register() {
                       onClick={() => setShowPassword((prev) => !prev)}
                       edge="end"
                     >
-                      {showPassword ? <EyeSlash size="20" variant="Outline" /> : <Eye size="20" variant="Outline" />}
+                      {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
                     </IconButton>
                   </InputAdornment>
                 ),
@@ -345,7 +345,7 @@ function Register() {
               helperText={errors.confirmPassword}
               InputProps={{
                 startAdornment: (
-                  <InputAdornment position="start"><Lock size="18" color="#8A94B0" /></InputAdornment>
+                  <InputAdornment position="start"><FiLock size={18} color="#8A94B0" /></InputAdornment>
                 ),
                 endAdornment: (
                   <InputAdornment position="end">
@@ -354,7 +354,7 @@ function Register() {
                       onClick={() => setShowConfirmPassword((prev) => !prev)}
                       edge="end"
                     >
-                      {showConfirmPassword ? <EyeSlash size="20" variant="Outline" /> : <Eye size="20" variant="Outline" />}
+                      {showConfirmPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
                     </IconButton>
                   </InputAdornment>
                 ),
@@ -372,7 +372,7 @@ function Register() {
             </Button>
 
             <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" sx={{ mt: 3 }}>
-              <ArrowLeft2 size="18" color="#8A94B0" />
+              <FiArrowLeft size={18} color="#8A94B0" />
               <Typography>
                 Already have an account? <Link to="/login" style={{ color: "#14286D", fontWeight: 700 }}>Login</Link>
               </Typography>

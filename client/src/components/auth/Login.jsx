@@ -3,7 +3,7 @@ import {
   TextField, Button, IconButton, InputAdornment, Box, Typography,
   Snackbar, Alert, Stack, Divider, CircularProgress,
 } from "@mui/material";
-import { TaskSquare, People, Activity, UserSquare, ArrowRight2, Lock, Sms, Eye, EyeSlash } from "iconsax-react";
+import { FiClipboard, FiUsers, FiActivity, FiUser, FiArrowRight, FiLock, FiMail, FiEye, FiEyeOff } from "react-icons/fi";
 import axios from "../../api/axios";
 import { useNavigate, Link } from "react-router-dom";
 
@@ -75,9 +75,9 @@ function Login() {
   };
 
   const features = [
-    { icon: <TaskSquare size="20" variant="Bold" />, text: "Tasks, projects & checklists with live activity" },
-    { icon: <People size="20" variant="Bold" />, text: "Workgroups, attendance & leave management" },
-    { icon: <Activity size="20" variant="Bold" />, text: "Reports and dashboards in one place" },
+    { icon: <FiClipboard size={20} />, text: "Tasks, projects & checklists with live activity" },
+    { icon: <FiUsers size={20} />, text: "Workgroups, attendance & leave management" },
+    { icon: <FiActivity size={20} />, text: "Reports and dashboards in one place" },
   ];
 
   return (
@@ -206,7 +206,7 @@ function Login() {
               margin="normal"
               InputProps={{
                 startAdornment: (
-                  <InputAdornment position="start"><Sms size="18" color="#8A94B0" /></InputAdornment>
+                  <InputAdornment position="start"><FiMail size={18} color="#8A94B0" /></InputAdornment>
                 ),
               }}
             />
@@ -221,12 +221,12 @@ function Login() {
               inputProps={{ maxLength: 16 }}
               InputProps={{
                 startAdornment: (
-                  <InputAdornment position="start"><Lock size="18" color="#8A94B0" /></InputAdornment>
+                  <InputAdornment position="start"><FiLock size={18} color="#8A94B0" /></InputAdornment>
                 ),
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton onClick={togglePasswordVisibility} edge="end">
-                      {showPassword ? <EyeSlash size="20" variant="Outline" /> : <Eye size="20" variant="Outline" />}
+                      {showPassword ? <FiEyeOff size={20} /> : <FiEye size={20} />}
                     </IconButton>
                   </InputAdornment>
                 ),
@@ -242,7 +242,7 @@ function Login() {
             >
               {submitting ? <CircularProgress size={22} color="inherit" /> : (
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  Log in <ArrowRight2 size="18" variant="Bold" />
+                  Log in <FiArrowRight size={18} />
                 </Box>
               )}
             </Button>
@@ -252,7 +252,7 @@ function Login() {
             </Divider>
 
             <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
-              <UserSquare size="18" color="#8A94B0" />
+              <FiUser size={18} color="#8A94B0" />
               <Typography>
                 Don&apos;t have an account? <Link to="/register" style={{ color: "#14286D", fontWeight: 700 }}>Register</Link>
               </Typography>

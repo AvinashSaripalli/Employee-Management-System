@@ -9,7 +9,7 @@ import EditEmployeeDialog from './EditEmployeeDialog';
 import AddEmployeeDialog from './AddEmployeeDialog';
 import DeleteDialog from './DeleteDialog';
 import ViewEmployeeDialog from './ViewEmployeeDialog';
-import { SearchNormal1, Add, Trash, Eye, Edit, UserSquare, More, ArrowUp2, ArrowDown2 } from 'iconsax-react';
+import { FiSearch, FiPlus, FiTrash2, FiEye, FiEdit2, FiUser, FiMoreHorizontal, FiChevronUp, FiChevronDown } from 'react-icons/fi';
 
 const EmployeesList = ({ onClose }) => {
   const [openAddUser, setOpenAddUser] = useState(false);
@@ -178,7 +178,7 @@ const EmployeesList = ({ onClose }) => {
               width: 48, height: 48, borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center',
               bgcolor: '#EEF2FF', color: 'primary.main',
             }}>
-              <UserSquare size="22" variant="Bold" />
+              <FiUser size="22" />
             </Box>
             <Box>
               <Typography variant="h6">Employees List</Typography>
@@ -197,7 +197,7 @@ const EmployeesList = ({ onClose }) => {
               sx={{ width: { xs: '100%', sm: 260 } }}
               InputProps={{
                 startAdornment: (
-                  <InputAdornment position="start"><SearchNormal1 size="18" color="#8A94B0" /></InputAdornment>
+                  <InputAdornment position="start"><FiSearch size="18" color="#8A94B0" /></InputAdornment>
                 ),
               }}
             />
@@ -206,12 +206,12 @@ const EmployeesList = ({ onClose }) => {
                 variant="contained"
                 color="error"
                 onClick={handleClickOpenDeleteUser}
-                startIcon={<Trash size="18" variant="Bold" />}
+                startIcon={<FiTrash2 size="18" />}
               >
                 Delete ({selectedUsers.length})
               </Button>
             )}
-            <Button variant="contained" onClick={handleClickOpenAddUser} startIcon={<Add size="18" variant="Bold" />}>
+            <Button variant="contained" onClick={handleClickOpenAddUser} startIcon={<FiPlus size="18" />}>
               Add Employee
             </Button>
           </Box>
@@ -234,7 +234,7 @@ const EmployeesList = ({ onClose }) => {
               </TableCell>
               <TableCell align="center">Photo</TableCell>
               <TableCell align="center" sx={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={handleSortByEmployeeId}>
-                Employee ID {sortOrder === 'asc' ? <ArrowDown2 size="16" /> : <ArrowUp2 size="16" />}
+                Employee ID {sortOrder === 'asc' ? <FiChevronDown size="16" /> : <FiChevronUp size="16" />}
               </TableCell>
               <TableCell align="left">Name</TableCell>
               <TableCell align="left">Designation</TableCell>
@@ -264,11 +264,11 @@ const EmployeesList = ({ onClose }) => {
                   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     <Tooltip title="View profile">
                       <IconButton size="small" onClick={() => handleViewUser(user)} sx={{ color: 'primary.main' }}>
-                        <Eye size="19" variant="Bold" />
+                        <FiEye size="19" />
                       </IconButton>
                     </Tooltip>
                     <IconButton size="small" onClick={(event) => handleMenuOpen(event, user)}>
-                      <More size="18" variant="Outline" />
+                      <FiMoreHorizontal size="18" />
                     </IconButton>
                   </Box>
                   <Menu
@@ -279,11 +279,11 @@ const EmployeesList = ({ onClose }) => {
                     anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                   >
                     <MenuItem onClick={handleEditMenuClick}>
-                      <Edit size="16" style={{ marginRight: 8 }} color="#14286D" /> Edit
+                      <FiEdit2 size="16" style={{ marginRight: 8 }} color="#14286D" /> Edit
                     </MenuItem>
                     <Divider />
                     <MenuItem onClick={handleDeleteMenuClick} sx={{ color: 'error.main' }}>
-                      <Trash size="16" style={{ marginRight: 8 }} /> Delete
+                      <FiTrash2 size="16" style={{ marginRight: 8 }} /> Delete
                     </MenuItem>
                   </Menu>
                 </TableCell>

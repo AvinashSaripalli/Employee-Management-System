@@ -7,7 +7,7 @@ import {
 } from '@mui/material';
 import axios from '../../api/axios';
 import dayjs from 'dayjs';
-import { SearchNormal1 } from 'iconsax-react';
+import { FiSearch } from 'react-icons/fi';
 import { durationLabel, formatLeaveDate, LEAVE_TYPE_META, statusColor, leaveIdentityParams } from '../../utils/leaveConfig';
 
 const employeeName = (leave) =>
@@ -128,7 +128,7 @@ const LeaveApprovals = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchNormal1 size={16} />
+                  <FiSearch size={16} />
                 </InputAdornment>
               ),
             }}

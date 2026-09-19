@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Box, Typography, Snackbar, Alert } from '@mui/material';
-import { Activity, Note, Notepad2, Profile, TaskSquare } from 'iconsax-react';
+import { HiOutlineClipboardDocumentCheck, HiOutlineChartBar, HiOutlineDocumentText, HiOutlineCalendarDays, HiOutlineUserCircle } from 'react-icons/hi2';
 import AppShell from './AppShell';
 import ApplyLeave from '../leaves/ApplyLeave';
 import MyLeaves from '../leaves/MyLeaves';
@@ -184,26 +184,27 @@ const Sidebar = () => {
     </Box>
   );
 
+  const iconStyle = (active) => ({ size: 22, color: active ? '#fff' : undefined });
   const navItems = [
     {
       text: 'Tasks',
-      icon: selectedComponent === 'Tasks' ? <TaskSquare size={22} variant="Bold" /> : <TaskSquare size={22} variant="Outline" />,
+      icon: <HiOutlineClipboardDocumentCheck {...iconStyle(selectedComponent === 'Tasks')} />,
     },
     {
       text: 'Work Reports',
-      icon: selectedComponent === 'Work Reports' ? <Activity size={22} variant="Bold" /> : <Activity size={22} variant="Outline" />,
+      icon: <HiOutlineChartBar {...iconStyle(selectedComponent === 'Work Reports')} />,
     },
     {
       text: 'Apply Leave',
-      icon: selectedComponent === 'Apply Leave' ? <Note size={22} variant="Bold" /> : <Note size={22} variant="Outline" />,
+      icon: <HiOutlineDocumentText {...iconStyle(selectedComponent === 'Apply Leave')} />,
     },
     {
       text: 'My Leaves',
-      icon: selectedComponent === 'My Leaves' ? <Notepad2 size={22} variant="Bold" /> : <Notepad2 size={22} variant="Outline" />,
+      icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'My Leaves')} />,
     },
     {
       text: 'Profile',
-      icon: selectedComponent === 'Profile' ? <Profile size={22} variant="Bold" /> : <Profile size={22} variant="Outline" />,
+      icon: <HiOutlineUserCircle {...iconStyle(selectedComponent === 'Profile')} />,
     },
   ];
 

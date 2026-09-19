@@ -19,10 +19,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip,
   CartesianGrid, PieChart, Pie, Cell, Legend, AreaChart, Area, LabelList,
 } from 'recharts';
-import {
-  TaskSquare, TickCircle, Clock, Timer1, NoteRemove, Ranking, UserSquare, ChartSquare,
-  Eye, Edit, Trash,
-} from 'iconsax-react';
+import { FiClipboard, FiCheckCircle, FiClock, FiFileMinus, FiAward, FiUser, FiBarChart2, FiEye, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import axios from '../../api/axios';
 
 const STATUS_META = {
@@ -729,7 +726,7 @@ const TasksProjects = () => {
                             onClick={() => handleView(task)}
                             sx={{ color: '#2067B0', '&:hover': { bgcolor: '#EAF4FC' } }}
                           >
-                            <Eye size="18" variant="Outline" />
+                            <FiEye size={18} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Edit task">
@@ -739,7 +736,7 @@ const TasksProjects = () => {
                             onClick={() => handleEdit(task)}
                             sx={{ color: '#14286D', '&:hover': { bgcolor: '#EEF2FF' } }}
                           >
-                            <Edit size="18" variant="Outline" />
+                            <FiEdit2 size={18} />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Delete task">
@@ -749,7 +746,7 @@ const TasksProjects = () => {
                             onClick={() => handleDelete(task)}
                             sx={{ color: '#D64545', '&:hover': { bgcolor: '#FDECEC' } }}
                           >
-                            <Trash size="18" variant="Outline" />
+                            <FiTrash2 size={18} />
                           </IconButton>
                         </Tooltip>
                       </Box>
@@ -1317,18 +1314,18 @@ const StatsBoard = ({ stats, onView }) => {
   const workloadData = stats.workload.map((w) => ({ name: w.name, Done: w.completed, Pending: w.pending }));
 
   const tiles = [
-    { icon: <TaskSquare size="26" />, label: 'Total Tasks', value: stats.total, sub: `${stats.myTasks} assigned to you`, color: '#14286D', tint: '#E2E7F5' },
-    { icon: <TickCircle size="26" />, label: 'Completed', value: stats.completed, sub: `${stats.completionRate}% completion rate`, color: '#16A34A', tint: '#E7F6EC' },
-    { icon: <Clock size="26" />, label: 'In Progress', value: stats.inProgress, sub: 'currently being worked on', color: '#D97706', tint: '#FEF3E2' },
-    { icon: <NoteRemove size="26" />, label: 'Overdue', value: stats.overdue, sub: 'past their deadline', color: '#E11D48', tint: '#FDECF0' },
-    { icon: <Ranking size="26" />, label: 'Completion Rate', value: `${stats.completionRate}%`, sub: 'of all tasks done', color: '#0284C7', tint: '#E0F2FE' },
-    { icon: <UserSquare size="26" />, label: 'My Tasks', value: stats.myTasks, sub: 'assigned to you', color: '#7C3AED', tint: '#F1E9FC' },
+    { icon: <FiClipboard size="26" />, label: 'Total Tasks', value: stats.total, sub: `${stats.myTasks} assigned to you`, color: '#14286D', tint: '#E2E7F5' },
+    { icon: <FiCheckCircle size="26" />, label: 'Completed', value: stats.completed, sub: `${stats.completionRate}% completion rate`, color: '#16A34A', tint: '#E7F6EC' },
+    { icon: <FiClock size="26" />, label: 'In Progress', value: stats.inProgress, sub: 'currently being worked on', color: '#D97706', tint: '#FEF3E2' },
+    { icon: <FiFileMinus size="26" />, label: 'Overdue', value: stats.overdue, sub: 'past their deadline', color: '#E11D48', tint: '#FDECF0' },
+    { icon: <FiAward size="26" />, label: 'Completion Rate', value: `${stats.completionRate}%`, sub: 'of all tasks done', color: '#0284C7', tint: '#E0F2FE' },
+    { icon: <FiUser size="26" />, label: 'My Tasks', value: stats.myTasks, sub: 'assigned to you', color: '#7C3AED', tint: '#F1E9FC' },
   ];
 
   if (stats.total === 0) {
     return (
       <Paper sx={{ p: 6, borderRadius: 3, border: '1px dashed #C9D6EE', textAlign: 'center' }}>
-        <ChartSquare size="48" color="#C9D6EE" />
+        <FiBarChart2 size="48" color="#C9D6EE" />
         <Typography variant="h6" sx={{ mt: 1.5, fontWeight: 'bold' }}>
           No statistics yet
         </Typography>
@@ -1462,7 +1459,7 @@ const StatsBoard = ({ stats, onView }) => {
 
       <Paper sx={{ mt: 2.5, borderRadius: 3, border: '1px solid #E8EEF9', boxShadow: '0 6px 18px rgba(20,40,109,0.07)', overflow: 'hidden' }}>
         <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid #EEF2FA', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Timer1 size="20" color="#E11D48" />
+          <FiClock size={20} color="#E11D48" />
           <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
             Overdue Tasks
           </Typography>
@@ -1503,7 +1500,7 @@ const StatsBoard = ({ stats, onView }) => {
           </TableContainer>
         ) : (
           <Box sx={{ px: 2.5, py: 3, textAlign: 'center' }}>
-            <TickCircle size="32" color="#16A34A" />
+            <FiCheckCircle size="32" color="#16A34A" />
             <Typography color="text.secondary" sx={{ mt: 1, fontSize: '0.9rem' }}>
               Nothing overdue. Great job!
             </Typography>

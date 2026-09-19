@@ -4,11 +4,7 @@ import {
   ListItemButton, ListItemIcon, IconButton, Menu, MenuItem, Divider,
   Avatar, Badge, Chip, CircularProgress, Tooltip,
 } from '@mui/material';
-import {
-  Menu as MenuIcon, SearchNormal1, Notification, ArrowCircleLeft,
-  ArrowCircleRight, Refresh, LogoutCurve, ArrowDown2, InfoCircle,
-  TaskSquare, Calendar1, Danger, TickCircle,
-} from 'iconsax-react';
+import { HiOutlineMagnifyingGlass, HiOutlineBell, HiOutlineArrowPath, HiOutlineArrowRightOnRectangle, HiOutlineChevronDown, HiOutlineInformationCircle, HiOutlineClipboardDocumentCheck, HiOutlineCalendarDays, HiOutlineExclamationTriangle, HiOutlineCheckCircle, HiOutlineBars3, HiOutlineChevronDoubleLeft, HiOutlineChevronDoubleRight } from 'react-icons/hi2';
 import axios from '../../api/axios';
 
 const OPEN_WIDTH = 256;
@@ -284,7 +280,7 @@ const AppShell = ({
               '&:hover': { bgcolor: '#E9EEFA' },
             }}
           >
-            {open ? <ArrowCircleLeft size="22" /> : <ArrowCircleRight size="22" />}
+            {open ? <HiOutlineChevronDoubleLeft size={22} /> : <HiOutlineChevronDoubleRight size={22} />}
           </IconButton>
         </Box>
       </Drawer>
@@ -330,7 +326,7 @@ const AppShell = ({
               color: 'text.disabled',
             }}
           >
-            <SearchNormal1 size="16" variant="Outline" />
+            <HiOutlineMagnifyingGlass size={16} />
             <Typography variant="caption" color="text.secondary">
               Search…
             </Typography>
@@ -342,7 +338,7 @@ const AppShell = ({
             aria-label="Notifications"
           >
             <Badge badgeContent={unreadNotifications.length || null} color="secondary" max={9}>
-              <Notification size="20" variant="Outline" />
+              <HiOutlineBell size={20} />
             </Badge>
           </IconButton>
 
@@ -369,13 +365,13 @@ const AppShell = ({
                       onClick={() => persistReadNotificationIds(notifications.map((notification) => notification.id))}
                       aria-label="Mark all notifications as read"
                     >
-                      <TickCircle size="17" variant="Outline" />
+                      <HiOutlineCheckCircle size={17} />
                     </IconButton>
                   </Tooltip>
                 )}
                 <Tooltip title="Refresh notifications">
                   <IconButton size="small" onClick={fetchNotifications} aria-label="Refresh notifications">
-                    <Refresh size="17" variant="Outline" />
+                    <HiOutlineArrowPath size={17} />
                   </IconButton>
                 </Tooltip>
               </Box>
@@ -396,7 +392,7 @@ const AppShell = ({
                   }}
                 >
                   <ListItemIcon sx={{ minWidth: 34, color: notification.category === 'urgent' ? 'error.main' : notification.category === 'leave' ? 'warning.main' : notification.category === 'success' ? 'success.main' : 'primary.main' }}>
-                    {notification.category === 'urgent' ? <Danger size="18" variant="Bold" /> : notification.category === 'leave' ? <InfoCircle size="18" variant="Bold" /> : notification.category === 'success' ? <TickCircle size="18" variant="Bold" /> : <TaskSquare size="18" variant="Bold" />}
+                    {notification.category === 'urgent' ? <HiOutlineExclamationTriangle size={18} /> : notification.category === 'leave' ? <HiOutlineInformationCircle size={18} /> : notification.category === 'success' ? <HiOutlineCheckCircle size={18} /> : <HiOutlineClipboardDocumentCheck size={18} />}
                   </ListItemIcon>
                   <Box sx={{ minWidth: 0, flex: 1 }}>
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>{notification.title}</Typography>
@@ -418,7 +414,7 @@ const AppShell = ({
             avatar={<Avatar alt={userName} src={userPhoto || undefined}>{getInitials(userName)}</Avatar>}
             label={<Typography sx={{ display: { xs: 'none', md: 'block' } }}>{userName}</Typography>}
             onClick={handleMenu}
-            deleteIcon={<ArrowDown2 size="16" />}
+            deleteIcon={<HiOutlineChevronDown size={16} />}
             onDelete={handleMenu}
             sx={{
               bgcolor: 'background.default',
@@ -445,12 +441,12 @@ const AppShell = ({
             <Divider sx={{ m: 1 }} />
             {onProfile && (
               <MenuItem onClick={() => { handleMenuClose(); onProfile(); }}>
-                <ListItemIcon><InfoCircle size="18" /></ListItemIcon>
+                <ListItemIcon><HiOutlineInformationCircle size={18} /></ListItemIcon>
                 Profile
               </MenuItem>
             )}
             <MenuItem onClick={() => { handleMenuClose(); onLogout && onLogout(); }}>
-              <ListItemIcon><LogoutCurve size="18" /></ListItemIcon>
+              <ListItemIcon><HiOutlineArrowRightOnRectangle size={18} /></ListItemIcon>
               Logout
             </MenuItem>
           </Menu>
