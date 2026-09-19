@@ -3,7 +3,6 @@ import Register from './components/auth/Register';
 import Login from './components/auth/Login';
 import Sidebar from './components/layout/Sidebar';
 import EmployeeSidebar from './components/layout/EmployeeSidebar';
-import HrSidebar from './components/layout/HrSidebar';
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('token');
@@ -16,16 +15,12 @@ const ProtectedRoute = ({ children }) => {
 const HomeRedirect = () => {
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('userRole');
-  const department = localStorage.getItem('userDepartment');
 
   if (!token) {
     return <Navigate to="/login" replace />;
   }
   if (role === 'Manager' || role === 'Admin') {
     return <Navigate to="/sidebar" replace />;
-  }
-  if (department === 'Human Resources') {
-    return <Navigate to="/hrsidebar" replace />;
   }
   return <Navigate to="/employeesidebar" replace />;
 };
@@ -50,14 +45,6 @@ function App() {
           element={
             <ProtectedRoute>
               <EmployeeSidebar />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/hrsidebar"
-          element={
-            <ProtectedRoute>
-              <HrSidebar />
             </ProtectedRoute>
           }
         />

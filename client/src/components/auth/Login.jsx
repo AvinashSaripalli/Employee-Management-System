@@ -57,8 +57,6 @@ function Login() {
         setTimeout(() => {
           if (role === "Manager" || role === "Admin") {
             navigate("/sidebar");
-          } else if (department === "Human Resources") {
-            navigate("/hrsidebar");
           } else {
             navigate("/employeesidebar");
           }

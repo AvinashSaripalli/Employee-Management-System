@@ -166,8 +166,8 @@ function getLeaveType(name) {
   return LEAVE_TYPES[name] || null;
 }
 
-function canApproveRole(role, department) {
-  return role === "Admin" || role === "Manager" || department === "Human Resources";
+function canApproveRole(role) {
+  return role === "Admin" || role === "Manager";
 }
 
 module.exports = {

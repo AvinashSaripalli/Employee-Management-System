@@ -100,6 +100,36 @@ const Dashboard = () => {
     { genderName: 'Female', genders: 0 },
   ]);
 
+  const normalizeDepartmentRows = (rows = []) => {
+    const departmentMap = new Map();
+
+    rows.forEach((row) => {
+      const rawName = row?.departmentName ?? row?.name ?? '';
+      const normalizedName = String(rawName).trim();
+      if (!normalizedName || normalizedName.toLowerCase() === 'management') return;
+
+      const key = normalizedName.toLowerCase().replace(/\s+/g, ' ');
+      const existing = departmentMap.get(key);
+      const count = Number(row?.indepartment ?? row?.count ?? 0) || 0;
+
+      if (existing) {
+        existing.indepartment += count;
+        return;
+      }
+
+      departmentMap.set(key, {
+        departmentName: normalizedName,
+        indepartment: count,
+      });
+    });
+
+    return Array.from(departmentMap.values()).sort((a, b) => {
+      const diff = Number(b.indepartment) - Number(a.indepartment);
+      if (diff !== 0) return diff;
+      return String(a.departmentName).localeCompare(String(b.departmentName));
+    });
+  };
+
   const colors = ["#14286D", "#3d5ae8", "#7c3aed", "#0e9f6e", "#f97316", "#e11d48", "#0891b2"];
   const colorcode = ['#14286D', '#FE8600'];
 
@@ -163,19 +193,41 @@ const Dashboard = () => {
           params: { companyName, year: selectedYear },
           headers: { Authorization: `Bearer ${token}` },
         });
+
+        const normalizedDepartmentData = normalizeDepartmentRows(usersByDepartmentData || []);
         let deptNames = [];
         try {
           const { data: deptRows } = await axios.get('/departments', { params: { companyName }, headers: { Authorization: `Bearer ${token}` } });
           deptNames = (Array.isArray(deptRows) ? deptRows.map((d) => d.name) : []).filter(Boolean);
         } catch {}
-        const byDeptMap = new Map(usersByDepartmentData.map((d) => [d.departmentName, d.indepartment]));
-        const merged = deptNames.length
-          ? deptNames.map((name) => ({ departmentName: name, indepartment: Number(byDeptMap.get(name) || 0) }))
-          : usersByDepartmentData.map((d) => ({ departmentName: d.departmentName, indepartment: Number(d.indepartment) }));
-        usersByDepartmentData.forEach((d) => {
-          if (!merged.find((m) => m.departmentName === d.departmentName)) merged.push({ departmentName: d.departmentName, indepartment: Number(d.indepartment) });
+
+        const dedupedDeptNames = [...new Set(
+          deptNames
+            .map((name) => String(name).trim())
+            .filter((name) => name && name.toLowerCase() !== 'management')
+            .map((name) => name.replace(/\s+/g, ' '))
+        )];
+
+        const departmentLookup = new Map();
+        normalizedDepartmentData.forEach((department) => {
+          departmentLookup.set(department.departmentName.toLowerCase().replace(/\s+/g, ' '), department.indepartment);
         });
-        setDepartmentOrder(merged);
+
+        const merged = dedupedDeptNames.length
+          ? dedupedDeptNames.map((name) => ({
+              departmentName: name,
+              indepartment: Number(departmentLookup.get(name.toLowerCase()) || 0),
+            }))
+          : normalizedDepartmentData;
+
+        normalizedDepartmentData.forEach((department) => {
+          const key = department.departmentName.toLowerCase().replace(/\s+/g, ' ');
+          if (!merged.some((item) => item.departmentName.toLowerCase().replace(/\s+/g, ' ') === key)) {
+            merged.push({ ...department });
+          }
+        });
+
+        setDepartmentOrder(merged.filter(Boolean).sort((a, b) => Number(b.indepartment) - Number(a.indepartment)));
 
         const { data: usersByGenderData } = await axios.get('/users-by-genders', {
           params: { companyName, year: selectedYear },

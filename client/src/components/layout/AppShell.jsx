@@ -71,7 +71,7 @@ const AppShell = ({
         axios.get('/tasks', { params: { companyName, myTasks: 'true' } }),
         axios.get('/leaves/recent'),
       ];
-      const canReviewLeaves = ['Admin', 'Manager'].includes(role) || department === 'Human Resources';
+      const canReviewLeaves = ['Admin', 'Manager'].includes(role);
       if (canReviewLeaves) {
         requests.push(axios.get('/leaves/leave', { params: { companyName, status: 'Pending' } }));
       }

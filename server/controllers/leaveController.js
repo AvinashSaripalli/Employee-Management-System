@@ -508,7 +508,7 @@ exports.updateLeaveStatus = async (req, res) => {
     const role = actor?.role || req.user?.role;
     const department = actor?.department || req.user?.department;
     if (!canApproveRole(role, department)) {
-      return res.status(403).json({ error: 'Only managers or HR can review leave requests' });
+      return res.status(403).json({ error: 'Only managers can review leave requests' });
     }
 
     const leave = await Leave.findByPk(leaveId);
