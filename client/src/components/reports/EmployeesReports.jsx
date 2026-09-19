@@ -71,7 +71,6 @@ const EmployeesReports = () => {
             <TableRow>
               <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Report ID</TableCell>
               <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Date</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Employee ID</TableCell>
               <TableCell sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Department</TableCell>
               <TableCell sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Task Name</TableCell>
               <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Hours Worked</TableCell>
@@ -83,7 +82,6 @@ const EmployeesReports = () => {
               <TableRow key={index} sx={{ '&:nth-of-type(odd)': { backgroundColor: '#f9f9f9' }, height: "70px" }}>
                 <TableCell align="center">{report.id}</TableCell>
                 <TableCell align="center">{new Date(report.date).toLocaleDateString('en-GB')}</TableCell>
-                <TableCell align="center">{report.employeeId}</TableCell>
                 <TableCell>{report.department}</TableCell>
                 <TableCell>{report.taskName}</TableCell>
                 <TableCell align="center">{report.hoursWorked}</TableCell>
@@ -115,7 +113,6 @@ const EmployeesReports = () => {
           {selectedReport && (
             <Grid container spacing={3}>
               {[
-                { label: 'Employee ID', value: selectedReport.employeeId },
                 { label: 'Department', value: selectedReport.department },
                 { label: 'Date', value: new Date(selectedReport.date).toLocaleDateString('en-GB') },
                 { label: 'Task Name', value: selectedReport.taskName },

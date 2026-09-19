@@ -13,7 +13,8 @@ import { durationLabel, formatLeaveDate, LEAVE_TYPE_META, statusColor, leaveIden
 const employeeName = (leave) =>
   leave.employee_name ||
   `${leave.employee?.firstName || ''} ${leave.employee?.lastName || ''}`.trim() ||
-  leave.employeeId;
+  leave.employee?.email ||
+  'Employee';
 
 const LeaveApprovals = () => {
   const [leaves, setLeaves] = useState([]);
@@ -185,10 +186,7 @@ const LeaveApprovals = () => {
                             <Box>
                               <Typography variant="body2" sx={{ fontWeight: 700 }}>{name}</Typography>
                               <Typography variant="caption" color="text.secondary">
-                                {leave.employeeId}
-                                {leave.department || leave.employee?.department
-                                  ? ` · ${leave.department || leave.employee?.department}`
-                                  : ''}
+                                {leave.department || leave.employee?.department || leave.employee?.designation || ''}
                               </Typography>
                             </Box>
                           </Stack>
@@ -277,7 +275,7 @@ const LeaveApprovals = () => {
             ) : (
               todayList.map((person, index) => (
                 <Box key={person.id}>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{person.name || person.employeeId}</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{person.name || 'Employee'}</Typography>
                   <Typography variant="caption" color="text.secondary">
                     {person.leave_type}
                     {person.half_day ? ` · Half day ${person.half_day_session || ''}` : ''}

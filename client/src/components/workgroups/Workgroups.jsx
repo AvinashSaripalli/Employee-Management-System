@@ -294,7 +294,7 @@ const Workgroups = () => {
                           src={emp.photo ? `${emp.photo}` : undefined}
                           alt={`${emp.firstName} ${emp.lastName}`}
                           sx={{ width: 40, height: 40 }}
-                          title={emp.employeeId}
+                          title={`${emp.firstName} ${emp.lastName}`}
                         />
                       ))}
                     </AvatarGroup>
@@ -346,13 +346,13 @@ const Workgroups = () => {
               />
               <Box>
                 <Typography variant="body2">
-                  <strong>ID:</strong> {emp.employeeId}
-                </Typography>
-                <Typography variant="body2">
                   <strong>Name:</strong> {emp.firstName} {emp.lastName}
                 </Typography>
                 <Typography variant="body2">
                   <strong>Email:</strong> {emp.email}
+                </Typography>
+                <Typography variant="body2">
+                  <strong>Designation:</strong> {emp.designation}
                 </Typography>
               </Box>
             </Box>
@@ -385,7 +385,7 @@ const Workgroups = () => {
               />
               <Box>
                 <Typography variant="body1">
-                  <strong>ID:</strong> {selectedEmployeeDetails.employeeId}
+                  <strong>Name:</strong> {selectedEmployeeDetails.firstName} {selectedEmployeeDetails.lastName}
                 </Typography>
                 <Typography variant="body1">
                   <strong>Name:</strong> {selectedEmployeeDetails.firstName} {selectedEmployeeDetails.lastName}
@@ -452,7 +452,7 @@ const Workgroups = () => {
             multiple
             id="add-employees"
             options={users}
-            getOptionLabel={(option) => `${option.firstName} ${option.lastName} (${option.employeeId})`}
+            getOptionLabel={(option) => `${option.firstName} ${option.lastName}`}
             value={users.filter((user) => createGroups.employeers.includes(user.employeeId))}
             onChange={(event, newValue) => {
               setCreateGroups((prev) => ({
@@ -480,33 +480,36 @@ const Workgroups = () => {
                   />
                   <Box>
                     <Typography variant="body2">
-                      <strong>ID:</strong> {option.employeeId}
-                    </Typography>
-                    <Typography variant="body2">
                       <strong>Name:</strong> {option.firstName} {option.lastName}
                     </Typography>
                     <Typography variant="body2">
                       <strong>Department:</strong> {option.department}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Email:</strong> {option.email}
                     </Typography>
                   </Box>
                   </Box>
                 </li>
               )}
               renderTags={(value, getTagProps) =>
-                value.map((user, index) => (
-                  <Chip
-                    key={user.employeeId}
-                    avatar={
-                      <Avatar
-                        src={user.photo || undefined}
-                        alt={`${user.firstName} ${user.lastName}`}
-                      />
-                    }
-                    label={user.employeeId}
-                    {...getTagProps({ index })}
-                    sx={{ m: 0.5 }}
-                  />
-                ))
+                value.map((user, index) => {
+                  const { key, ...tagProps } = getTagProps({ index });
+                  return (
+                    <Chip
+                      key={key}
+                      avatar={
+                        <Avatar
+                          src={user.photo || undefined}
+                          alt={`${user.firstName} ${user.lastName}`}
+                        />
+                      }
+                      label={`${user.firstName} ${user.lastName}`}
+                      {...tagProps}
+                      sx={{ m: 0.5 }}
+                    />
+                  );
+                })
               }
               sx={{ width: '100%', mt: 2 }}
             />

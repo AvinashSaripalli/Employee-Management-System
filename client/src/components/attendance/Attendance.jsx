@@ -164,7 +164,6 @@ const Attendance = () => {
                   <Table stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell align="center" sx={{ color: '#000', fontWeight: 'bold' }}>Employee ID</TableCell>
                         <TableCell align="left" sx={{ color: '#000', fontWeight: 'bold' }}>Name</TableCell>
                         <TableCell sx={{ color: '#000', fontWeight: 'bold' }}>Department</TableCell>
                         <TableCell align="center"sx={{ color: '#000', fontWeight: 'bold' }}>ClockIn_Date</TableCell>
@@ -178,7 +177,6 @@ const Attendance = () => {
                           .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                           .map((attendance, index) => (
                             <TableRow key={index}>
-                              <TableCell align="center">{attendance.employeeId}</TableCell>
                               <TableCell align="left">{attendance.lastName} {attendance.firstName}</TableCell>
                               <TableCell>{attendance.department}</TableCell>
                               <TableCell align="center">{formatDate(attendance.clockInDate)}</TableCell>
@@ -194,7 +192,7 @@ const Attendance = () => {
                           ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={6} align="center">
+                          <TableCell colSpan={5} align="center">
                             No attendance records found
                           </TableCell>
                         </TableRow>

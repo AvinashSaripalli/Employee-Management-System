@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Box, Typography, Snackbar, Alert } from '@mui/material';
-import { HiOutlineClipboardDocumentCheck, HiOutlineChartBar, HiOutlineDocumentText, HiOutlineCalendarDays, HiOutlineUserCircle } from 'react-icons/hi2';
+import { HiOutlineClipboardDocumentCheck, HiOutlineChartBar, HiOutlineDocumentText, HiOutlineCalendarDays, HiOutlineUserCircle, HiOutlineChatBubbleLeftRight } from 'react-icons/hi2';
 import AppShell from './AppShell';
 import ApplyLeave from '../leaves/ApplyLeave';
 import MyLeaves from '../leaves/MyLeaves';
 import EmployeeProfile from '../employees/EmployeeProfile';
 import WorkReports from '../reports/WorkReports';
 import TasksProjects from '../tasks/TasksProjects';
+import Messenger from '../messenger/Messenger';
 import axios from '../../api/axios';
 
 const Sidebar = () => {
@@ -136,6 +137,7 @@ const Sidebar = () => {
     switch (selectedComponent) {
       case 'Tasks': return <TasksProjects />;
       case 'Work Reports': return <WorkReports />;
+      case 'Messenger': return <Messenger />;
       case 'Apply Leave': return <ApplyLeave />;
       case 'My Leaves': return <MyLeaves />;
       case 'Profile': return <EmployeeProfile />;
@@ -193,6 +195,10 @@ const Sidebar = () => {
     {
       text: 'Work Reports',
       icon: <HiOutlineChartBar {...iconStyle(selectedComponent === 'Work Reports')} />,
+    },
+    {
+      text: 'Messenger',
+      icon: <HiOutlineChatBubbleLeftRight {...iconStyle(selectedComponent === 'Messenger')} />,
     },
     {
       text: 'Apply Leave',

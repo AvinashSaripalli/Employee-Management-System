@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -43,6 +44,9 @@ app.use('/api/tasks', verifyToken, taskRoutes);
 const departmentRoutes = require('./routes/departmentRoutes');
 app.use('/api/departments', departmentRoutes);
 
+const messageRoutes = require('./routes/messageRoutes');
+app.use('/api/messages', messageRoutes);
+
 const distPath = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
@@ -59,14 +63,66 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
+// --- Socket.IO ---
+const server = http.createServer(app);
+const { Server } = require('socket.io');
+const jwt = require('jsonwebtoken');
+const io = new Server(server, {
+  cors: { origin: '*', methods: ['GET', 'POST', 'PATCH', 'DELETE'] },
+});
+app.set('io', io);
+
+const onlineUsers = new Map(); // employeeId -> socketId
+
+io.on('connection', (socket) => {
+  // auth via token in handshake auth or query
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  let user = null;
+  if (token) {
+    try { user = jwt.verify(token, process.env.JWT_SECRET); } catch {}
+  }
+  if (user?.employeeId) {
+    onlineUsers.set(user.employeeId, socket.id);
+    socket.employeeId = user.employeeId;
+    socket.companyName = user.companyName;
+    socket.join(`company:${user.companyName}`);
+    io.to(`company:${user.companyName}`).emit('presence:update', { online: Array.from(onlineUsers.keys()).filter((id) => {
+      // only those in same company (approx)
+      return true;
+    })});
+  }
+
+  socket.on('join:conversation', (conversationId) => {
+    if (conversationId) socket.join(conversationId);
+  });
+  socket.on('leave:conversation', (conversationId) => {
+    if (conversationId) socket.leave(conversationId);
+  });
+  socket.on('typing:start', (payload) => {
+    const { conversationId, senderName } = payload || {};
+    if (conversationId) socket.to(conversationId).emit('typing:start', { conversationId, senderName, employeeId: socket.employeeId });
+  });
+  socket.on('typing:stop', (payload) => {
+    const { conversationId } = payload || {};
+    if (conversationId) socket.to(conversationId).emit('typing:stop', { conversationId, employeeId: socket.employeeId });
+  });
+  socket.on('disconnect', () => {
+    if (socket.employeeId) {
+      onlineUsers.delete(socket.employeeId);
+      if (socket.companyName) io.to(`company:${socket.companyName}`).emit('presence:update', { online: Array.from(onlineUsers.keys()) });
+    }
+  });
+});
+
 ensureLeaveSchema()
   .then(() => backfillCompanyMembership())
   .then(() => require('./models').Department.sync())
+  .then(() => require('./models').Message.sync())
   .catch((err) => {
     console.error('Startup data sync failed:', err.message);
   })
   .finally(() => {
-    app.listen(port, () => {
+    server.listen(port, () => {
       console.log(`Server running on http://localhost:${port}`);
     });
   });

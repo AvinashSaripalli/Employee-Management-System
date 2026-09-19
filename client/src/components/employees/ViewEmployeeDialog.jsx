@@ -65,16 +65,6 @@ const ViewEmployeeDialog = ({ open, onClose, user }) => {
             </Grid2>
             <Grid2 size={7}>
             </Grid2>
-            <Grid2 size={0.2}>
-            </Grid2>
-            <Grid2 size={4.5}>
-              <Typography variant="body1">Employee ID: </Typography>
-            </Grid2>
-            <Grid2 size={7}>
-              {user.employeeId}
-            </Grid2>
-            <Grid2 size={0.2}>
-            </Grid2>
             <Grid2 size={4.5}>
               <Typography variant="body1">Designation: </Typography>
             </Grid2>

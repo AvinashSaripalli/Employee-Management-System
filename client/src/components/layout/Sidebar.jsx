@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HiOutlineSquares2X2, HiOutlineClipboardDocumentCheck, HiOutlineUsers, HiOutlineBuildingOffice2, HiOutlineUserGroup, HiOutlineCalendarDays, HiOutlineChartBar } from 'react-icons/hi2';
+import { HiOutlineSquares2X2, HiOutlineClipboardDocumentCheck, HiOutlineUsers, HiOutlineBuildingOffice2, HiOutlineUserGroup, HiOutlineCalendarDays, HiOutlineChartBar, HiOutlineChatBubbleLeftRight } from 'react-icons/hi2';
 import AppShell from './AppShell';
 import Dashboard from '../dashboard/Dashboard';
 import TasksProjects from '../tasks/TasksProjects';
@@ -10,6 +10,7 @@ import Workgroups from '../workgroups/Workgroups';
 import ManageLeaves from '../leaves/ManageLeaves';
 import Reports from '../reports/Reports';
 import UserProfile from '../profile/UserProfile';
+import Messenger from '../messenger/Messenger';
 
 const Sidebar = () => {
   const [selectedComponent, setSelectedComponent] = useState('Dashboard');
@@ -47,6 +48,7 @@ const Sidebar = () => {
       case 'Employees List': return <EmployeesList />;
       case 'Company Structure': return <CompanyStructure />;
       case 'Work Groups': return <Workgroups />;
+      case 'Messenger': return <Messenger />;
       case 'Manage Leaves': return <ManageLeaves />;
       case 'Reports': return <Reports />;
       default: return <UserProfile />;
@@ -75,6 +77,10 @@ const Sidebar = () => {
     {
       text: 'Work Groups',
       icon: <HiOutlineUserGroup {...iconStyle(selectedComponent === 'Work Groups')} />,
+    },
+    {
+      text: 'Messenger',
+      icon: <HiOutlineChatBubbleLeftRight {...iconStyle(selectedComponent === 'Messenger')} />,
     },
     {
       text: 'Manage Leaves',

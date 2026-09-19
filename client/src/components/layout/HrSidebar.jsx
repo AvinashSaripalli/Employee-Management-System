@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HiOutlineSquares2X2, HiOutlineUsers, HiOutlineClipboardDocumentList, HiOutlineCalendarDays, HiOutlineChartBar } from 'react-icons/hi2';
+import { HiOutlineSquares2X2, HiOutlineUsers, HiOutlineClipboardDocumentList, HiOutlineCalendarDays, HiOutlineChartBar, HiOutlineChatBubbleLeftRight } from 'react-icons/hi2';
 import AppShell from './AppShell';
 import HrDashboard from '../dashboard/HrDashboard';
 import EmployeeManagement from '../employees/EmployeeManagement';
 import Attendance from '../attendance/Attendance';
 import LeaveManagement from '../leaves/LeaveManagement';
 import EmployeesReports from '../reports/EmployeesReports';
+import Messenger from '../messenger/Messenger';
 
 const HrSidebar = () => {
   const [selectedComponent, setSelectedComponent] = useState('Dashboard');
@@ -43,6 +44,7 @@ const HrSidebar = () => {
       case 'Employee': return <EmployeeManagement />;
       case 'Attendance': return <Attendance />;
       case 'Leaves': return <LeaveManagement />;
+      case 'Messenger': return <Messenger />;
       case 'Employees Reports': return <EmployeesReports />;
       default: return <HrDashboard />;
     }
@@ -66,6 +68,10 @@ const HrSidebar = () => {
     {
       text: 'Leaves',
       icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Leaves')} />,
+    },
+    {
+      text: 'Messenger',
+      icon: <HiOutlineChatBubbleLeftRight {...iconStyle(selectedComponent === 'Messenger')} />,
     },
     {
       text: 'Employees Reports',

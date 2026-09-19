@@ -9,6 +9,7 @@ const TaskChecklistItem = require("./TaskChecklistItem");
 const TaskActivity = require("./TaskActivity");
 const TaskMember = require("./TaskMember");
 const Department = require("./Department");
+const Message = require("./Message");
 
 Workgroup.belongsTo(User, {
   foreignKey: "employeeId",
@@ -120,4 +121,5 @@ module.exports = {
   TaskActivity,
   TaskMember,
   Department,
+  Message,
 };
