@@ -1,4 +1,4 @@
-const { CrmLead, CrmAccount, CrmOpportunity, CrmActivity, User } = require('../models');
+const { CrmLead, CrmAccount, CrmOpportunity, CrmActivity, CrmContact, CrmProduct, CrmQuote, User } = require('../models');
 const { DEFAULT_COMPANY } = require('./companyMembership');
 
 const COMPANY = DEFAULT_COMPANY || 'KN Advisors';
@@ -43,6 +43,29 @@ const exampleActivities = [
   { type: 'Email', subject: 'Welcome email to new leads', description: 'Send case studies and 2-min video', relatedType: 'Lead', dueDate: addDays(0) },
 ];
 
+const exampleContacts = [
+  { firstName: 'Arjun', lastName: 'Nayak', email: 'arjun.nayak@infosys.com', phone: '9876500001', title: 'CHRO', accountName: 'Infosys Ltd', isPrimary: true },
+  { firstName: 'Meera', lastName: 'Desai', email: 'meera.desai@tcs.com', phone: '9876500002', title: 'Head Talent', accountName: 'Tata Consultancy Services', isPrimary: true },
+  { firstName: 'Suresh', lastName: 'Bala', email: 'suresh.bala@wipro.com', phone: '9876500003', title: 'HR Operations Manager', accountName: 'Wipro Enterprises', isPrimary: false },
+  { firstName: 'Divya', lastName: 'Krishnan', email: 'divya.k@techmahindra.com', phone: '9876500004', title: 'VP People', accountName: 'Tech Mahindra', isPrimary: true },
+  { firstName: 'Karan', lastName: 'Joshi', email: 'karan.joshi@hcltech.com', phone: '9876500005', title: 'Director HR', accountName: 'HCL Technologies', isPrimary: true },
+];
+
+const exampleProducts = [
+  { name: 'HRMS Core', sku: 'HRMS-CORE-01', category: 'Platform', price: 45000, cost: 18000 },
+  { name: 'Payroll Pro', sku: 'PAY-PRO-02', category: 'Payroll', price: 68000, cost: 25000 },
+  { name: 'Attendance AI', sku: 'ATT-AI-03', category: 'Attendance', price: 22000, cost: 9000 },
+  { name: 'Leave & Compliance', sku: 'LEAVE-04', category: 'Compliance', price: 18000, cost: 7000 },
+  { name: 'Performance 360', sku: 'PERF-360-05', category: 'Performance', price: 35000, cost: 14000 },
+  { name: 'Workforce Analytics', sku: 'WFA-06', category: 'Analytics', price: 55000, cost: 22000 },
+];
+
+const exampleQuotes = [
+  { title: 'Infosys - Quote Q1', amount: 125000, discount: 5000, status: 'Sent', validUntil: addDays(15) },
+  { title: 'TCS - Enterprise Suite Quote', amount: 195000, discount: 10000, status: 'Draft', validUntil: addDays(20) },
+  { title: 'HCL - Analytics Quote', amount: 215000, discount: 0, status: 'Accepted', validUntil: addDays(-2) },
+];
+
 function addDays(n){
   const d=new Date();
   d.setDate(d.getDate()+n);
@@ -55,9 +78,12 @@ async function seedCrm(companyName = COMPANY){
     const accCount = await CrmAccount.count({ where: { companyName } });
     const oppCount = await CrmOpportunity.count({ where: { companyName } });
     const actCount = await CrmActivity.count({ where: { companyName } });
+    const contactCount = await CrmContact.count({ where: { companyName } });
+    const prodCount = await CrmProduct.count({ where: { companyName } });
+    const quoteCount = await CrmQuote.count({ where: { companyName } });
 
-    if(leadCount>3 && accCount>2 && oppCount>3){
-      console.log(`[CRM Seed] Skip — already has data (${leadCount} leads, ${accCount} accounts, ${oppCount} opps) for ${companyName}`);
+    if(leadCount>3 && accCount>2 && oppCount>3 && contactCount>2){
+      console.log(`[CRM Seed] Skip — already has data (${leadCount} leads, ${accCount} accounts, ${oppCount} opps, ${contactCount} contacts) for ${companyName}`);
       return;
     }
 
@@ -111,6 +137,37 @@ async function seedCrm(companyName = COMPANY){
       console.log(`[CRM Seed] Created ${exampleActivities.length} activities`);
     }
 
+    // Contacts
+    if(contactCount===0){
+      for(const c of exampleContacts){
+        const accId = accountByName[c.accountName] || null;
+        const { accountName, ...rest } = c;
+        await CrmContact.create({ ...rest, companyName, accountId: accId, ownerId });
+      }
+      console.log(`[CRM Seed] Created ${exampleContacts.length} contacts`);
+    }
+
+    // Products
+    if(prodCount===0){
+      for(const p of exampleProducts){
+        await CrmProduct.create({ ...p, companyName });
+      }
+      console.log(`[CRM Seed] Created ${exampleProducts.length} products`);
+    }
+
+    // Quotes
+    if(quoteCount===0){
+      const oppRows = await CrmOpportunity.findAll({ where:{ companyName } });
+      const accRows = createdAccounts;
+      for(let i=0;i<exampleQuotes.length;i++){
+        const q = exampleQuotes[i];
+        const oppId = oppRows[i]?.id || null;
+        const accId = accRows[i]?.id || null;
+        await CrmQuote.create({ ...q, companyName, opportunityId: oppId, accountId: accId, createdBy: ownerId });
+      }
+      console.log(`[CRM Seed] Created ${exampleQuotes.length} quotes`);
+    }
+
     console.log(`[CRM Seed] Done for ${companyName}`);
   }catch(e){
     console.error('[CRM Seed] Failed:', e.message);
@@ -124,10 +181,13 @@ if(require.main===module){
   (async()=>{
     const { sequelize } = require('../models');
     await sequelize.authenticate();
-    await require('../models').CrmLead.sync();
+    await require('../models').CrmLead.sync({ alter: true });
     await require('../models').CrmAccount.sync();
-    await require('../models').CrmOpportunity.sync();
+    await require('../models').CrmOpportunity.sync({ alter: true });
     await require('../models').CrmActivity.sync();
+    await require('../models').CrmContact.sync();
+    await require('../models').CrmProduct.sync();
+    await require('../models').CrmQuote.sync();
     await seedCrm(process.argv[2]|| COMPANY);
     await sequelize.close();
     process.exit(0);

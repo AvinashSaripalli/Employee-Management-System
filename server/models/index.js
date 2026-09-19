@@ -14,6 +14,9 @@ const CrmLead = require("./CrmLead");
 const CrmAccount = require("./CrmAccount");
 const CrmOpportunity = require("./CrmOpportunity");
 const CrmActivity = require("./CrmActivity");
+const CrmContact = require("./CrmContact");
+const CrmProduct = require("./CrmProduct");
+const CrmQuote = require("./CrmQuote");
 
 Workgroup.belongsTo(User, {
   foreignKey: "employeeId",
@@ -130,4 +133,7 @@ module.exports = {
   CrmAccount,
   CrmOpportunity,
   CrmActivity,
+  CrmContact,
+  CrmProduct,
+  CrmQuote,
 };
