@@ -25,6 +25,7 @@ exports.registerUsers = async (req, res) => {
   }
 
   const photo = req.file ? `/uploads/${req.file.filename}` : null;
+  const effectiveCompany = String(companyName || "").trim() || DEFAULT_COMPANY;
 
   try {
     const existingUser = await User.findOne({ where: { email } });
@@ -33,15 +34,15 @@ exports.registerUsers = async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(effectivePassword, 10);
-    const assignedEmployeeId = employeeId || await generateEmployeeId(DEFAULT_COMPANY);
+    const assignedEmployeeId = employeeId || await generateEmployeeId(effectiveCompany);
 
     await User.create({
-      firstName, lastName, email, phoneNumber, password: hashedPassword, companyName: DEFAULT_COMPANY,
+      firstName, lastName, email, phoneNumber, password: hashedPassword, companyName: effectiveCompany,
       role: role || "Employee", designation, department, jobLocation, dateOfBirth, bloodGroup,
       photo, technicalSkills, employeeId: assignedEmployeeId, gender,
     });
 
-    return res.status(201).json({ message: "User added successfully", employeeId: assignedEmployeeId, companyName: DEFAULT_COMPANY });
+    return res.status(201).json({ message: "User added successfully", employeeId: assignedEmployeeId, companyName: effectiveCompany });
   } catch (error) {
     console.error("Server error:", error);
     return res.status(500).json({ error: "Server error", details: error.message });

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, MenuItem,
   Box, Typography, Stack, Avatar, Snackbar, Alert, CircularProgress, FormControlLabel,
-  Switch, Divider
+  Switch, Divider, FormControl, InputLabel, Select
 } from '@mui/material';
 import axios from '../../api/axios';
 import useDepartments from '../../hooks/useDepartments';
@@ -10,19 +10,30 @@ import useDepartments from '../../hooks/useDepartments';
 const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], onAssigned }) => {
   const [department, setDepartment] = useState('');
   const [customDept, setCustomDept] = useState('');
+  const [customParent, setCustomParent] = useState('');
   const [designation, setDesignation] = useState('');
   const [isManager, setIsManager] = useState(false);
   const [saving, setSaving] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  const { departmentNames: companyDepartments, refresh: refreshCompanyDepts } = useDepartments();
+  const { departmentOptions, departmentNames: companyDepartments, refresh: refreshCompanyDepts } = useDepartments();
+  const companyName = localStorage.getItem('companyName') || '';
 
-  // Source of truth = Company Structure (/departments) + any live existing departments from users
-  const departmentOptions = Array.from(
-    new Set([
-      ...companyDepartments,
-      ...(existingDepartments || []).filter((d) => d && d !== 'Unassigned' && d !== 'KN Advisors')
-    ])
-  ).sort();
+  const ensureDepartment = async (name, parentId) => {
+    try {
+      await axios.post('/departments', { name, parentId: parentId || null, companyName });
+    } catch (e) {
+      if (e.response?.status !== 409) throw e;
+    }
+  };
+
+  // Source of truth = Company Structure (/departments tree) + any live free-text departments from users
+  const departmentOptionsFlat = departmentOptions.map((opt) => opt.name).filter(Boolean);
+  const extraNames = Array.from(
+    new Set(
+      [...companyDepartments, ...(existingDepartments || [])].filter((d) => d && d !== 'Unassigned' && d !== 'KN Advisors')
+    )
+  ).filter((d) => !departmentOptionsFlat.includes(d && String(d).trim()));
+  const options = [...departmentOptions, ...extraNames.map((name) => ({ id: `extra-${name}`, name, depth: 0, parentId: null, record: null }))];
 
   useEffect(() => {
     if (open) refreshCompanyDepts();
@@ -33,6 +44,7 @@ const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], o
       const currentDept = user.department || '';
       setDepartment(currentDept);
       setCustomDept('');
+      setCustomParent('');
       setDesignation(user.designation || '');
       setIsManager(user.role?.toLowerCase() === 'manager' || user.role?.toLowerCase() === 'admin');
     }
@@ -51,12 +63,32 @@ const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], o
 
     setSaving(true);
     try {
+      if (department === '__custom__') {
+        await ensureDepartment(finalDept, customParent);
+      }
+
+      // Preserve Admin role; otherwise reflect the manager toggle
+      const isAdmin = String(user.role || '').toLowerCase() === 'admin';
+      const desiredRole = isManager ? 'Manager' : (isAdmin ? 'Admin' : 'Employee');
+
       await axios.patch('/users/update', {
         id: user.id,
         department: finalDept,
         designation: designation.trim(),
-        role: isManager ? 'Manager' : 'Employee',
+        role: desiredRole,
       });
+
+      // Single-supervisor consistency: demote other Managers in the same department
+      if (isManager) {
+        const res = await axios.get('/users', { params: { companyName } });
+        const others = (Array.isArray(res.data) ? res.data : []).filter(
+          (u) => u.id !== user.id && String(u.department || '').trim() === finalDept && String(u.role || '').toLowerCase() === 'manager'
+        );
+        for (const other of others) {
+          await axios.patch('/users/update', { id: other.id, role: 'Employee' });
+        }
+      }
+
       setSnackbar({ open: true, message: 'Employee updated successfully!', severity: 'success' });
       setTimeout(() => {
         onAssigned && onAssigned();
@@ -75,6 +107,28 @@ const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], o
   if (!user) return null;
 
   const initials = `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || 'U';
+
+  const renderDeptOptions = (includeCustom = true, source = options) => (
+    <>
+      {source.length === 0 ? (
+        <MenuItem disabled value="">No departments yet — create one below</MenuItem>
+      ) : (
+        source.map((opt) => (
+          <MenuItem key={String(opt.id)} value={opt.name} sx={{ pl: 1.5 + opt.depth * 2 }}>
+            {opt.depth > 0 && <Typography component="span" sx={{ color: '#94A3B8', mr: 0.6 }}>└─</Typography>}
+            {opt.name}
+          </MenuItem>
+        ))
+      )}
+      {includeCustom && (
+        <MenuItem value="__custom__">
+          <em>+ New Department...</em>
+        </MenuItem>
+      )}
+    </>
+  );
+
+  const showNewDeptFields = department === '__custom__';
 
   return (
     <>
@@ -103,36 +157,35 @@ const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], o
             </Box>
           </Stack>
 
-          <TextField
-            select
-            label="Department"
-            size="small"
-            fullWidth
-            value={department}
-            onChange={(e) => setDepartment(e.target.value)}
-            sx={{ mb: 2 }}
-          >
-            {departmentOptions.map((dept) => (
-              <MenuItem key={dept} value={dept}>
-                {dept}
-              </MenuItem>
-            ))}
-            <MenuItem value="__custom__">
-              <em>+ New Department...</em>
-            </MenuItem>
-          </TextField>
+          <FormControl size="small" fullWidth sx={{ mb: 2 }}>
+            <InputLabel>Department</InputLabel>
+            <Select label="Department" value={department} onChange={(e) => setDepartment(e.target.value)}>
+              {renderDeptOptions(true, options)}
+            </Select>
+          </FormControl>
 
-          {department === '__custom__' && (
-            <TextField
-              label="New Department Name"
-              size="small"
-              fullWidth
-              value={customDept}
-              onChange={(e) => setCustomDept(e.target.value)}
-              placeholder="e.g. Risk Assessment"
-              sx={{ mb: 2 }}
-              autoFocus
-            />
+          {showNewDeptFields && (
+            <Box sx={{ mb: 2, p: 1.5, bgcolor: '#F8FAFD', border: '1px dashed #C7D2DD', borderRadius: 2 }}>
+              <TextField
+                label="New Department Name"
+                size="small"
+                fullWidth
+                value={customDept}
+                onChange={(e) => setCustomDept(e.target.value)}
+                placeholder="e.g. Risk Assessment"
+                autoFocus
+                sx={{ mb: 1.5 }}
+              />
+              <FormControl size="small" fullWidth>
+                <InputLabel>Parent (optional)</InputLabel>
+                <Select label="Parent (optional)" value={customParent} onChange={(e) => setCustomParent(e.target.value)}>
+                  <MenuItem value="">
+                    <em>Top-level department</em>
+                  </MenuItem>
+                  {renderDeptOptions(false, options)}
+                </Select>
+              </FormControl>
+            </Box>
           )}
 
           <TextField
@@ -206,4 +259,3 @@ const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], o
 };
 
 export default AssignEmployeeDialog;
-

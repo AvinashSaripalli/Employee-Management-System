@@ -29,7 +29,7 @@ const EditEmployeeDialog = ({ open, onClose, user, onSave }) => {
 
   const [errors, setErrors] = useState({});
   const [skillsOption, setSkillsOption] = useState([]);
-  const { departmentNames, refresh: refreshDepartments } = useDepartments();
+  const { departmentOptions, refresh: refreshDepartments } = useDepartments();
 
   useEffect(() => {
     if (user) {
@@ -278,11 +278,14 @@ const EditEmployeeDialog = ({ open, onClose, user, onSave }) => {
                  label="Department"
                  value={formData.department}
                >
-                 {departmentNames.length === 0 ? (
+                 {departmentOptions.length === 0 ? (
                    <MenuItem disabled value="">No departments — create in Company Structure</MenuItem>
                  ) : (
-                   departmentNames.map((name) => (
-                     <MenuItem key={name} value={name}>{name}</MenuItem>
+                   departmentOptions.map((opt) => (
+                     <MenuItem key={opt.id} value={opt.name} sx={{ pl: 1.5 + opt.depth * 2 }}>
+                       {opt.depth > 0 && <Typography component="span" sx={{ color: '#94A3B8', mr: 0.6 }}>└─</Typography>}
+                       {opt.name}
+                     </MenuItem>
                    ))
                  )}
                </Select> 

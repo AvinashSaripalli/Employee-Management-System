@@ -5,10 +5,12 @@ import {
   ListItemButton, Snackbar, Alert, Stack, IconButton, Tooltip, TextField, InputAdornment,
   Button, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Divider, Paper
 } from '@mui/material';
-import { FiSearch, FiPlus, FiEdit2, FiUserPlus, FiAward, FiUsers, FiGitBranch, FiXCircle, FiRefreshCw, FiBriefcase, FiChevronRight, FiGrid } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiEdit2, FiUserPlus, FiAward, FiUsers, FiGitBranch, FiXCircle, FiRefreshCw, FiBriefcase, FiChevronRight, FiGrid, FiTrash2 } from 'react-icons/fi';
 import { HiOutlineBuildingOffice2, HiOutlineMagnifyingGlass } from 'react-icons/hi2';
 import axios from '../../api/axios';
 import AssignEmployeeDialog from './AssignEmployeeDialog';
+import AddEmployeeDialog from '../employees/AddEmployeeDialog';
+import UnassignedEmployeesDialog from './UnassignedEmployeesDialog';
 
 const BITRIX_LEVEL_STYLES = {
   // Level 1: Root / Company
@@ -76,6 +78,15 @@ const CompanyStructure = () => {
   const [assignUser, setAssignUser] = useState(null);
   const [assignOpen, setAssignOpen] = useState(false);
 
+  // Add NEW employee modal (preset to a department)
+  const [addOpen, setAddOpen] = useState(false);
+  const [addDept, setAddDept] = useState('');
+
+  // Unassigned-employee picker (add existing employee to a department)
+  const [pickOpen, setPickOpen] = useState(false);
+  const [pickDept, setPickDept] = useState('');
+  const [pickAsHead, setPickAsHead] = useState(false);
+
   // Add / Edit Department modal
   const [deptModalOpen, setDeptModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState(null);
@@ -130,6 +141,52 @@ const CompanyStructure = () => {
     });
     return Array.from(set).sort();
   }, [allUsers]);
+
+  // Depth-first flattened department tree for the "Parent Department" picker
+  const deptHierarchy = useMemo(() => {
+    const byParent = {};
+    departments.forEach((d) => {
+      const key = d.parentId || 'root';
+      (byParent[key] = byParent[key] || []).push(d);
+    });
+    const out = [];
+    const walked = new Set();
+    const walk = (parentKey, depth) => {
+      (byParent[parentKey] || [])
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach((d) => {
+          walked.add(d.id);
+          out.push({ ...d, treeDepth: depth });
+          walk(d.id, depth + 1);
+        });
+    };
+    walk('root', 0);
+    departments
+      .filter((d) => d.parentId && !walked.has(d.id))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach((d) => out.push({ ...d, treeDepth: 0 }));
+    return out;
+  }, [departments]);
+
+  // The department being edited + all of its descendants must not be selectable
+  // as its own parent (would create a cycle).
+  const deptSubtree = useMemo(() => {
+    const set = new Set();
+    if (editingDept?.id) {
+      set.add(editingDept.id);
+      const findChildren = (pid) => {
+        departments.forEach((d) => {
+          if (d.parentId === pid) {
+            set.add(d.id);
+            findChildren(d.id);
+          }
+        });
+      };
+      findChildren(editingDept.id);
+    }
+    return set;
+  }, [departments, editingDept]);
 
   // Filter users by search term
   const filteredUsers = useMemo(() => {
@@ -205,6 +262,7 @@ const CompanyStructure = () => {
           data: {
             id: d.record?.id,
             name: deptName,
+            supervisorId: d.record?.supervisorId || null,
             head: d.head,
             additionalManagers: d.managers,
             members: d.members,
@@ -226,7 +284,8 @@ const CompanyStructure = () => {
     const unassignedGroup = depts[''] || { head: null, managers: [], members: [] };
     const unassignedList = (unassignedGroup.head ? [unassignedGroup.head] : [])
       .concat(unassignedGroup.managers)
-      .concat(unassignedGroup.members);
+      .concat(unassignedGroup.members)
+      .filter((user) => !rootSupervisors.some((supervisor) => supervisor.id === user.id));
 
     if (unassignedList.length > 0) {
       departmentCards.unshift({
@@ -283,15 +342,59 @@ const CompanyStructure = () => {
     setAssignOpen(true);
   };
 
-  const handleQuickAddEmployee = (deptName) => {
-    // Pick first unassigned user or open blank
-    const unassignedUser = allUsers.find(u => !u.department || u.department.trim() === '');
-    if (unassignedUser) {
-      setAssignUser({ ...unassignedUser, department: deptName === 'Unassigned' ? '' : deptName });
-    } else {
-      setAssignUser({ id: null, firstName: 'Select an', lastName: 'employee in list', department: deptName });
+  const handleRemoveMember = async (user) => {
+    if (!selectedDeptInfo?.id || !user?.id) return;
+    if (!window.confirm(`Remove ${user.firstName} ${user.lastName} from ${selectedDeptInfo.name}?`)) return;
+
+    try {
+      await axios.delete(`/departments/${selectedDeptInfo.id}/members/${user.id}`);
+      setSnackbar({ open: true, message: `${user.firstName} ${user.lastName} removed from ${selectedDeptInfo.name}.`, severity: 'success' });
+      setDrawerOpen(false);
+      await Promise.all([fetchUsers(), fetchDepartments()]);
+    } catch (error) {
+      console.error('Error removing department member:', error);
+      setSnackbar({ open: true, message: error.response?.data?.error || 'Failed to remove employee from department', severity: 'error' });
     }
-    setAssignOpen(true);
+  };
+
+  // Open the "Add / Assign Employee" picker for a department. It lists
+  // existing employees who are not yet in any department, so the admin can
+  // add one (or more) to this department. The "Unassigned" pool instead
+  // allows creating a brand-new employee with no department.
+  const handleAddEmployee = (deptName) => {
+    // Never turn the company root or the unassigned pool into a real department.
+    if (!deptName || deptName === 'Unassigned' || deptName === companyName) {
+      setAddDept('');
+      setAddOpen(true);
+      return;
+    }
+    setPickAsHead(false);
+    setPickDept(deptName);
+    setPickOpen(true);
+  };
+
+  // Open the picker to designate an existing employee as the department head.
+  // This also promotes them to Manager so they occupy the supervisor slot.
+  const handleAssignSupervisor = (deptData) => {
+    if (!deptData?.name || deptData.isRoot || deptData.isUnassigned) return;
+    setPickAsHead(true);
+    setPickDept(deptData.name);
+    setPickOpen(true);
+  };
+
+  const handleDeleteDept = async (deptData, e) => {
+    e && e.stopPropagation();
+    if (!deptData.id) return;
+    if (!window.confirm(`Delete department "${deptData.name}"? Members will be moved to its parent department.`)) return;
+    try {
+      await axios.delete(`/departments/${deptData.id}`);
+      setSnackbar({ open: true, message: `Department '${deptData.name}' deleted.`, severity: 'success' });
+      fetchUsers();
+      fetchDepartments();
+    } catch (error) {
+      console.error('Error deleting department:', error);
+      setSnackbar({ open: true, message: error.response?.data?.error || 'Failed to delete department', severity: 'error' });
+    }
   };
 
   const handleOpenEditDept = (deptData, e) => {
@@ -299,8 +402,9 @@ const CompanyStructure = () => {
     setEditingDept(deptData);
     setDeptForm({
       name: deptData.name,
-      supervisorId: deptData.head?.id || '',
-      parentId: deptData.parentId || '',
+      // Prefer the stored department supervisor; fall back to the role-derived head
+      supervisorId: deptData.supervisorId != null ? String(deptData.supervisorId) : (deptData.head?.id != null ? String(deptData.head.id) : ''),
+      parentId: deptData.parentId != null ? String(deptData.parentId) : '',
     });
     setDeptModalOpen(true);
   };
@@ -324,36 +428,6 @@ const CompanyStructure = () => {
           parentId: deptForm.parentId || null,
           supervisorId: deptForm.supervisorId || null,
         });
-        // If department name changed, update all users with old department name
-        if (editingDept.name !== deptForm.name.trim()) {
-          const usersInDept = allUsers.filter(u => u.department === editingDept.name);
-          for (const u of usersInDept) {
-            await axios.patch('/users/update', { id: u.id, department: deptForm.name.trim() });
-          }
-        }
-        // If new supervisor selected
-        if (deptForm.supervisorId) {
-          await axios.patch('/users/update', {
-            id: deptForm.supervisorId,
-            department: deptForm.name.trim(),
-            role: 'Manager',
-          });
-        }
-        setSnackbar({ open: true, message: 'Department updated successfully!', severity: 'success' });
-      } else if (editingDept) {
-        if (editingDept.name !== deptForm.name.trim()) {
-          const usersInDept = allUsers.filter(u => u.department === editingDept.name);
-          for (const u of usersInDept) {
-            await axios.patch('/users/update', { id: u.id, department: deptForm.name.trim() });
-          }
-        }
-        if (deptForm.supervisorId) {
-          await axios.patch('/users/update', {
-            id: deptForm.supervisorId,
-            department: deptForm.name.trim(),
-            role: 'Manager',
-          });
-        }
         setSnackbar({ open: true, message: 'Department updated successfully!', severity: 'success' });
       } else {
         await axios.post('/departments', {
@@ -362,14 +436,6 @@ const CompanyStructure = () => {
           supervisorId: deptForm.supervisorId || null,
           companyName,
         });
-        // Assign selected supervisor to newly created department
-        if (deptForm.supervisorId) {
-          await axios.patch('/users/update', {
-            id: deptForm.supervisorId,
-            department: deptForm.name.trim(),
-            role: 'Manager',
-          });
-        }
         setSnackbar({ open: true, message: `Department '${deptForm.name.trim()}' created!`, severity: 'success' });
       }
 
@@ -378,7 +444,7 @@ const CompanyStructure = () => {
       fetchDepartments();
     } catch (error) {
       console.error('Error saving department:', error);
-      setSnackbar({ open: true, message: 'Failed to save department', severity: 'error' });
+      setSnackbar({ open: true, message: error.response?.data?.error || 'Failed to save department', severity: 'error' });
     }
   };
 
@@ -492,6 +558,15 @@ const CompanyStructure = () => {
                     <FiEdit2 size="13" />
                   </IconButton>
                 </Tooltip>
+                <Tooltip title="Delete Department">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => handleDeleteDept(deptData, e)}
+                    sx={{ p: 0.25, color: '#DC2626' }}
+                  >
+                    <FiTrash2 size="13" />
+                  </IconButton>
+                </Tooltip>
               </Box>
             )}
           </Box>
@@ -560,7 +635,7 @@ const CompanyStructure = () => {
             </>
           ) : (
             <Box
-              onClick={() => handleQuickAddEmployee(deptData.name)}
+              onClick={() => handleAssignSupervisor(deptData)}
               sx={{
                 width: '100%',
                 display: 'flex',
@@ -669,7 +744,7 @@ const CompanyStructure = () => {
           <Button
             size="small"
             startIcon={<FiUserPlus size="12" />}
-            onClick={() => handleQuickAddEmployee(deptData.name)}
+            onClick={() => handleAddEmployee(deptData.name)}
             sx={{
               py: 0.2,
               px: 1,
@@ -765,7 +840,10 @@ const CompanyStructure = () => {
 
           <Tooltip title="Reload structure">
             <IconButton
-              onClick={fetchUsers}
+              onClick={() => {
+                fetchUsers();
+                fetchDepartments();
+              }}
               sx={{ border: '1px solid #E8ECF5', bgcolor: '#FFFFFF', borderRadius: 2 }}
             >
               <FiRefreshCw size="18" color="#14286D" />
@@ -928,29 +1006,13 @@ const CompanyStructure = () => {
                 return (
                   <ListItem
                     key={user.id}
-                    secondaryAction={
-                      <Button
-                        size="small"
-                        onClick={() => handleAssignOpen(user)}
-                        sx={{
-                          fontSize: 11,
-                          textTransform: 'none',
-                          fontWeight: 700,
-                          bgcolor: '#EEF2FF',
-                          color: '#14286D',
-                          borderRadius: 1.5,
-                          '&:hover': { bgcolor: '#14286D', color: '#FFFFFF' },
-                        }}
-                      >
-                        Transfer
-                      </Button>
-                    }
                     sx={{
                       mb: 1.2,
                       bgcolor: '#FFFFFF',
                       borderRadius: 2,
                       border: '1px solid #E8ECF5',
                       p: 1.2,
+                      alignItems: 'center',
                       '&:hover': { bgcolor: '#F8FAFD' },
                     }}
                   >
@@ -970,6 +1032,7 @@ const CompanyStructure = () => {
                       </Avatar>
                     </ListItemAvatar>
                     <ListItemText
+                      sx={{ minWidth: 0, flex: 1, mr: 1 }}
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
                           <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>
@@ -989,6 +1052,41 @@ const CompanyStructure = () => {
                         </Box>
                       }
                     />
+                    <Stack direction="row" spacing={0.5} sx={{ flexShrink: 0, alignItems: 'center' }}>
+                      <Button
+                        size="small"
+                        onClick={() => handleAssignOpen(user)}
+                        sx={{
+                          minWidth: 0,
+                          px: 1,
+                          fontSize: 11,
+                          textTransform: 'none',
+                          fontWeight: 700,
+                          bgcolor: '#EEF2FF',
+                          color: '#14286D',
+                          borderRadius: 1.5,
+                          '&:hover': { bgcolor: '#14286D', color: '#FFFFFF' },
+                        }}
+                      >
+                        Transfer
+                      </Button>
+                      <Button
+                        size="small"
+                        onClick={() => handleRemoveMember(user)}
+                        sx={{
+                          minWidth: 0,
+                          px: 1,
+                          fontSize: 11,
+                          textTransform: 'none',
+                          fontWeight: 700,
+                          color: '#B42318',
+                          borderRadius: 1.5,
+                          '&:hover': { bgcolor: '#FDECEC' },
+                        }}
+                      >
+                        Remove
+                      </Button>
+                    </Stack>
                   </ListItem>
                 );
               })}
@@ -1007,7 +1105,7 @@ const CompanyStructure = () => {
                 variant="outlined"
                 fullWidth
                 startIcon={<FiUserPlus size="16" />}
-                onClick={() => handleQuickAddEmployee(selectedDeptInfo.name)}
+                onClick={() => handleAddEmployee(selectedDeptInfo.name)}
                 sx={{
                   borderRadius: 2,
                   textTransform: 'none',
@@ -1016,7 +1114,7 @@ const CompanyStructure = () => {
                   borderColor: '#14286D',
                 }}
               >
-                + Assign Employee to Department
+                + Add / Assign Employee to Department
               </Button>
             </Box>
           </Box>
@@ -1056,11 +1154,14 @@ const CompanyStructure = () => {
             sx={{ mb: 2.5 }}
           >
             <MenuItem value=""><em>None (Top-level department)</em></MenuItem>
-            {departments
-              .filter((department) => department.id !== editingDept?.id)
+            {deptHierarchy
+              .filter((department) => !deptSubtree.has(department.id) && department.name !== 'Management')
               .map((department) => (
-                <MenuItem key={department.id} value={department.id}>
-                  {department.parentId ? '- ' : ''}{department.name}
+                <MenuItem key={department.id} value={String(department.id)} sx={{ pl: 1.5 + department.treeDepth * 2 }}>
+                  {department.treeDepth > 0 && (
+                    <Typography component="span" sx={{ color: '#94A3B8', mr: 0.6 }}>└─</Typography>
+                  )}
+                  {department.name}
                 </MenuItem>
               ))}
           </TextField>
@@ -1078,7 +1179,7 @@ const CompanyStructure = () => {
               <em>None (Vacant)</em>
             </MenuItem>
             {allUsers.map((u) => (
-              <MenuItem key={u.id} value={u.id}>
+              <MenuItem key={u.id} value={String(u.id)}>
                 {u.firstName} {u.lastName} ({u.department || 'Unassigned'} • {u.designation || u.role})
               </MenuItem>
             ))}
@@ -1114,6 +1215,35 @@ const CompanyStructure = () => {
         onAssigned={() => {
           setAssignOpen(false);
           fetchUsers();
+          fetchDepartments();
+        }}
+      />
+
+      {/* Add New Employee Dialog (pre-set department) */}
+      <AddEmployeeDialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        onSave={() => {
+          fetchUsers();
+          fetchDepartments();
+        }}
+        initialDepartment={addDept}
+      />
+
+      {/* Unassigned Employees Picker — add existing employee to a department */}
+      <UnassignedEmployeesDialog
+        open={pickOpen}
+        onClose={() => setPickOpen(false)}
+        department={pickDept}
+        employees={allUsers}
+        onAssigned={() => {
+          fetchUsers();
+          fetchDepartments();
+        }}
+        onCreateNew={() => {
+          setPickOpen(false);
+          setAddDept(pickDept);
+          setAddOpen(true);
         }}
       />
 
