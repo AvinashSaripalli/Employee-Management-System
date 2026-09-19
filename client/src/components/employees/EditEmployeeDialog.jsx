@@ -6,6 +6,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
+import useDepartments from '../../hooks/useDepartments';
 
 const EditEmployeeDialog = ({ open, onClose, user, onSave }) => {
   const [formData, setFormData] = useState({
@@ -28,6 +29,7 @@ const EditEmployeeDialog = ({ open, onClose, user, onSave }) => {
 
   const [errors, setErrors] = useState({});
   const [skillsOption, setSkillsOption] = useState([]);
+  const { departmentNames, refresh: refreshDepartments } = useDepartments();
 
   useEffect(() => {
     if (user) {
@@ -52,6 +54,10 @@ const EditEmployeeDialog = ({ open, onClose, user, onSave }) => {
     }
     
   }, [user]);
+
+  useEffect(() => {
+    if (open) refreshDepartments();
+  }, [open, refreshDepartments]);
 
   useEffect(() => {
     setSkillsOption([
@@ -262,24 +268,26 @@ const EditEmployeeDialog = ({ open, onClose, user, onSave }) => {
           variant="outlined"
           margin="dense"  disabled
         />
-         <FormControl margin="dense"  variant="outlined" fullWidth >
-              <InputLabel>Department</InputLabel>
-              <Select
-                sx={{width :535.2}}
-                fullWidth
-                name="department"
-                onChange={handleChange}
-                label="Department"
-                value={formData.department}
-              >
-                <MenuItem value="Software Development">Software Development</MenuItem>
-                <MenuItem value="Human Resources">Human Resources</MenuItem>
-                <MenuItem value="Design">Design</MenuItem>
-                <MenuItem value="Testing">Testing</MenuItem>
-                <MenuItem value="Accounting">Accounting</MenuItem>
-              </Select> 
-                
-        </FormControl>
+          <FormControl margin="dense"  variant="outlined" fullWidth >
+               <InputLabel>Department</InputLabel>
+               <Select
+                 sx={{width :535.2}}
+                 fullWidth
+                 name="department"
+                 onChange={handleChange}
+                 label="Department"
+                 value={formData.department}
+               >
+                 {departmentNames.length === 0 ? (
+                   <MenuItem disabled value="">No departments — create in Company Structure</MenuItem>
+                 ) : (
+                   departmentNames.map((name) => (
+                     <MenuItem key={name} value={name}>{name}</MenuItem>
+                   ))
+                 )}
+               </Select> 
+                 
+         </FormControl>
          <FormControl margin="dense"  variant="outlined" fullWidth>
               <InputLabel>Gender</InputLabel>
               <Select

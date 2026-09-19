@@ -20,6 +20,7 @@ import { LocalizationProvider, DatePicker } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import axios from '../../api/axios';
 import dayjs from "dayjs";
+import useDepartments from '../../hooks/useDepartments';
 
 const EmployeeProfile = () => {
   const [editMode, setEditMode] = useState({
@@ -59,6 +60,7 @@ const EmployeeProfile = () => {
 
   const [openSkills, setOpenSkills] = useState(false);
   const [newSkill, setNewSkill] = useState("");
+  const { departmentNames } = useDepartments();
   const validateFields = () => {
     const errors = {};
   
@@ -686,11 +688,17 @@ const EmployeeProfile = () => {
               onChange={(e) => handleChange(e, "userDepartment")}
               disabled
             >
-              <MenuItem value="Software Development">Software Development</MenuItem>
-              <MenuItem value="Human Resources">Human Resources</MenuItem>
-              <MenuItem value="Design">Design</MenuItem>
-              <MenuItem value="Testing">Testing</MenuItem>
-              <MenuItem value="Accounting">Accounting</MenuItem>
+              {departmentNames.length === 0 ? (
+                <MenuItem disabled value="">{userData.userDepartment || "No departments"}</MenuItem>
+              ) : (
+                departmentNames.map((name) => (
+                  <MenuItem key={name} value={name}>{name}</MenuItem>
+                ))
+              )}
+              {/* keep current value even if not in list */}
+              {userData.userDepartment && !departmentNames.includes(userData.userDepartment) && (
+                <MenuItem value={userData.userDepartment}>{userData.userDepartment} (legacy)</MenuItem>
+              )}
             </Select>
             {validationErrors.userDepartment && (
         <Typography variant="caption" color="error">{validationErrors.userDepartment}</Typography>

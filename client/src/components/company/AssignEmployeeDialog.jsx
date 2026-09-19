@@ -5,18 +5,7 @@ import {
   Switch, Divider
 } from '@mui/material';
 import axios from '../../api/axios';
-
-const DEFAULT_DEPARTMENTS = [
-  'Management',
-  'Engineering',
-  'Design',
-  'Marketing',
-  'Sales',
-  'Human Resources',
-  'Finance',
-  'Operations',
-  'Legal & Compliance'
-];
+import useDepartments from '../../hooks/useDepartments';
 
 const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], onAssigned }) => {
   const [department, setDepartment] = useState('');
@@ -25,14 +14,19 @@ const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], o
   const [isManager, setIsManager] = useState(false);
   const [saving, setSaving] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const { departmentNames: companyDepartments, refresh: refreshCompanyDepts } = useDepartments();
 
-  // Merge default + existing departments
+  // Source of truth = Company Structure (/departments) + any live existing departments from users
   const departmentOptions = Array.from(
     new Set([
-      ...DEFAULT_DEPARTMENTS,
+      ...companyDepartments,
       ...(existingDepartments || []).filter((d) => d && d !== 'Unassigned' && d !== 'KN Advisors')
     ])
   ).sort();
+
+  useEffect(() => {
+    if (open) refreshCompanyDepts();
+  }, [open, refreshCompanyDepts]);
 
   useEffect(() => {
     if (open && user) {

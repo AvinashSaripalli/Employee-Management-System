@@ -93,13 +93,7 @@ const Dashboard = () => {
     { locationName: 'Delhi', locations: 0 },
   ]);
 
-  const [departmentOrder, setDepartmentOrder] = useState([
-    { departmentName: 'Human Resources', indepartment: 0 },
-    { departmentName: 'Design', indepartment: 0 },
-    { departmentName: 'Software Development', indepartment: 0 },
-    { departmentName: 'Testing', indepartment: 0 },
-    { departmentName: 'Accounting', indepartment: 0 },
-  ]);
+  const [departmentOrder, setDepartmentOrder] = useState([]);
 
   const [genderOrder, setGenderOrder] = useState([
     { genderName: 'Male', genders: 0 },
@@ -169,14 +163,19 @@ const Dashboard = () => {
           params: { companyName, year: selectedYear },
           headers: { Authorization: `Bearer ${token}` },
         });
-        const updatedDepartmentOrder = departmentOrder.map((departments) => {
-          const foundDepartment = usersByDepartmentData.find((item) => item.departmentName === departments.departmentName);
-          return {
-            departmentName: departments.departmentName,
-            indepartment: foundDepartment ? foundDepartment.indepartment : 0,
-          };
+        let deptNames = [];
+        try {
+          const { data: deptRows } = await axios.get('/departments', { params: { companyName }, headers: { Authorization: `Bearer ${token}` } });
+          deptNames = (Array.isArray(deptRows) ? deptRows.map((d) => d.name) : []).filter(Boolean);
+        } catch {}
+        const byDeptMap = new Map(usersByDepartmentData.map((d) => [d.departmentName, d.indepartment]));
+        const merged = deptNames.length
+          ? deptNames.map((name) => ({ departmentName: name, indepartment: Number(byDeptMap.get(name) || 0) }))
+          : usersByDepartmentData.map((d) => ({ departmentName: d.departmentName, indepartment: Number(d.indepartment) }));
+        usersByDepartmentData.forEach((d) => {
+          if (!merged.find((m) => m.departmentName === d.departmentName)) merged.push({ departmentName: d.departmentName, indepartment: Number(d.indepartment) });
         });
-        setDepartmentOrder(updatedDepartmentOrder);
+        setDepartmentOrder(merged);
 
         const { data: usersByGenderData } = await axios.get('/users-by-genders', {
           params: { companyName, year: selectedYear },

@@ -13,20 +13,18 @@ exports.registerUsers = async (req, res) => {
     technicalSkills, employeeId, gender, confirmPassword
   } = req.body;
 
-  if (!password) {
-    return res.status(400).json({ error: "Password is required" });
-  }
-  if (!confirmPassword) {
-    return res.status(400).json({ error: "Confirm password is required" });
-  }
-  if (password !== confirmPassword) {
+  // Basic-fields mode: password/photo are optional for admin-created employees
+  // Default password if not supplied, and photo is nullable
+  const effectivePassword = password || "Welcome@123";
+  const effectiveConfirm = confirmPassword || effectivePassword;
+  if (effectivePassword !== effectiveConfirm) {
     return res.status(400).json({ error: "Passwords do not match" });
   }
-  if (!req.file) {
-    return res.status(400).json({ error: "Photo is required" });
+  if (password && !confirmPassword) {
+    return res.status(400).json({ error: "Confirm password is required" });
   }
 
-  const photo = `/uploads/${req.file.filename}`;
+  const photo = req.file ? `/uploads/${req.file.filename}` : null;
 
   try {
     const existingUser = await User.findOne({ where: { email } });
@@ -34,12 +32,12 @@ exports.registerUsers = async (req, res) => {
       return res.status(400).json({ error: "Email already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(effectivePassword, 10);
     const assignedEmployeeId = employeeId || await generateEmployeeId(DEFAULT_COMPANY);
 
     await User.create({
       firstName, lastName, email, phoneNumber, password: hashedPassword, companyName: DEFAULT_COMPANY,
-      role, designation, department, jobLocation, dateOfBirth, bloodGroup,
+      role: role || "Employee", designation, department, jobLocation, dateOfBirth, bloodGroup,
       photo, technicalSkills, employeeId: assignedEmployeeId, gender,
     });
 
