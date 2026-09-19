@@ -10,6 +10,10 @@ const TaskActivity = require("./TaskActivity");
 const TaskMember = require("./TaskMember");
 const Department = require("./Department");
 const Message = require("./Message");
+const CrmLead = require("./CrmLead");
+const CrmAccount = require("./CrmAccount");
+const CrmOpportunity = require("./CrmOpportunity");
+const CrmActivity = require("./CrmActivity");
 
 Workgroup.belongsTo(User, {
   foreignKey: "employeeId",
@@ -122,4 +126,8 @@ module.exports = {
   TaskMember,
   Department,
   Message,
+  CrmLead,
+  CrmAccount,
+  CrmOpportunity,
+  CrmActivity,
 };

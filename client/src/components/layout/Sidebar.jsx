@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { HiOutlineSquares2X2, HiOutlineClipboardDocumentCheck, HiOutlineUsers, HiOutlineBuildingOffice2, HiOutlineUserGroup, HiOutlineCalendarDays, HiOutlineChartBar, HiOutlineChatBubbleLeftRight } from 'react-icons/hi2';
+import { HiOutlineSquares2X2, HiOutlineClipboardDocumentCheck, HiOutlineUsers, HiOutlineBuildingOffice2, HiOutlineUserGroup, HiOutlineCalendarDays, HiOutlineChartBar, HiOutlineChatBubbleLeftRight, HiOutlineBriefcase } from 'react-icons/hi2';
 import AppShell from './AppShell';
 import Dashboard from '../dashboard/Dashboard';
 import TasksProjects from '../tasks/TasksProjects';
@@ -11,6 +11,7 @@ import ManageLeaves from '../leaves/ManageLeaves';
 import Reports from '../reports/Reports';
 import UserProfile from '../profile/UserProfile';
 import Messenger from '../messenger/Messenger';
+import Crm from '../crm/Crm';
 
 const Sidebar = () => {
   const [selectedComponent, setSelectedComponent] = useState('Dashboard');
@@ -49,6 +50,7 @@ const Sidebar = () => {
       case 'Company Structure': return <CompanyStructure />;
       case 'Work Groups': return <Workgroups />;
       case 'Messenger': return <Messenger />;
+      case 'CRM': return <Crm />;
       case 'Manage Leaves': return <ManageLeaves />;
       case 'Reports': return <Reports />;
       default: return <UserProfile />;
@@ -81,6 +83,10 @@ const Sidebar = () => {
     {
       text: 'Messenger',
       icon: <HiOutlineChatBubbleLeftRight {...iconStyle(selectedComponent === 'Messenger')} />,
+    },
+    {
+      text: 'CRM',
+      icon: <HiOutlineBriefcase {...iconStyle(selectedComponent === 'CRM')} />,
     },
     {
       text: 'Manage Leaves',

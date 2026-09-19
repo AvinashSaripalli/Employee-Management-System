@@ -47,6 +47,9 @@ app.use('/api/departments', departmentRoutes);
 const messageRoutes = require('./routes/messageRoutes');
 app.use('/api/messages', messageRoutes);
 
+const crmRoutes = require('./routes/crmRoutes');
+app.use('/api/crm', crmRoutes);
+
 const distPath = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
@@ -118,6 +121,11 @@ ensureLeaveSchema()
   .then(() => backfillCompanyMembership())
   .then(() => require('./models').Department.sync())
   .then(() => require('./models').Message.sync())
+  .then(() => require('./models').CrmLead.sync())
+  .then(() => require('./models').CrmAccount.sync())
+  .then(() => require('./models').CrmOpportunity.sync())
+  .then(() => require('./models').CrmActivity.sync())
+  .then(() => require('./utils/seedCrm').seedCrm())
   .catch((err) => {
     console.error('Startup data sync failed:', err.message);
   })

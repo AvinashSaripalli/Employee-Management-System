@@ -6,6 +6,7 @@
   "scripts": {
     "start": "nodemon Server.js",
     "sync": "node sync.js",
+    "seed:crm": "node utils/seedCrm.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
