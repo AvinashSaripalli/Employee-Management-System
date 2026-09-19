@@ -5,6 +5,7 @@ import { HiOutlineClipboardDocumentCheck, HiOutlineChartBar, HiOutlineDocumentTe
 import AppShell from './AppShell';
 import ApplyLeave from '../leaves/ApplyLeave';
 import MyLeaves from '../leaves/MyLeaves';
+import ManageLeaves from '../leaves/ManageLeaves';
 import EmployeeProfile from '../employees/EmployeeProfile';
 import WorkReports from '../reports/WorkReports';
 import TasksProjects from '../tasks/TasksProjects';
@@ -24,6 +25,7 @@ const Sidebar = () => {
   const [clockInterval, setClockInterval] = useState(null);
   const [showContinueWorking, setShowContinueWorking] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [canReviewLeaves, setCanReviewLeaves] = useState(false);
 
   const navigate = useNavigate();
 
@@ -32,6 +34,14 @@ const Sidebar = () => {
     setUserName(
       `${localStorage.getItem('userFirstName') || ''} ${localStorage.getItem('userLastName') || ''}`.trim() || 'User'
     );
+  }, []);
+
+  useEffect(() => {
+    axios.get('/leaves/leave', { params: {
+      companyName: localStorage.getItem('companyName'),
+      employeeId: localStorage.getItem('userEmployeeId'),
+      status: 'Pending',
+    } }).then(() => setCanReviewLeaves(true)).catch(() => setCanReviewLeaves(false));
   }, []);
 
   const startTimer = () => {
@@ -142,6 +152,7 @@ const Sidebar = () => {
       case 'CRM': return <Crm />;
       case 'Apply Leave': return <ApplyLeave />;
       case 'My Leaves': return <MyLeaves />;
+      case 'Manage Leaves': return <ManageLeaves />;
       case 'Profile': return <EmployeeProfile />;
       default: return <MyLeaves />;
     }
@@ -214,6 +225,10 @@ const Sidebar = () => {
       text: 'My Leaves',
       icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'My Leaves')} />,
     },
+    ...(canReviewLeaves ? [{
+      text: 'Manage Leaves',
+      icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves')} />,
+    }] : []),
     {
       text: 'Profile',
       icon: <HiOutlineUserCircle {...iconStyle(selectedComponent === 'Profile')} />,

@@ -1,6 +1,7 @@
 const sequelize = require("../config/database");
 const User = require("./User");
 const Leave = require("./Leave");
+const LeaveApprovalSetting = require("./LeaveApprovalSetting");
 const Attendance = require("./Attendance");
 const Report = require("./Report");
 const Workgroup = require("./Workgroup");
@@ -120,6 +121,7 @@ module.exports = {
   sequelize,
   User,
   Leave,
+  LeaveApprovalSetting,
   Attendance,
   Report,
   Workgroup,

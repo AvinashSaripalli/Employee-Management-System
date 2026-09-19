@@ -120,6 +120,7 @@ io.on('connection', (socket) => {
 ensureLeaveSchema()
   .then(() => backfillCompanyMembership())
   .then(() => require('./models').Department.sync())
+  .then(() => require('./models').LeaveApprovalSetting.sync({ alter: true }))
   .then(() => require('./models').Message.sync())
   .then(() => require('./models').CrmLead.sync({ alter: true }))
   .then(() => require('./models').CrmAccount.sync())

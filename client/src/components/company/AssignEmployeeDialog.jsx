@@ -26,14 +26,32 @@ const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], o
     }
   };
 
-  // Source of truth = Company Structure (/departments tree) + any live free-text departments from users
-  const departmentOptionsFlat = departmentOptions.map((opt) => opt.name).filter(Boolean);
-  const extraNames = Array.from(
-    new Set(
-      [...companyDepartments, ...(existingDepartments || [])].filter((d) => d && d !== 'Unassigned' && d !== 'KN Advisors')
-    )
-  ).filter((d) => !departmentOptionsFlat.includes(d && String(d).trim()));
-  const options = [...departmentOptions, ...extraNames.map((name) => ({ id: `extra-${name}`, name, depth: 0, parentId: null, record: null }))];
+  // Use the saved department tree first, then include legacy free-text names once.
+  const canonicalName = (value) => String(value || '').trim().replace(/\s+/g, ' ');
+  const optionMap = new Map();
+  [
+    ...departmentOptions,
+    ...companyDepartments.map((name) => ({ name })),
+    ...(existingDepartments || []).map((name) => ({ name })),
+    ...(user?.department ? [{ name: user.department }] : []),
+  ]
+    .forEach((option) => {
+      const name = canonicalName(option.name);
+      if (!name || name === 'Unassigned' || name === 'KN Advisors') return;
+      const key = name.toLowerCase();
+      if (!optionMap.has(key)) {
+        optionMap.set(key, {
+          ...option,
+          id: option.id || `extra-${key}`,
+          name,
+          depth: option.depth || 0,
+          parentId: option.parentId || null,
+          record: option.record || null,
+        });
+      }
+    });
+  const options = Array.from(optionMap.values());
+  const hasSelectedDepartment = options.some((option) => option.name === department);
 
   useEffect(() => {
     if (open) refreshCompanyDepts();
@@ -41,11 +59,12 @@ const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], o
 
   useEffect(() => {
     if (open && user) {
-      const currentDept = user.department || '';
-      setDepartment(currentDept);
+      const currentDept = canonicalName(user.department);
+      const matchingOption = options.find((option) => option.name.toLowerCase() === currentDept.toLowerCase());
+      setDepartment(matchingOption?.name || currentDept);
       setCustomDept('');
       setCustomParent('');
-      setDesignation(user.designation || '');
+      setDesignation(user.designation || (user.role === 'Admin' ? 'Administrator' : user.role || ''));
       setIsManager(user.role?.toLowerCase() === 'manager' || user.role?.toLowerCase() === 'admin');
     }
   }, [open, user]);
@@ -157,12 +176,29 @@ const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], o
             </Box>
           </Stack>
 
-          <FormControl size="small" fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Department</InputLabel>
-            <Select label="Department" value={department} onChange={(e) => setDepartment(e.target.value)}>
-              {renderDeptOptions(true, options)}
-            </Select>
-          </FormControl>
+          <TextField
+            select
+            native
+            label="Department"
+            fullWidth
+            size="small"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            SelectProps={{ native: true }}
+            InputLabelProps={{ shrink: true }}
+            sx={{ mb: 2 }}
+          >
+            <option value="">Select department</option>
+            {department && !options.some((option) => option.name === department) && (
+              <option value={department}>{department}</option>
+            )}
+            {options.map((option) => (
+              <option key={String(option.id)} value={option.name}>
+                {`${option.depth > 0 ? `${'  '.repeat(option.depth)}└─ ` : ''}${option.name}`}
+              </option>
+            ))}
+            <option value="__custom__">+ New Department...</option>
+          </TextField>
 
           {showNewDeptFields && (
             <Box sx={{ mb: 2, p: 1.5, bgcolor: '#F8FAFD', border: '1px dashed #C7D2DD', borderRadius: 2 }}>

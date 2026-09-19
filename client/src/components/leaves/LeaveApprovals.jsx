@@ -28,8 +28,13 @@ const LeaveApprovals = () => {
   const [review, setReview] = useState(null);
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
+  const [workflowSaving, setWorkflowSaving] = useState(false);
+  const [workflowUsers, setWorkflowUsers] = useState([]);
+  const [workflowForm, setWorkflowForm] = useState({ finalApproverId: '', processorId: '' });
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [policies, setPolicies] = useState({ types: {} });
+  const isAdmin = String(localStorage.getItem('userRole') || '').toLowerCase() === 'admin';
+  const currentUserId = Number(localStorage.getItem('userId')) || 0;
 
   const fetchLeaves = useCallback(async () => {
     const identity = leaveIdentityParams();
@@ -63,6 +68,31 @@ const LeaveApprovals = () => {
     return () => clearTimeout(timer);
   }, [fetchLeaves]);
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    axios.get('/leaves/approval-settings', { params: leaveIdentityParams() })
+      .then(({ data }) => {
+        setWorkflowUsers(data.users || []);
+        setWorkflowForm({
+          finalApproverId: data.finalApproverId ? String(data.finalApproverId) : '',
+          processorId: data.processorId ? String(data.processorId) : '',
+        });
+      })
+      .catch((error) => console.error('Error fetching leave workflow settings:', error));
+  }, [isAdmin]);
+
+  const saveWorkflow = async () => {
+    setWorkflowSaving(true);
+    try {
+      await axios.put('/leaves/approval-settings', workflowForm, { params: leaveIdentityParams() });
+      setSnackbar({ open: true, message: 'Leave approval flow saved', severity: 'success' });
+    } catch (error) {
+      setSnackbar({ open: true, message: error.response?.data?.error || 'Could not save leave approval flow', severity: 'error' });
+    } finally {
+      setWorkflowSaving(false);
+    }
+  };
+
   const visibleLeaves = useMemo(() => {
     if (tab !== 'Today') return leaves;
     const today = dayjs().format('YYYY-MM-DD');
@@ -74,6 +104,15 @@ const LeaveApprovals = () => {
   const openReview = (leave, action) => {
     setReview({ leave, action });
     setComment('');
+  };
+
+  const canReview = (leave) => {
+    if (leave.status !== 'Pending') return false;
+    if (isAdmin || !leave.approval_stage) return true;
+    if (leave.approval_stage === 'Supervisor') return Number(leave.supervisor_id) === currentUserId;
+    if (leave.approval_stage === 'FinalApprover') return Number(leave.final_approver_id) === currentUserId;
+    if (leave.approval_stage === 'Processor') return Number(leave.processor_id) === currentUserId;
+    return false;
   };
 
   const submitReview = async () => {
@@ -203,12 +242,17 @@ const LeaveApprovals = () => {
                         </TableCell>
                         <TableCell>
                           <Chip size="small" label={leave.status} color={statusColor(leave.status)} />
+                          {leave.status === 'Pending' && leave.approval_stage && (
+                            <Typography display="block" variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                              Waiting for {leave.approval_stage === 'FinalApprover' ? 'final approver' : leave.approval_stage.toLowerCase()}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell align="right">
-                          {leave.status === 'Pending' ? (
+                          {canReview(leave) ? (
                             <Stack direction="row" spacing={1} justifyContent="flex-end">
                               <Button size="small" variant="contained" color="success" onClick={() => openReview(leave, 'Approved')}>
-                                Approve
+                                {leave.approval_stage === 'Processor' ? 'Process' : 'Approve'}
                               </Button>
                               <Button size="small" variant="outlined" color="error" onClick={() => openReview(leave, 'Rejected')}>
                                 Reject
@@ -216,7 +260,7 @@ const LeaveApprovals = () => {
                             </Stack>
                           ) : (
                             <Typography variant="caption" color="text.secondary">
-                              {leave.reviewer_name || '—'}
+                              {leave.status === 'Pending' ? 'Waiting for assigned reviewer' : (leave.reviewer_name || '—')}
                             </Typography>
                           )}
                         </TableCell>
@@ -249,6 +293,49 @@ const LeaveApprovals = () => {
       </Box>
 
       <Box sx={{ width: { xs: '100%', lg: 320 } }}>
+        {isAdmin && (
+          <Card sx={{ mb: 2 }}>
+            <CardContent>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Leave approval flow</Typography>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                Supervisor → final approver → processor
+              </Typography>
+              <Stack spacing={1.5}>
+                <TextField
+                  select
+                  size="small"
+                  label="Final approver"
+                  value={workflowForm.finalApproverId}
+                  onChange={(event) => setWorkflowForm((prev) => ({ ...prev, finalApproverId: event.target.value }))}
+                  fullWidth
+                >
+                  {workflowUsers.map((user) => (
+                    <MenuItem key={user.id} value={String(user.id)}>
+                      {`${user.firstName || ''} ${user.lastName || ''}`.trim()} · {user.employeeId}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
+                  size="small"
+                  label="Processor"
+                  value={workflowForm.processorId}
+                  onChange={(event) => setWorkflowForm((prev) => ({ ...prev, processorId: event.target.value }))}
+                  fullWidth
+                >
+                  {workflowUsers.map((user) => (
+                    <MenuItem key={user.id} value={String(user.id)}>
+                      {`${user.firstName || ''} ${user.lastName || ''}`.trim()} · {user.employeeId}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <Button variant="contained" onClick={saveWorkflow} disabled={workflowSaving || !workflowForm.finalApproverId || !workflowForm.processorId}>
+                  {workflowSaving ? 'Saving…' : 'Save flow'}
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
+        )}
         <Grid container spacing={2}>
           {[
             { label: 'Total', value: counts.total, color: '#14286D' },

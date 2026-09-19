@@ -158,6 +158,11 @@ const MyLeaves = () => {
                               </TableCell>
                               <TableCell align="center">
                                 <Chip label={leave.status} color={statusColor(leave.status)} size="small" />
+                                {leave.status === 'Pending' && leave.approval_stage && (
+                                  <Typography display="block" variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
+                                    Waiting for {leave.approval_stage === 'FinalApprover' ? 'final approver' : leave.approval_stage.toLowerCase()}
+                                  </Typography>
+                                )}
                               </TableCell>
                               <TableCell align="right">
                                 {canCancel(leave) && (

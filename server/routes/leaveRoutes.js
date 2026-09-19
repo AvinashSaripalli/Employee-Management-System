@@ -6,6 +6,8 @@ router.post('/apply', leaveController.leaveApply);
 router.get('/', leaveController.getLeavesByEmployee);
 router.get('/leave', leaveController.getAllLeaves);
 router.get('/policies', leaveController.getPolicies);
+router.get('/approval-settings', leaveController.getApprovalSettings);
+router.put('/approval-settings', leaveController.updateApprovalSettings);
 router.get('/balance', leaveController.getBalance);
 router.get('/calendar', leaveController.getCalendar);
 router.put('/update-status', leaveController.updateLeaveStatus);

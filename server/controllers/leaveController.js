@@ -1,4 +1,4 @@
-const { Leave, User } = require('../models');
+const { Leave, User, Department, LeaveApprovalSetting } = require('../models');
 const { Op } = require('sequelize');
 const { ensureCompanyMembership, DEFAULT_COMPANY } = require('../utils/companyMembership');
 const {
@@ -37,6 +37,44 @@ function firstValue(...values) {
     if (text && text !== 'null' && text !== 'undefined') return text;
   }
   return null;
+}
+
+async function getApprovalSetting(companyName) {
+  if (!companyName) return null;
+  return LeaveApprovalSetting.findOne({ where: { companyName } });
+}
+
+async function getDepartmentSupervisor(companyName, departmentName) {
+  if (!companyName || !departmentName) return null;
+  const department = await Department.findOne({ where: { companyName, name: String(departmentName).trim() } });
+  if (!department?.supervisorId) return null;
+  return User.findOne({ where: { id: department.supervisorId, companyName, exists: 1 } });
+}
+
+function isAdmin(actor, req) {
+  return String(actor?.role || req.user?.role || '').toLowerCase() === 'admin';
+}
+
+function actorId(actor, req) {
+  return Number(actor?.id || req.user?.id || 0) || null;
+}
+
+function canActOnStage(leave, actor, req) {
+  const id = actorId(actor, req);
+  if (isAdmin(actor, req)) return true;
+  if (leave.approval_stage === 'Supervisor') return id && Number(leave.supervisor_id) === id;
+  if (leave.approval_stage === 'FinalApprover') return id && Number(leave.final_approver_id) === id;
+  if (leave.approval_stage === 'Processor') return id && Number(leave.processor_id) === id;
+  return false;
+}
+
+function stageLabel(stage) {
+  return {
+    Supervisor: 'Department supervisor',
+    FinalApprover: 'Final approver',
+    Processor: 'Processor',
+    Completed: 'Completed',
+  }[stage] || stage || 'Supervisor';
 }
 
 async function resolveIdentity(req) {
@@ -186,6 +224,59 @@ exports.getPolicies = async (_req, res) => {
   });
 };
 
+exports.getApprovalSettings = async (req, res) => {
+  const { actor, companyName } = await resolveIdentity(req);
+  if (!companyName) return res.status(400).json({ error: 'Company name is required' });
+  if (!isAdmin(actor, req)) return res.status(403).json({ error: 'Only Admin can manage leave approval settings' });
+
+  try {
+    const setting = await getApprovalSetting(companyName);
+    const users = await User.findAll({
+      where: { companyName, exists: 1 },
+      attributes: ['id', 'firstName', 'lastName', 'employeeId', 'role', 'department'],
+      order: [['firstName', 'ASC'], ['lastName', 'ASC']],
+    });
+    res.json({
+      finalApproverId: setting?.finalApproverId || null,
+      processorId: setting?.processorId || null,
+      users,
+    });
+  } catch (error) {
+    console.error('Error fetching leave approval settings:', error);
+    res.status(500).json({ error: 'Could not load leave approval settings' });
+  }
+};
+
+exports.updateApprovalSettings = async (req, res) => {
+  const { actor, companyName } = await resolveIdentity(req);
+  if (!companyName) return res.status(400).json({ error: 'Company name is required' });
+  if (!isAdmin(actor, req)) return res.status(403).json({ error: 'Only Admin can manage leave approval settings' });
+
+  const finalApproverId = Number(req.body.finalApproverId) || null;
+  const processorId = Number(req.body.processorId) || null;
+  if (!finalApproverId || !processorId) {
+    return res.status(400).json({ error: 'Final approver and processor are required' });
+  }
+  if (finalApproverId === processorId) {
+    return res.status(400).json({ error: 'Final approver and processor must be different people' });
+  }
+
+  try {
+    const users = await User.findAll({
+      where: { id: { [Op.in]: [finalApproverId, processorId] }, companyName, exists: 1 },
+      attributes: ['id'],
+    });
+    if (users.length !== 2) return res.status(400).json({ error: 'Both selected users must belong to this company' });
+
+    const [setting] = await LeaveApprovalSetting.findOrCreate({ where: { companyName } });
+    await setting.update({ finalApproverId, processorId });
+    res.json({ finalApproverId, processorId });
+  } catch (error) {
+    console.error('Error updating leave approval settings:', error);
+    res.status(500).json({ error: 'Could not save leave approval settings' });
+  }
+};
+
 exports.leaveApply = async (req, res) => {
   const {
     leaveType,
@@ -294,6 +385,10 @@ exports.leaveApply = async (req, res) => {
       }
     }
 
+    const setting = await getApprovalSetting(companyName);
+    const supervisor = await getDepartmentSupervisor(companyName, profile?.department || actor?.department);
+    const approvalStage = supervisor ? 'Supervisor' : 'FinalApprover';
+
     const leave = await Leave.create({
       employeeId,
       employee_name: displayName(profile || actor),
@@ -308,11 +403,16 @@ exports.leaveApply = async (req, res) => {
       half_day_session: halfDay ? (halfDaySession || 'AM') : null,
       contact_phone: contactPhone || profile?.phoneNumber || actor?.phoneNumber || null,
       status: 'Pending',
+      approval_stage: approvalStage,
+      supervisor_id: supervisor?.id || null,
+      supervisor_name: supervisor ? displayName(supervisor) : null,
+      final_approver_id: setting?.finalApproverId || null,
+      processor_id: setting?.processorId || null,
       companyName,
     });
 
     res.status(201).json({
-      message: 'Leave request submitted for approval',
+      message: `Leave request submitted. Next step: ${stageLabel(approvalStage)}`,
       leave,
     });
   } catch (error) {
@@ -354,7 +454,12 @@ exports.getAllLeaves = async (req, res) => {
   if (!companyName) {
     return res.status(400).json({ error: 'Company name is required' });
   }
-  if (!canApproveRole(role, department)) {
+  const setting = await getApprovalSetting(companyName);
+  const currentActorId = actorId(actor, req);
+  const isConfiguredReviewer = currentActorId && (
+    Number(setting?.finalApproverId) === currentActorId || Number(setting?.processorId) === currentActorId
+  );
+  if (!canApproveRole(role, department) && !isConfiguredReviewer) {
     return res.status(403).json({ error: 'Not allowed to view team leave requests' });
   }
 
@@ -374,9 +479,14 @@ exports.getAllLeaves = async (req, res) => {
       order: [['created_at', 'DESC']],
     }));
 
+    const broadAccess = canApproveRole(role, department) || isAdmin(actor, req);
+    const visibleResults = broadAccess
+      ? results
+      : results.filter((row) => canActOnStage(row, actor, req));
+
     const needle = (search || '').trim().toLowerCase();
     const filtered = needle
-      ? results.filter((row) => {
+      ? visibleResults.filter((row) => {
           const name = row.employee_name || displayName(row.employee);
           return (
             String(row.employeeId || '').toLowerCase().includes(needle) ||
@@ -385,7 +495,7 @@ exports.getAllLeaves = async (req, res) => {
             String(row.reason || '').toLowerCase().includes(needle)
           );
         })
-      : results;
+      : visibleResults;
 
     filtered.sort((a, b) => {
       const rank = (statusValue) => (normalizeStatus(statusValue) === 'Pending' ? 0 : normalizeStatus(statusValue) === 'Approved' ? 1 : 2);
@@ -507,9 +617,6 @@ exports.updateLeaveStatus = async (req, res) => {
     const { actor, employeeId, companyName } = await resolveIdentity(req);
     const role = actor?.role || req.user?.role;
     const department = actor?.department || req.user?.department;
-    if (!canApproveRole(role, department)) {
-      return res.status(403).json({ error: 'Only managers can review leave requests' });
-    }
 
     const leave = await Leave.findByPk(leaveId);
     if (!leave) {
@@ -525,15 +632,54 @@ exports.updateLeaveStatus = async (req, res) => {
       return res.status(400).json({ error: 'You cannot approve or reject your own leave request' });
     }
 
-    await leave.update({
-      status: nextStatus,
-      reviewer_id: actor?.id || req.user?.id || null,
-      reviewer_name: displayName(actor) || req.user?.role || 'Reviewer',
-      review_comment: comment ? String(comment).trim() : null,
-      reviewed_at: new Date(),
-    });
+    const legacyManagerApproval = !leave.approval_stage && canApproveRole(role, department);
+    if (!legacyManagerApproval && !canActOnStage(leave, actor, req)) {
+      return res.status(403).json({ error: `Only the ${stageLabel(leave.approval_stage)} can review this leave request` });
+    }
 
-    res.json({ message: `Leave ${nextStatus.toLowerCase()} successfully`, leave });
+    const reviewer = displayName(actor) || req.user?.role || 'Reviewer';
+    if (nextStatus === 'Rejected') {
+      await leave.update({
+        status: 'Rejected',
+        review_comment: comment ? String(comment).trim() : null,
+        reviewer_id: actorId(actor, req),
+        reviewer_name: reviewer,
+        reviewed_at: new Date(),
+      });
+      return res.json({ message: 'Leave rejected successfully', leave });
+    }
+
+    const now = new Date();
+    const updates = {
+      review_comment: comment ? String(comment).trim() : leave.review_comment,
+      reviewer_id: actorId(actor, req),
+      reviewer_name: reviewer,
+      reviewed_at: now,
+    };
+
+    if (leave.approval_stage === 'Supervisor') {
+      updates.supervisor_comment = comment ? String(comment).trim() : null;
+      updates.supervisor_reviewed_at = now;
+      updates.approval_stage = leave.final_approver_id ? 'FinalApprover' : 'Processor';
+    } else if (leave.approval_stage === 'FinalApprover') {
+      updates.final_approver_name = reviewer;
+      updates.final_approver_comment = comment ? String(comment).trim() : null;
+      updates.final_approved_at = now;
+      updates.approval_stage = leave.processor_id ? 'Processor' : 'Completed';
+      if (!leave.processor_id) updates.status = 'Approved';
+    } else if (leave.approval_stage === 'Processor') {
+      updates.processor_name = reviewer;
+      updates.processed_at = now;
+      updates.approval_stage = 'Completed';
+      updates.status = 'Approved';
+    } else {
+      updates.status = 'Approved';
+      updates.approval_stage = 'Completed';
+    }
+
+    await leave.update(updates);
+
+    res.json({ message: `Leave advanced to ${stageLabel(updates.approval_stage)}`, leave });
   } catch (error) {
     console.error('Error updating leave status:', error);
     res.status(500).json({ error: 'Database error', details: error.message });
