@@ -1,54 +1,75 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  Avatar,
-  AvatarGroup,
-  Menu,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  IconButton,
   Button,
-  Grid,
   TextField,
-DialogActions,
+  InputAdornment,
+  IconButton,
+  ToggleButton,
+  ToggleButtonGroup,
   FormControl,
   InputLabel,
   Select,
-  Autocomplete,
+  MenuItem,
+  Chip,
+  Snackbar,
+  Alert,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Tooltip,
 } from '@mui/material';
+import {
+  Add as AddIcon,
+  Search as SearchIcon,
+  Refresh as RefreshIcon,
+  GridView as GridViewIcon,
+  ViewList as TableViewIcon,
+  FileDownload as ExportIcon,
+  FilterList as FilterIcon,
+  PersonPin as MyGroupsIcon,
+} from '@mui/icons-material';
 import axios from '../../api/axios';
-import { Close as CloseIcon, Add as AddIcon, Edit as EditIcon } from '@mui/icons-material';
+import WorkgroupStatsBar from './components/WorkgroupStatsBar';
+import WorkgroupCard from './components/WorkgroupCard';
+import WorkgroupTable from './components/WorkgroupTable';
+import WorkgroupWorkspaceDialog from './components/WorkgroupWorkspaceDialog';
+import WorkgroupFormDialog from './components/WorkgroupFormDialog';
 
 const Workgroups = () => {
-  const [workgroups, setWorkgroups] = useState([]);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedEmployees, setSelectedEmployees] = useState([]);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [selectedEmployeeDetails, setSelectedEmployeeDetails] = useState(null);
-  const [openDialog, setOpenDialog] = useState(false);
+  const [rawWorkgroups, setRawWorkgroups] = useState([]);
   const [users, setUsers] = useState([]);
-  const [createGroups, setCreateGroups] = useState({
-    partnerCompanyName: '',
-    createdOn: '',
-    privacyType: '',
-    employeers: [],
-  });
-  const [isEditMode, setIsEditMode] = useState(false); // Track edit mode
-  const [selectedWorkgroupId, setSelectedWorkgroupId] = useState(null); // Track workgroup ID for editing
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState({ open: false, message: '', severity: 'info' });
+
+  // View & Filter state
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' or 'table'
+  const [searchValue, setSearchValue] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [privacyFilter, setPrivacyFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('Active');
+  const [onlyMyGroups, setOnlyMyGroups] = useState(false);
+
+  // Dialogs state
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedGroupToEdit, setSelectedGroupToEdit] = useState(null);
+
+  const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
+  const [activeWorkspaceGroup, setActiveWorkspaceGroup] = useState(null);
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+
+  const currentEmployeeId = localStorage.getItem('userEmployeeId') || '';
+  const userRole = localStorage.getItem('userRole') || 'Employee';
+  const isAdminOrManager = ['Admin', 'Manager'].includes(userRole);
 
   const fetchWorkGroups = async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const companyName = localStorage.getItem('companyName');
@@ -57,9 +78,16 @@ const Workgroups = () => {
         headers: { Authorization: `Bearer ${token}` },
         params: { companyName },
       });
-      setWorkgroups(response.data);
+      setRawWorkgroups(response.data || []);
     } catch (error) {
       console.error('Error fetching workgroups:', error);
+      setFeedback({
+        open: true,
+        message: 'Unable to load workgroups. Please refresh and try again.',
+        severity: 'error',
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -72,7 +100,7 @@ const Workgroups = () => {
         headers: { Authorization: `Bearer ${token}` },
         params: { companyName },
       });
-      setUsers(response.data);
+      setUsers(response.data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
     }
@@ -80,447 +108,573 @@ const Workgroups = () => {
 
   useEffect(() => {
     fetchWorkGroups();
+    fetchUsers();
   }, []);
 
-  useEffect(() => {
-    if (openDialog) {
-      fetchUsers();
-    }
-  }, [openDialog]);
+  // Aggregate raw rows into distinct workgroup entities
+  const groupedData = useMemo(() => {
+    const map = new Map();
 
-  const groupedWorkgroups = workgroups.reduce((acc, workgroup) => {
-    const { partnerCompanyName, employeeId } = workgroup;
-    if (!acc[partnerCompanyName]) {
-      acc[partnerCompanyName] = {
-        id: workgroup.id,
-        companyName: workgroup.companyName,
-        createdOn: workgroup.createdOn,
-        privacyType: workgroup.privacyType,
-        employees: new Map(),
-      };
-    }
-    if (!acc[partnerCompanyName].employees.has(employeeId)) {
-      acc[partnerCompanyName].employees.set(employeeId, {
-        employeeId,
-        firstName: workgroup.firstName,
-        lastName: workgroup.lastName,
-        email: workgroup.email,
-        designation: workgroup.designation,
-        department: workgroup.department,
-        technicalSkills: workgroup.technicalSkills,
-        photo: workgroup.photo,
-      });
-    }
-    return acc;
-  }, {});
+    (rawWorkgroups || []).forEach((row) => {
+      const groupKey = row.partnerCompanyName || `group-${row.id}`;
 
-  const groupedData = Object.entries(groupedWorkgroups).map(([partnerCompanyName, data]) => ({
-    partnerCompanyName,
-    id: data.id,
-    companyName: data.companyName,
-    createdOn: data.createdOn,
-    privacyType: data.privacyType,
-    employees: Array.from(data.employees.values()),
-  }));
-
-  const handleAvatarGroupClick = (event, employees) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedEmployees(employees);
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setCreateGroups((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const workgroupsData = {
-        partnerCompanyName: createGroups.partnerCompanyName,
-        createdOn: createGroups.createdOn,
-        privacyType: createGroups.privacyType,
-        employeers: createGroups.employeers,
-      };
-
-      if (isEditMode) {
-        // Update workgroup
-        await axios.put(`/workgroups/${selectedWorkgroupId}`, workgroupsData, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-      } else {
-        // Create new workgroup
-        await axios.post('/workgroups/', workgroupsData, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+      if (!map.has(groupKey)) {
+        map.set(groupKey, {
+          id: row.id,
+          companyName: row.companyName,
+          groupName: row.groupName || row.partnerCompanyName,
+          partnerCompanyName: row.partnerCompanyName,
+          description: row.description || '',
+          category: row.category || 'Project Pod',
+          status: row.status || 'Active',
+          privacyType: row.privacyType || 'Private',
+          leaderId: row.leaderId || null,
+          leader: row.leader || null,
+          tags: row.tags || '',
+          resources: Array.isArray(row.resources) ? row.resources : [],
+          announcements: Array.isArray(row.announcements) ? row.announcements : [],
+          createdOn: row.createdOn,
+          employeesMap: new Map(),
         });
       }
 
-      setOpenDialog(false);
+      const grp = map.get(groupKey);
+
+      if (row.employeeId && !grp.employeesMap.has(row.employeeId)) {
+        grp.employeesMap.set(row.employeeId, {
+          employeeId: row.employeeId,
+          firstName: row.firstName || '',
+          lastName: row.lastName || '',
+          email: row.email || '',
+          designation: row.designation || '',
+          department: row.department || '',
+          technicalSkills: row.technicalSkills || '',
+          photo: row.photo || null,
+          phoneNumber: row.phoneNumber || '',
+          memberRole: row.memberRole || (row.employeeId === grp.leaderId ? 'Leader' : 'Member'),
+        });
+      }
+    });
+
+    return Array.from(map.values()).map((g) => ({
+      ...g,
+      employees: Array.from(g.employeesMap.values()),
+    }));
+  }, [rawWorkgroups]);
+
+  // Apply filters & search
+  const visibleGroups = useMemo(() => {
+    return groupedData.filter((group) => {
+      // Search
+      const q = searchValue.trim().toLowerCase();
+      if (q) {
+        const matchesName =
+          (group.groupName && group.groupName.toLowerCase().includes(q)) ||
+          (group.partnerCompanyName && group.partnerCompanyName.toLowerCase().includes(q));
+        const matchesTags = group.tags && group.tags.toLowerCase().includes(q);
+        const matchesDesc = group.description && group.description.toLowerCase().includes(q);
+        const matchesLeader =
+          group.leader &&
+          `${group.leader.firstName} ${group.leader.lastName}`.toLowerCase().includes(q);
+        const matchesMember = (group.employees || []).some((emp) =>
+          `${emp.firstName} ${emp.lastName} ${emp.employeeId}`.toLowerCase().includes(q)
+        );
+
+        if (!matchesName && !matchesTags && !matchesDesc && !matchesLeader && !matchesMember) {
+          return false;
+        }
+      }
+
+      // Category filter
+      if (categoryFilter !== 'All' && group.category !== categoryFilter) {
+        return false;
+      }
+
+      // Privacy filter
+      if (privacyFilter !== 'All' && group.privacyType !== privacyFilter) {
+        return false;
+      }
+
+      // Status filter
+      if (statusFilter !== 'All' && group.status !== statusFilter) {
+        return false;
+      }
+
+      // My Groups filter
+      if (onlyMyGroups) {
+        const isMember = (group.employees || []).some((e) => e.employeeId === currentEmployeeId);
+        if (!isMember) return false;
+      }
+
+      return true;
+    });
+  }, [groupedData, searchValue, categoryFilter, privacyFilter, statusFilter, onlyMyGroups, currentEmployeeId]);
+
+  // Form Submit (Create / Edit)
+  const handleFormSubmit = async (formData) => {
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
+      if (isEditMode && selectedGroupToEdit) {
+        await axios.put(`/workgroups/${selectedGroupToEdit.id}`, formData, { headers });
+        setFeedback({ open: true, message: 'Workgroup updated successfully.', severity: 'success' });
+      } else {
+        await axios.post('/workgroups/', formData, { headers });
+        setFeedback({ open: true, message: 'Workgroup created successfully.', severity: 'success' });
+      }
+
+      setFormDialogOpen(false);
       setIsEditMode(false);
-      setSelectedWorkgroupId(null);
-      setCreateGroups({
-        partnerCompanyName: '',
-        createdOn: '',
-        privacyType: '',
-        employeers: [],
-      });
+      setSelectedGroupToEdit(null);
       fetchWorkGroups();
     } catch (error) {
-      console.error(`Error ${isEditMode ? 'updating' : 'creating'} workgroup:`, error);
+      console.error('Error saving workgroup:', error);
+      setFeedback({
+        open: true,
+        message: error.response?.data?.error || 'Unable to save workgroup.',
+        severity: 'error',
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleEditClick = (group) => {
+  // Delete Workgroup
+  const handleDeleteGroup = async () => {
+    if (!deleteTarget) return;
+    try {
+      await axios.delete(`/workgroups/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      setFeedback({ open: true, message: 'Workgroup deleted successfully.', severity: 'success' });
+      fetchWorkGroups();
+      if (activeWorkspaceGroup?.id === deleteTarget.id) {
+        setWorkspaceDialogOpen(false);
+      }
+    } catch (error) {
+      console.error('Error deleting workgroup:', error);
+      setFeedback({ open: true, message: 'Unable to delete this workgroup.', severity: 'error' });
+    }
+  };
+
+  // Self-service Join
+  const handleJoinGroup = async (group) => {
+    try {
+      await axios.post(`/workgroups/${group.id}/join`);
+      setFeedback({ open: true, message: `Joined ${group.groupName}!`, severity: 'success' });
+      fetchWorkGroups();
+    } catch (error) {
+      setFeedback({
+        open: true,
+        message: error.response?.data?.error || 'Failed to join workgroup',
+        severity: 'error',
+      });
+    }
+  };
+
+  // Self-service Leave
+  const handleLeaveGroup = async (group) => {
+    if (!window.confirm(`Are you sure you want to leave ${group.groupName}?`)) return;
+    try {
+      await axios.post(`/workgroups/${group.id}/leave`);
+      setFeedback({ open: true, message: `Left ${group.groupName}.`, severity: 'success' });
+      fetchWorkGroups();
+    } catch (error) {
+      setFeedback({
+        open: true,
+        message: error.response?.data?.error || 'Failed to leave workgroup',
+        severity: 'error',
+      });
+    }
+  };
+
+  // CSV Export
+  const handleExportCSV = () => {
+    if (!visibleGroups.length) return;
+
+    const headers = ['ID', 'Group Name', 'Partner Company', 'Category', 'Privacy', 'Status', 'Leader ID', 'Members Count', 'Created Date'];
+    const rows = visibleGroups.map((g) => [
+      g.id,
+      `"${(g.groupName || '').replace(/"/g, '""')}"`,
+      `"${(g.partnerCompanyName || '').replace(/"/g, '""')}"`,
+      g.category,
+      g.privacyType,
+      g.status,
+      g.leaderId || 'N/A',
+      g.employees?.length || 0,
+      g.createdOn ? new Date(g.createdOn).toISOString().slice(0, 10) : '',
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `workgroups_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Open Workspace
+  const handleOpenWorkspace = (group) => {
+    setActiveWorkspaceGroup(group);
+    setWorkspaceDialogOpen(true);
+  };
+
+  // Edit Action
+  const handleEditGroup = (group) => {
+    setSelectedGroupToEdit(group);
     setIsEditMode(true);
-    setSelectedWorkgroupId(group.id);
-    setCreateGroups({
-      partnerCompanyName: group.partnerCompanyName,
-      createdOn: group.createdOn.split('T')[0], // Format date for input
-      privacyType: group.privacyType,
-      employeers: group.employees.map((emp) => emp.employeeId),
-    });
-    setOpenDialog(true);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedEmployees([]);
-  };
-
-  const handleDialogClose = () => {
-    setOpenDialog(false);
-    setIsEditMode(false);
-    setSelectedWorkgroupId(null);
-    setCreateGroups({
-      partnerCompanyName: '',
-      createdOn: '',
-      privacyType: '',
-      employeers: [],
-    });
+    setFormDialogOpen(true);
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 } }}>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+    <Box sx={{ p: { xs: 2, md: 4 }, minHeight: '100vh', bgcolor: '#F8FAFC' }}>
+      {/* Header Banner */}
+      <Box
+        sx={{
+          mb: 3,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 2,
+          flexWrap: 'wrap',
+        }}
+      >
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-            Work Groups
+          <Typography variant="h5" sx={{ fontWeight: 800, color: '#1E293B', letterSpacing: '-0.02em' }}>
+            Work Groups & Collaboration Hub
           </Typography>
           <Typography color="text.secondary" sx={{ fontSize: '0.88rem' }}>
-            Collaborate with partner companies and manage cross-company groups
+            Coordinate cross-functional pods, partner channels, task forces, and team initiatives.
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setIsEditMode(false);
-            setOpenDialog(true);
-          }}
-        >
-          Add WorkGroup
-        </Button>
-      </Box>
-      <TableContainer
-        component={Paper}
-        sx={{
-          maxHeight: '462px',
-          overflowY: 'auto',
-          borderRadius: 3,
-          border: '1px solid #E8EEF9',
-          boxShadow: '0 6px 18px rgba(20,40,109,0.07)',
-        }}
-      >
-        <Table stickyHeader aria-label="workgroups table">
-          <TableHead sx={{ backgroundColor: '#f4f7fe' }}>
-            <TableRow>
-              <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
-                ID
-              </TableCell>
-              <TableCell align="left" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
-                Partner Company
-              </TableCell>
-              <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
-                Date Created
-              </TableCell>
-              <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
-                Privacy Type
-              </TableCell>
-              <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>
-                Employees
-              </TableCell>
-              <TableCell>
-                Actions
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {groupedData.length > 0 ? (
-              groupedData.map((group) => (
-                <TableRow key={group.id} hover>
-                  <TableCell align="center">{group.id}</TableCell>
-                  <TableCell align="left">
-                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                      {group.partnerCompanyName}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    {new Date(group.createdOn).toLocaleDateString('en-GB')}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Chip
-                      label={group.privacyType}
-                      color={group.privacyType === 'Public' ? 'info' : 'secondary'}
-                      variant="outlined"
-                      sx={{ width: '100px', minWidth: 'unset' }}
-                    />
-                  </TableCell>
-                  <TableCell align="center">
-                    <AvatarGroup
-                      max={3}
-                      sx={{ justifyContent: 'center', cursor: 'pointer' }}
-                      onClick={(event) => handleAvatarGroupClick(event, group.employees)}
-                    >
-                      {group.employees.map((emp) => (
-                        <Avatar
-                          key={emp.employeeId}
-                          src={emp.photo ? `${emp.photo}` : undefined}
-                          alt={`${emp.firstName} ${emp.lastName}`}
-                          sx={{ width: 40, height: 40 }}
-                          title={`${emp.firstName} ${emp.lastName}`}
-                        />
-                      ))}
-                    </AvatarGroup>
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<EditIcon sx={{ fontSize: 16 }} />}
-                      onClick={() => handleEditClick(group)}
-                    >
-                      Edit
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={11} align="center">
-                  No workgroups found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-        PaperProps={{
-          sx: { maxHeight: '400px', width: '400px' },
-        }}
-      >
-        {selectedEmployees.map((emp) => (
-          <MenuItem
-            key={emp.employeeId}
-            onClick={() => {
-              setSelectedEmployeeDetails(emp);
-              setDialogOpen(true);
-              handleMenuClose();
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Avatar
-                src={emp.photo ? `${emp.photo}` : undefined}
-                alt={`${emp.firstName} ${emp.lastName}`}
-                sx={{ width: 40, height: 40 }}
-              />
-              <Box>
-                <Typography variant="body2">
-                  <strong>Name:</strong> {emp.firstName} {emp.lastName}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Email:</strong> {emp.email}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Designation:</strong> {emp.designation}
-                </Typography>
-              </Box>
-            </Box>
-          </MenuItem>
-        ))}
-      </Menu>
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Employee Details
-          <IconButton
-            color="inherit"
-            onClick={() => setDialogOpen(false)}
-            aria-label="close"
+
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+          <Button
+            variant="outlined"
+            size="medium"
+            startIcon={<ExportIcon />}
+            onClick={handleExportCSV}
+            disabled={!visibleGroups.length}
             sx={{
-              position: 'absolute',
-              right: 8,
-              top: 14,
+              borderRadius: 2.5,
+              textTransform: 'none',
+              fontWeight: 600,
+              bgcolor: '#FFF',
+              borderColor: '#CBD5E1',
+              color: '#334155',
+              '&:hover': { bgcolor: '#F1F5F9', borderColor: '#94A3B8' },
             }}
           >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          {selectedEmployeeDetails && (
-            <Box sx={{ display: 'flex', gap: 2 }}>
-              <Avatar
-                src={selectedEmployeeDetails.photo ? `${selectedEmployeeDetails.photo}` : undefined}
-                alt={`${selectedEmployeeDetails.firstName} ${selectedEmployeeDetails.lastName}`}
-                sx={{ width: 80, height: 80 }}
-              />
-              <Box>
-                <Typography variant="body1">
-                  <strong>Name:</strong> {selectedEmployeeDetails.firstName} {selectedEmployeeDetails.lastName}
-                </Typography>
-                <Typography variant="body1">
-                  <strong>Name:</strong> {selectedEmployeeDetails.firstName} {selectedEmployeeDetails.lastName}
-                </Typography>
-                <Typography variant="body1">
-                  <strong>Email:</strong> {selectedEmployeeDetails.email}
-                </Typography>
-                <Typography variant="body1">
-                  <strong>Designation:</strong> {selectedEmployeeDetails.designation}
-                </Typography>
-                <Typography variant="body1">
-                  <strong>Department:</strong> {selectedEmployeeDetails.department}
-                </Typography>
-                <Typography variant="body1">
-                  <strong>Skills:</strong>
-                </Typography>
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
-                  {(selectedEmployeeDetails.technicalSkills || '')
-                    .split(',')
-                    .map((skill) => skill.trim())
-                    .filter(Boolean)
-                    .map((skill, idx) => (
-                      <Chip key={idx} label={skill} />
-                    ))}
-                </Box>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-      </Dialog>
-      <Dialog open={openDialog} onClose={handleDialogClose} fullWidth maxWidth="sm">
-        <DialogTitle>{isEditMode ? 'Edit WorkGroup' : 'Add WorkGroups'}</DialogTitle>
-        <DialogContent dividers>
-          <TextField
-            label="Company Name"
-            name="partnerCompanyName"
-            margin="normal"
-            fullWidth
-            value={createGroups.partnerCompanyName}
-            onChange={handleChange}
-          />
-          <TextField
-            type="date"
-            label="Created On"
-            InputLabelProps={{ shrink: true }}
-            margin="normal"
-            value={createGroups.createdOn}
-            onChange={handleChange}
-            fullWidth
-          />
-          <FormControl fullWidth margin="normal">
-            <InputLabel>Privacy Type</InputLabel>
-            <Select
-              name="privacyType"
-              value={createGroups.privacyType}
-              onChange={handleChange}
-              label="Privacy Type"
+            Export CSV
+          </Button>
+
+          {isAdminOrManager && (
+            <Button
+              variant="contained"
+              size="medium"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setIsEditMode(false);
+                setSelectedGroupToEdit(null);
+                setFormDialogOpen(true);
+              }}
+              sx={{
+                borderRadius: 2.5,
+                textTransform: 'none',
+                fontWeight: 700,
+                px: 2.5,
+                boxShadow: '0 4px 14px rgba(79, 70, 229, 0.35)',
+              }}
             >
-              <MenuItem value="Public">Public</MenuItem>
-              <MenuItem value="Private">Private</MenuItem>
+              New Workgroup
+            </Button>
+          )}
+        </Box>
+      </Box>
+
+      {/* KPI Stats Bar */}
+      <WorkgroupStatsBar workgroups={groupedData} />
+
+      {/* Search & Filter Toolbar */}
+      <Box
+        sx={{
+          p: 2,
+          mb: 3,
+          bgcolor: '#FFFFFF',
+          borderRadius: 3,
+          border: '1px solid #E2E8F0',
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          gap: 2,
+          alignItems: { xs: 'stretch', md: 'center' },
+          justifyContent: 'space-between',
+        }}
+      >
+        {/* Search input */}
+        <TextField
+          size="small"
+          placeholder="Search by name, partner, tags, or team member..."
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+          sx={{ flex: 1, minWidth: { xs: '100%', md: 280 } }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ color: '#94A3B8' }} />
+              </InputAdornment>
+            ),
+          }}
+        />
+
+        {/* Filter Controls */}
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Category</InputLabel>
+            <Select
+              value={categoryFilter}
+              label="Category"
+              onChange={(e) => setCategoryFilter(e.target.value)}
+            >
+              <MenuItem value="All">All Categories</MenuItem>
+              <MenuItem value="Project Pod">Project Pod</MenuItem>
+              <MenuItem value="Client/Partner">Client/Partner</MenuItem>
+              <MenuItem value="Cross-Functional">Cross-Functional</MenuItem>
+              <MenuItem value="Innovation Lab">Innovation Lab</MenuItem>
+              <MenuItem value="Department">Department</MenuItem>
+              <MenuItem value="Committee">Committee</MenuItem>
             </Select>
           </FormControl>
-          <Autocomplete
-            multiple
-            id="add-employees"
-            options={users}
-            getOptionLabel={(option) => `${option.firstName} ${option.lastName}`}
-            value={users.filter((user) => createGroups.employeers.includes(user.employeeId))}
-            onChange={(event, newValue) => {
-              setCreateGroups((prev) => ({
-                ...prev,
-                employeers: newValue.map((user) => user.employeeId),
-              }));
-            }}
-            filterSelectedOptions
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Add Employees"
-                margin="normal"
-                fullWidth
-                placeholder="Add employees..."
-              />
-            )}
-            renderOption={(props, option) => (
-              <li {...props} key={option.employeeId}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar
-                    src={option.photo || undefined}
-                    alt={`${option.firstName} ${option.lastName}`}
-                    sx={{ width: 40, height: 40 }}
-                  />
-                  <Box>
-                    <Typography variant="body2">
-                      <strong>Name:</strong> {option.firstName} {option.lastName}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Department:</strong> {option.department}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Email:</strong> {option.email}
-                    </Typography>
-                  </Box>
-                  </Box>
-                </li>
-              )}
-              renderTags={(value, getTagProps) =>
-                value.map((user, index) => {
-                  const { key, ...tagProps } = getTagProps({ index });
-                  return (
-                    <Chip
-                      key={key}
-                      avatar={
-                        <Avatar
-                          src={user.photo || undefined}
-                          alt={`${user.firstName} ${user.lastName}`}
-                        />
-                      }
-                      label={`${user.firstName} ${user.lastName}`}
-                      {...tagProps}
-                      sx={{ m: 0.5 }}
-                    />
-                  );
-                })
-              }
-              sx={{ width: '100%', mt: 2 }}
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button variant="contained" onClick={handleSubmit}>
-              {isEditMode ? 'Update' : 'Submit'}
-            </Button>
-          </DialogActions>
-        </Dialog>
+
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Privacy</InputLabel>
+            <Select
+              value={privacyFilter}
+              label="Privacy"
+              onChange={(e) => setPrivacyFilter(e.target.value)}
+            >
+              <MenuItem value="All">All Types</MenuItem>
+              <MenuItem value="Public">Public Only</MenuItem>
+              <MenuItem value="Private">Private Only</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>Status</InputLabel>
+            <Select
+              value={statusFilter}
+              label="Status"
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <MenuItem value="All">All Status</MenuItem>
+              <MenuItem value="Active">Active</MenuItem>
+              <MenuItem value="On Hold">On Hold</MenuItem>
+              <MenuItem value="Archived">Archived</MenuItem>
+            </Select>
+          </FormControl>
+
+          <Chip
+            icon={<MyGroupsIcon sx={{ fontSize: '16px !important' }} />}
+            label="My Groups"
+            clickable
+            color={onlyMyGroups ? 'primary' : 'default'}
+            variant={onlyMyGroups ? 'filled' : 'outlined'}
+            onClick={() => setOnlyMyGroups(!onlyMyGroups)}
+            sx={{ fontWeight: 600, borderRadius: 2 }}
+          />
+
+          <IconButton
+            onClick={fetchWorkGroups}
+            aria-label="Refresh"
+            sx={{ border: '1px solid #E2E8F0', borderRadius: 2 }}
+          >
+            <RefreshIcon fontSize="small" />
+          </IconButton>
+
+          {/* View Mode Toggle */}
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(e, val) => val && setViewMode(val)}
+            size="small"
+            sx={{ bgcolor: '#F8FAFC', borderRadius: 2 }}
+          >
+            <ToggleButton value="cards" aria-label="cards view">
+              <Tooltip title="Card View">
+                <GridViewIcon fontSize="small" />
+              </Tooltip>
+            </ToggleButton>
+            <ToggleButton value="table" aria-label="table view">
+              <Tooltip title="Table View">
+                <TableViewIcon fontSize="small" />
+              </Tooltip>
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
       </Box>
+
+      {/* Main Content Area */}
+      {loading ? (
+        <Box sx={{ textAlign: 'center', py: 10 }}>
+          <CircularProgress size={42} />
+          <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+            Loading workgroups hub...
+          </Typography>
+        </Box>
+      ) : visibleGroups.length > 0 ? (
+        viewMode === 'cards' ? (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: '1fr',
+                sm: 'repeat(2, 1fr)',
+                lg: 'repeat(3, 1fr)',
+              },
+              gap: 2.5,
+            }}
+          >
+            {visibleGroups.map((group) => (
+              <WorkgroupCard
+                key={group.id}
+                group={group}
+                currentEmployeeId={currentEmployeeId}
+                userRole={userRole}
+                onOpenWorkspace={handleOpenWorkspace}
+                onEdit={handleEditGroup}
+                onDelete={(g) => setDeleteTarget(g)}
+                onJoin={handleJoinGroup}
+                onLeave={handleLeaveGroup}
+                onChat={handleOpenWorkspace}
+              />
+            ))}
+          </Box>
+        ) : (
+          <WorkgroupTable
+            workgroups={visibleGroups}
+            currentEmployeeId={currentEmployeeId}
+            userRole={userRole}
+            onOpenWorkspace={handleOpenWorkspace}
+            onEdit={handleEditGroup}
+            onDelete={(g) => setDeleteTarget(g)}
+            onJoin={handleJoinGroup}
+            onLeave={handleLeaveGroup}
+            onChat={handleOpenWorkspace}
+          />
+        )
+      ) : (
+        <Box
+          sx={{
+            p: 6,
+            textAlign: 'center',
+            bgcolor: '#FFF',
+            borderRadius: 3,
+            border: '1px dashed #CBD5E1',
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: 700, color: '#334155', mb: 1 }}>
+            {searchValue || categoryFilter !== 'All' || onlyMyGroups
+              ? 'No workgroups match your filters.'
+              : 'No workgroups found.'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            {searchValue || categoryFilter !== 'All' || onlyMyGroups
+              ? 'Try adjusting your search criteria or resetting filters.'
+              : 'Create the first workgroup to start collaborating seamlessly across teams.'}
+          </Typography>
+          {isAdminOrManager && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setIsEditMode(false);
+                setSelectedGroupToEdit(null);
+                setFormDialogOpen(true);
+              }}
+              sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+            >
+              Create First Workgroup
+            </Button>
+          )}
+        </Box>
+      )}
+
+      {/* Deep-Dive Workspace Dialog */}
+      {workspaceDialogOpen && activeWorkspaceGroup && (
+        <WorkgroupWorkspaceDialog
+          open={workspaceDialogOpen}
+          onClose={() => setWorkspaceDialogOpen(false)}
+          group={
+            groupedData.find((g) => g.id === activeWorkspaceGroup.id) || activeWorkspaceGroup
+          }
+          users={users}
+          currentEmployeeId={currentEmployeeId}
+          userRole={userRole}
+          onGroupUpdated={fetchWorkGroups}
+          onEditGroup={handleEditGroup}
+        />
+      )}
+
+      {/* Create / Edit Form Dialog */}
+      <WorkgroupFormDialog
+        open={formDialogOpen}
+        onClose={() => {
+          setFormDialogOpen(false);
+          setIsEditMode(false);
+          setSelectedGroupToEdit(null);
+        }}
+        onSubmit={handleFormSubmit}
+        isEditMode={isEditMode}
+        initialData={selectedGroupToEdit}
+        users={users}
+        saving={saving}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700 }}>Delete Workgroup?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            Are you sure you want to delete <strong>{deleteTarget?.groupName || deleteTarget?.partnerCompanyName}</strong>?
+            This will remove all member assignments and resources for this workgroup.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setDeleteTarget(null)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleDeleteGroup}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Feedback Toast */}
+      <Snackbar
+        open={feedback.open}
+        autoHideDuration={3000}
+        onClose={() => setFeedback({ ...feedback, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          severity={feedback.severity}
+          onClose={() => setFeedback({ ...feedback, open: false })}
+          sx={{ width: '100%', borderRadius: 2 }}
+        >
+          {feedback.message}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 };
 

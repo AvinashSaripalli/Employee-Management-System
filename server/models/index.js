@@ -25,6 +25,12 @@ Workgroup.belongsTo(User, {
   as: "user",
   constraints: false,
 });
+Workgroup.belongsTo(User, {
+  foreignKey: "leaderId",
+  targetKey: "employeeId",
+  as: "leader",
+  constraints: false,
+});
 User.hasMany(Workgroup, {
   foreignKey: "employeeId",
   sourceKey: "employeeId",

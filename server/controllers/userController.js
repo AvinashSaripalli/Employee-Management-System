@@ -202,9 +202,12 @@ exports.loginUser = async (req, res) => {
 exports.updateUser = async (req, res) => {
   const { id, designation, department, role, jobLocation, technicalSkills, phoneNumber, dateOfBirth, bloodGroup, gender } = req.body;
   const skillsString = technicalSkills ? (Array.isArray(technicalSkills) ? technicalSkills.join(",") : technicalSkills) : null;
+  const normalizedDateOfBirth = /^\d{4}-\d{2}-\d{2}$/.test(String(dateOfBirth || ''))
+    ? dateOfBirth
+    : null;
 
   try {
-    const updatePayload = { designation, department, jobLocation, phoneNumber, dateOfBirth, bloodGroup, gender };
+    const updatePayload = { designation, department, jobLocation, phoneNumber, dateOfBirth: normalizedDateOfBirth, bloodGroup, gender };
     if (skillsString !== null) updatePayload.technicalSkills = skillsString;
     if (role) updatePayload.role = role;
 

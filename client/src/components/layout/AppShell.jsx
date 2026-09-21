@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import {
   AppBar, Toolbar, Box, Drawer, Typography, List, ListItem,
   ListItemButton, ListItemIcon, IconButton, Menu, MenuItem, Divider,
-  Avatar, Badge, Chip, CircularProgress, Tooltip,
+  Avatar, Badge, Chip, CircularProgress, Tooltip, Dialog, DialogTitle,
+  DialogContent, DialogActions, Button, Snackbar,
 } from '@mui/material';
-import { HiOutlineMagnifyingGlass, HiOutlineBell, HiOutlineArrowPath, HiOutlineArrowRightOnRectangle, HiOutlineChevronDown, HiOutlineInformationCircle, HiOutlineClipboardDocumentCheck, HiOutlineCalendarDays, HiOutlineExclamationTriangle, HiOutlineCheckCircle, HiOutlineBars3, HiOutlineChevronDoubleLeft, HiOutlineChevronDoubleRight } from 'react-icons/hi2';
+import { HiOutlineMagnifyingGlass, HiOutlineBell, HiOutlineArrowPath, HiOutlineArrowRightOnRectangle, HiOutlineChevronDown, HiOutlineInformationCircle, HiOutlineClipboardDocumentCheck, HiOutlineCalendarDays, HiOutlineExclamationTriangle, HiOutlineCheckCircle, HiOutlineBars3, HiOutlineChevronDoubleLeft, HiOutlineChevronDoubleRight, HiOutlineEnvelope, HiOutlineIdentification, HiOutlineShieldCheck, HiOutlineCheck } from 'react-icons/hi2';
 import axios from '../../api/axios';
 
 const OPEN_WIDTH = 256;
@@ -41,6 +42,8 @@ const AppShell = ({
 }) => {
   const [open, setOpen] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
   const [notificationAnchor, setNotificationAnchor] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -55,6 +58,25 @@ const AppShell = ({
 
   const handleMenu = (e) => setAnchorEl(e.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
+
+  const userEmail = localStorage.getItem('userEmail') || '';
+  const employeeId = localStorage.getItem('userEmployeeId') || '';
+
+  const handleCopyEmail = async () => {
+    if (!userEmail || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(userEmail);
+    setEmailCopied(true);
+  };
+
+  const requestLogout = () => {
+    handleMenuClose();
+    setLogoutDialogOpen(true);
+  };
+
+  const confirmLogout = () => {
+    setLogoutDialogOpen(false);
+    onLogout?.();
+  };
 
   const readNotificationsKey = `readNotifications:${localStorage.getItem('userId') || 'guest'}`;
 
@@ -435,25 +457,86 @@ const AppShell = ({
             onClose={handleMenuClose}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            slotProps={{ paper: { sx: { width: 320, maxWidth: 'calc(100vw - 24px)', mt: 1 } } }}
           >
-            <Box sx={{ px: 2, py: 1 }}>
-              <Typography variant="subtitle1" sx={{ lineHeight: 1.2 }}>{userName}</Typography>
-              <Typography variant="caption" color="text.secondary">
-                {userRole}{userRole && userCompany ? ' • ' : ''}{userCompany}
-              </Typography>
+            <Box sx={{ p: 1.5, background: 'linear-gradient(135deg, #14286D 0%, #2847B8 100%)', color: '#FFFFFF' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                <Avatar
+                  alt={userName}
+                  src={userPhoto || undefined}
+                  sx={{ width: 48, height: 48, bgcolor: '#FE8600', fontWeight: 800, border: '2px solid rgba(255,255,255,0.7)' }}
+                >
+                  {getInitials(userName)}
+                </Avatar>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>{userName}</Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }} noWrap>
+                    {userRole || 'Team member'}{userCompany ? ` · ${userCompany}` : ''}
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 1.25, opacity: 0.9 }}>
+                <HiOutlineShieldCheck size={15} />
+                <Typography variant="caption">Active account</Typography>
+              </Box>
             </Box>
-            <Divider sx={{ m: 1 }} />
+            <Box sx={{ px: 2, py: 1.25 }}>
+              {userEmail && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                  <HiOutlineEnvelope size={17} color="#66708C" />
+                  <Typography variant="body2" color="text.secondary" noWrap sx={{ flex: 1 }}>{userEmail}</Typography>
+                  <Tooltip title={emailCopied ? 'Copied' : 'Copy email'}>
+                    <IconButton size="small" onClick={handleCopyEmail} aria-label="Copy email">
+                      {emailCopied ? <HiOutlineCheck size={16} color="#16A34A" /> : <HiOutlineClipboardDocumentCheck size={16} />}
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              )}
+              {employeeId && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75 }}>
+                  <HiOutlineIdentification size={17} color="#66708C" />
+                  <Typography variant="caption" color="text.secondary">Employee ID: {employeeId}</Typography>
+                </Box>
+              )}
+            </Box>
+            <Divider />
             {onProfile && (
-              <MenuItem onClick={() => { handleMenuClose(); onProfile(); }}>
+              <MenuItem onClick={() => { handleMenuClose(); onProfile(); }} sx={{ py: 1 }}>
                 <ListItemIcon><HiOutlineInformationCircle size={18} /></ListItemIcon>
-                Profile
+                <Box>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>View profile</Typography>
+                  <Typography variant="caption" color="text.secondary">Manage your personal details</Typography>
+                </Box>
               </MenuItem>
             )}
-            <MenuItem onClick={() => { handleMenuClose(); onLogout && onLogout(); }}>
-              <ListItemIcon><HiOutlineArrowRightOnRectangle size={18} /></ListItemIcon>
-              Logout
+            <MenuItem onClick={requestLogout} sx={{ py: 1, color: 'error.main' }}>
+              <ListItemIcon sx={{ color: 'inherit' }}><HiOutlineArrowRightOnRectangle size={18} /></ListItemIcon>
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: 'inherit' }}>Sign out</Typography>
+                <Typography variant="caption" color="text.secondary">End this session securely</Typography>
+              </Box>
             </MenuItem>
           </Menu>
+
+          <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)} maxWidth="xs" fullWidth>
+            <DialogTitle>Sign out of your account?</DialogTitle>
+            <DialogContent>
+              <Typography variant="body2" color="text.secondary">
+                You will need to sign in again to access your employee workspace.
+              </Typography>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+              <Button onClick={() => setLogoutDialogOpen(false)}>Cancel</Button>
+              <Button color="error" variant="contained" onClick={confirmLogout}>Sign out</Button>
+            </DialogActions>
+          </Dialog>
+
+          <Snackbar
+            open={emailCopied}
+            autoHideDuration={1800}
+            onClose={() => setEmailCopied(false)}
+            message="Email copied to clipboard"
+          />
         </Toolbar>
       </AppBar>
 

@@ -22,6 +22,11 @@ import axios from '../../api/axios';
 import dayjs from "dayjs";
 import useDepartments from '../../hooks/useDepartments';
 
+const getStoredValue = (key) => {
+  const value = localStorage.getItem(key);
+  return value && value !== "null" && value !== "undefined" ? value : "";
+};
+
 const UserProfile = () => {
   const [editMode, setEditMode] = useState({
     designation: false,
@@ -35,65 +40,67 @@ const UserProfile = () => {
 
 
   const [userData, setUserData] = useState({
-    userPhoto: localStorage.getItem("userPhoto") || "",
-    userDesignation: localStorage.getItem("userDesignation") || "",
-    userEmail: localStorage.getItem("userEmail") || "",
-    userFirstuserData: localStorage.getItem("userFirstName") || "",
-    userJobLocation: localStorage.getItem("userJobLocation"),
-    userLastuserData: localStorage.getItem("userLastName") || "",
-    userPhoneNumber: localStorage.getItem("userPhoneNumber") || "",
-    userDepartment: localStorage.getItem("userDepartment"),
-    userId: localStorage.getItem("userId") || "",
-    userTechnicalSkills: localStorage.getItem("userTechnicalSkills")
-    ? localStorage.getItem("userTechnicalSkills").split(",") 
+    userPhoto: getStoredValue("userPhoto"),
+    userDesignation: getStoredValue("userDesignation"),
+    userEmail: getStoredValue("userEmail"),
+    userFirstuserData: getStoredValue("userFirstName"),
+    userJobLocation: getStoredValue("userJobLocation"),
+    userLastuserData: getStoredValue("userLastName"),
+    userPhoneNumber: getStoredValue("userPhoneNumber"),
+    userDepartment: getStoredValue("userDepartment"),
+    userId: getStoredValue("userId"),
+    userTechnicalSkills: getStoredValue("userTechnicalSkills")
+    ? getStoredValue("userTechnicalSkills").split(",") 
     : [],
-    userDateofBirth: localStorage.getItem("userDateofBirth"),
-    userBloodGroup: localStorage.getItem("userBloodGroup"),
-    userGender: localStorage.getItem("userGender"),
+    userDateofBirth: getStoredValue("userDateofBirth"),
+    userBloodGroup: getStoredValue("userBloodGroup"),
+    userGender: getStoredValue("userGender"),
   });
 
   const [skillsList, setSkillsList] = useState(
-    localStorage.getItem("userTechnicalSkills")
-      ? localStorage.getItem("userTechnicalSkills").split(",")
+    getStoredValue("userTechnicalSkills")
+      ? getStoredValue("userTechnicalSkills").split(",")
       : []
   );
 
   const [openSkills, setOpenSkills] = useState(false);
   const [newSkill, setNewSkill] = useState("");
   const { departmentNames } = useDepartments();
-  const validateFields = () => {
+  const validateFields = (section = "all") => {
     const errors = {};
   
-    // Basic details
-    if (!userData.userDesignation?.trim()) {
-      errors.userDesignation = "Designation is required.";
+    if (section === "all" || section === "work") {
+      if (!userData.userDesignation?.trim()) {
+        errors.userDesignation = "Designation is required.";
+      }
+
+      if (!userData.userDepartment?.trim()) {
+        errors.userDepartment = "Department is required.";
+      }
+
+      if (!userData.userJobLocation?.trim()) {
+        errors.userJobLocation = "Job Location is required.";
+      }
     }
   
-    if (!userData.userDepartment?.trim()) {
-      errors.userDepartment = "Department is required.";
-    }
-  
-    if (!userData.userJobLocation?.trim()) {
-      errors.userJobLocation = "Job Location is required.";
-    }
-  
-    // Personal details
-    if (!userData.userPhoneNumber?.trim()) {
-      errors.userPhoneNumber = "Phone number is required.";
-    } else if (!/^\d{10}$/.test(userData.userPhoneNumber)) {
-      errors.userPhoneNumber = "Enter a valid 10-digit phone number.";
-    }
-  
-    if (!userData.userDateofBirth) {
-      errors.userDateofBirth = "Date of birth is required.";
-    }
-  
-    if (!userData.userBloodGroup?.trim()) {
-      errors.userBloodGroup = "Blood group is required.";
-    }
-  
-    if (!userData.userGender?.trim()) {
-      errors.userGender = "Gender is required.";
+    if (section === "all" || section === "personal") {
+      if (!userData.userPhoneNumber?.trim()) {
+        errors.userPhoneNumber = "Phone number is required.";
+      } else if (!/^\d{10}$/.test(userData.userPhoneNumber)) {
+        errors.userPhoneNumber = "Enter a valid 10-digit phone number.";
+      }
+
+      if (!userData.userDateofBirth) {
+        errors.userDateofBirth = "Date of birth is required.";
+      }
+
+      if (!userData.userBloodGroup?.trim()) {
+        errors.userBloodGroup = "Blood group is required.";
+      }
+
+      if (!userData.userGender?.trim()) {
+        errors.userGender = "Gender is required.";
+      }
     }
   
     setValidationErrors(errors);
@@ -116,7 +123,7 @@ const UserProfile = () => {
   const onClose=()=>{
     setUserData((prev) => ({
       ...prev,
-      userTechnicalSkills: localStorage.getItem("userTechnicalSkills")? localStorage.getItem("userTechnicalSkills").split(",") : [],
+      userTechnicalSkills: getStoredValue("userTechnicalSkills") ? getStoredValue("userTechnicalSkills").split(",") : [],
     }));
     setValidationErrors({});
     setOpenSkills(false);
@@ -142,9 +149,9 @@ const UserProfile = () => {
   const handleCloseEditDialog = () => {
     setUserData((prev) => ({
       ...prev,
-      userDesignation: localStorage.getItem("userDesignation") || "",
-      userDepartment: localStorage.getItem("userDepartment") || "",
-      userJobLocation: localStorage.getItem("userJobLocation") || "",
+      userDesignation: getStoredValue("userDesignation"),
+      userDepartment: getStoredValue("userDepartment"),
+      userJobLocation: getStoredValue("userJobLocation"),
     }));
     setValidationErrors({});
     setOpenEditDialog(false);
@@ -165,17 +172,22 @@ const UserProfile = () => {
   const handleCloseEditDetailsDialog = () => {
     setUserData((prev) => ({
       ...prev,
-      userPhoneNumber: localStorage.getItem("userPhoneNumber") || "",
-      userDateofBirth: localStorage.getItem("userDateofBirth") || null,
-      userBloodGroup: localStorage.getItem("userBloodGroup") || "",
-      userGender: localStorage.getItem("userGender") || "",
+      userPhoneNumber: getStoredValue("userPhoneNumber"),
+      userDateofBirth: getStoredValue("userDateofBirth"),
+      userBloodGroup: getStoredValue("userBloodGroup"),
+      userGender: getStoredValue("userGender"),
     }));
     setValidationErrors({});
     setOpenEditDetailsDialog(false);
   };  
 
-  const handleSaveClick = async () => {
-    if (!validateFields()) {
+  const handleSaveClick = async (section = "all") => {
+    if (!userData.userId) {
+      alert("Unable to save profile: user identity is missing. Please sign in again.");
+      return;
+    }
+
+    if (!validateFields(section)) {
       return;
     }
     const userId = userData.userId;
@@ -187,7 +199,9 @@ const UserProfile = () => {
       jobLocation: userData.userJobLocation,
       technicalSkills: skillsList,
       phoneNumber: userData.userPhoneNumber,
-      dateOfBirth: userData.userDateofBirth ? dayjs(userData.userDateofBirth).format("YYYY-MM-DD") : null, 
+      dateOfBirth: userData.userDateofBirth && dayjs(userData.userDateofBirth).isValid()
+        ? dayjs(userData.userDateofBirth).format("YYYY-MM-DD")
+        : null,
       bloodGroup: userData.userBloodGroup,
       gender: userData.userGender,
     };
@@ -316,239 +330,78 @@ const UserProfile = () => {
     }
   };
 
+  const fullName = `${userData.userFirstuserData} ${userData.userLastuserData}`.trim() || "User";
+  const formattedDateOfBirth = userData.userDateofBirth && dayjs(userData.userDateofBirth).isValid()
+    ? dayjs(userData.userDateofBirth).format("DD MMM YYYY")
+    : "Not added";
+  const profileFields = [userData.userDesignation, userData.userDepartment, userData.userJobLocation, userData.userPhoneNumber, userData.userDateofBirth, userData.userBloodGroup, userData.userGender];
+  const completedFields = profileFields.filter(Boolean).length;
+  const profileCompletion = Math.round((completedFields / profileFields.length) * 100);
+  const detailValue = (value) => value || "Not added";
+
   return (
-    <Box sx={{ mt: 2, display: "flex", justifyContent: "center", p: 3 }}>
-      <Box
-        elevation={6}
-          sx={{ 
-          width: 250,
-          height: '100%',
-          boxShadow: "rgba(0, 0, 0, 0.1) 0px 4px 12px",
-          border: "0.1px solid #e0e0e0", 
-          backgroundColor:'#ffffff',
-          p: 3,
-          textAlign: "center",
-        }}
-      >
-        <Box sx={{ position: "relative", display: "inline-block" }}>
-          <Avatar
-            src={userData.userPhoto}
-            alt={`${userData.userFirstuserData} ${userData.userLastuserData}`}
-            sx={{ width: 140, height: 140, mx: "auto", mb: 2, border: "4px solid #2196f3", borderRadius: "50%",  }}
-          />
-          <IconButton
-            component="label"
-            sx={{
-              position: "absolute",
-              bottom: 8,
-              right: 8,
-              backgroundColor: "white",
-              boxShadow: 1,
-              "&:hover": { backgroundColor: "lightgray" }
-            }}
-          >
-            <PhotoCameraRoundedIcon />
-            <input type="file" accept="image/*" style={{ display: "none" }} onChange={handlePhotoChange} />
-          </IconButton>
-        </Box>
-        <Typography variant="h6" sx={{ fontWeight: "bold", color: "#333" }}>
-          {userData.userLastuserData} {userData.userFirstuserData}
-        </Typography>
-        <Typography variant="body1" sx={{ color: "#666" }}>
-          {userData.userEmail}
-        </Typography>
-        
-      <Box
-       
-        sx={{
-          mt: 1,
-          p: 3,
-          border: "0.1px solid gray",
-          // boxShadow: "rgba(0, 0, 0, 0.1) 0px 2px 12px", 
-          backgroundColor:'#ffffff',
-        }}
-      > 
-          <Stack direction="row" justifyContent="flex-end">
-            <IconButton variant="outlined" size="small" onClick={handleEditFieldsClick}sx={{ p: 0.2, fontSize: 5, width: 5, height: 5 }}>
-              <EditIcon />
-            </IconButton>
-          </Stack>
-        <Stack spacing={1}>
-          <Stack direction="row" >
-            
-              <Typography variant="body2" fontWeight="bold" fontSize={14}>
-                Designation:
-              </Typography>
-          </Stack>
-          <Stack direction="row">
-              <Typography sx={{ml:3}} variant="body4" color="gray" >
-                {userData.userDesignation}
-              </Typography>
-           
-          </Stack>
-
-          <Stack direction="row" >
-            
-              <Typography variant="body2" fontWeight="bold" fontSize={14}>
-                Department:
-              </Typography>
-          </Stack>
-          <Stack direction="row">
-              <Typography sx={{ml:3}} variant="body4" color="gray" >
-                {userData.userDepartment}
-              </Typography>
-           
-          </Stack>
-
-          <Stack direction="row"  >
-            
-              <Typography variant="body2" fontWeight="bold" fontSize={14}>
-                Job Location:
-              </Typography>
-              </Stack>
-              <Stack direction="row">
-              <Typography sx={{ml:3}} variant="body4" color="gray" >
-                {userData.userJobLocation}
-              </Typography>
-            
-          </Stack>
-        </Stack>
-      </Box>
-      </Box>
-  <Box display="flex" flexDirection="column" gap={3} >
-  <Box
-      elevation={6}
-        sx={{
-          ml:3,
-          width: 600,
-          p: 3,
-          boxShadow: "rgba(0, 0, 0, 0.1) 0px 4px 12px",
-          border: "1px solid #e0e0e0", 
-          backgroundColor:'#ffffff',
-        }}
-      >
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h6" fontWeight="bold" fontSize={18}>
-            Personal Info
+    <Box sx={{ maxWidth: 1240, mx: "auto", p: { xs: 2, md: 4 }, width: "100%", boxSizing: "border-box" }}>
+      {!userData.userDepartment && (
+        <Box sx={{ mb: 2.5, p: 2, bgcolor: "#FFF8E1", border: "1px solid #FFE082", borderRadius: 2 }}>
+          <Typography variant="body2" sx={{ color: "#795548", fontWeight: 600 }}>
+            Your account is waiting for company assignment. You can still complete your personal details below.
           </Typography>
-          <Stack direction="row" spacing={1} alignItems="center">
-           
-            <Button variant="outlined" startIcon={<Edit />} size="small" onClick={handleEditDetails}>
-              Edit
-            </Button>
-          </Stack>
-        </Stack>
-
-        <Divider sx={{ my: 2 }} />
-        <Stack spacing={2}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Box>
-              <Typography variant="body2" fontWeight="bold" fontSize={14}>
-                Phone Number:
-              </Typography>
-              <Typography variant="body4" color="gray" >
-               {userData.userPhoneNumber}
-              </Typography>
-            </Box>
-            <Stack >
-              <Box>
-                <Typography variant="body2" fontWeight="bold" fontSize={14} sx={{mr:9}}>
-                  Blood Group:
-                </Typography>
-                <Typography variant="body4" color="gray">
-                {userData.userBloodGroup}
-                </Typography>
-              </Box>
-            </Stack>
-          </Stack>
-          
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Box>
-              <Typography variant="body2" fontWeight="bold" fontSize={14}>
-                Date of Birth:
-              </Typography>
-              <Typography variant="body4" color="gray" >  
-                {dayjs(userData.userDateofBirth).format("DD-MM-YYYY")}
-              </Typography>
-            </Box>
-            <Stack >
-              <Box>
-                <Typography variant="body2" fontWeight="bold" fontSize={14} sx={{mr:13}}>
-                  Gender:
-                </Typography>
-                <Typography variant="body4" color="gray">
-                  {userData.userGender}
-                </Typography>
-              </Box>
-            </Stack>
-          </Stack>
-        </Stack>
+        </Box>
+      )}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h4" sx={{ color: "primary.main", fontSize: { xs: "1.6rem", md: "2rem" } }}>My profile</Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>Keep your employee information accurate and up to date.</Typography>
       </Box>
 
-      
-      <Box
-      elevation={6}
-      sx={{
-        ml: 3,
-        width: 600,
-        height: 210,
-        p: 3,
-        boxShadow: "rgba(0, 0, 0, 0.1) 0px 4px 12px",
-        border: "0.1px solid #e0e0e0",
-        backgroundColor: '#ffffff',
-      }}
-    >
-      <Stack direction="row" justifyContent="space-between" alignItems="center">
-        <Typography variant="h6" fontWeight="bold" fontSize={18}>
-          Technical Skills
-        </Typography>
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<Edit />}
-          color="primary"
-          onClick={openSkillDialog}
-        >
-          edit
-        </Button>
-      </Stack>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "310px minmax(0, 1fr)" }, gap: 3, alignItems: "start" }}>
+        <Box sx={{ bgcolor: "background.paper", borderRadius: 3, boxShadow: 2, overflow: "hidden" }}>
+          <Box sx={{ height: 92, background: "linear-gradient(135deg, #14286D 0%, #2847B8 100%)" }} />
+          <Box sx={{ px: 3, pb: 3, mt: -6, textAlign: "center" }}>
+            <Box sx={{ position: "relative", display: "inline-block" }}>
+              <Avatar src={userData.userPhoto || undefined} alt={fullName} sx={{ width: 112, height: 112, border: "5px solid #fff", bgcolor: "secondary.main", fontSize: "2rem", fontWeight: 700, boxShadow: 2 }}>
+                {fullName.split(" ").map((word) => word[0]).join("").slice(0, 2).toUpperCase()}
+              </Avatar>
+              <IconButton component="label" aria-label="Change profile photo" sx={{ position: "absolute", bottom: 2, right: -4, bgcolor: "#fff", color: "primary.main", boxShadow: 2, "&:hover": { bgcolor: "#F1F5FF" } }}>
+                <PhotoCameraRoundedIcon fontSize="small" />
+                <input type="file" accept="image/*" hidden onChange={handlePhotoChange} />
+              </IconButton>
+            </Box>
+            <Typography variant="h6" sx={{ mt: 1.5, fontWeight: 700 }}>{fullName}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-word" }}>{detailValue(userData.userEmail)}</Typography>
+            <Chip label={detailValue(userData.userDesignation)} color="primary" size="small" sx={{ mt: 1.5 }} />
+            <Divider sx={{ my: 2.5 }} />
+            <Stack spacing={1.5} sx={{ textAlign: "left" }}>
+              <Box><Typography variant="caption" color="text.secondary">Department</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{detailValue(userData.userDepartment)}</Typography></Box>
+              <Box><Typography variant="caption" color="text.secondary">Work location</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{detailValue(userData.userJobLocation)}</Typography></Box>
+              <Box><Typography variant="caption" color="text.secondary">Employee ID</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{detailValue(localStorage.getItem("userEmployeeId"))}</Typography></Box>
+            </Stack>
+            <Button fullWidth variant="outlined" startIcon={<Edit />} onClick={handleEditFieldsClick} sx={{ mt: 2.5 }}>Edit work details</Button>
+          </Box>
+        </Box>
 
-      <Divider sx={{ my: 2, flexGrow: 1 }} />
-      <Box
-        sx={{
-          maxHeight: 120, 
-          overflowY: 'auto',
-          padding: 1,
-          mt: 2,
-        }}
-      >
-        <Stack
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: 3.0,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          {skillsList.map((skill, index) => (
-            <Chip
-              key={index}
-              label={skill}
-              color="primary"
-              variant="outlined"
-              size="small"
-              sx={{
-                borderRadius: 1,
-                fontSize: '0.875rem',
-                height: 32,
-                '& .MuiChip-label': { fontWeight: 500 },
-              }}
-            />
-          ))}
+        <Stack spacing={3}>
+          <Box sx={{ bgcolor: "background.paper", borderRadius: 3, boxShadow: 2, p: { xs: 2, md: 3 } }}>
+            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1}>
+              <Box><Typography variant="h6">Profile overview</Typography><Typography variant="body2" color="text.secondary">Your profile is {profileCompletion}% complete.</Typography></Box>
+              <Button variant="contained" startIcon={<Edit />} onClick={handleEditDetails}>Edit personal info</Button>
+            </Stack>
+            <Box sx={{ height: 8, bgcolor: "#E8ECF5", borderRadius: 5, mt: 2 }}><Box sx={{ height: "100%", width: `${profileCompletion}%`, bgcolor: profileCompletion === 100 ? "success.main" : "secondary.main", borderRadius: 5, transition: "width 300ms ease" }} /></Box>
+          </Box>
+
+          <Box sx={{ bgcolor: "background.paper", borderRadius: 3, boxShadow: 2, p: { xs: 2, md: 3 } }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center"><Box><Typography variant="h6">Personal information</Typography><Typography variant="body2" color="text.secondary">Private details used for employee records.</Typography></Box><IconButton aria-label="Edit personal information" onClick={handleEditDetails}><EditIcon /></IconButton></Stack>
+            <Divider sx={{ my: 2 }} />
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, gap: 2.5 }}>
+              {[["Phone number", userData.userPhoneNumber], ["Blood group", userData.userBloodGroup], ["Date of birth", formattedDateOfBirth], ["Gender", userData.userGender]].map(([label, value]) => <Box key={label}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography variant="body1" sx={{ mt: 0.25, fontWeight: 600 }}>{detailValue(value)}</Typography></Box>)}
+            </Box>
+          </Box>
+
+          <Box sx={{ bgcolor: "background.paper", borderRadius: 3, boxShadow: 2, p: { xs: 2, md: 3 } }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center"><Box><Typography variant="h6">Technical skills</Typography><Typography variant="body2" color="text.secondary">Skills that represent your current capabilities.</Typography></Box><Button variant="outlined" startIcon={<Edit />} onClick={openSkillDialog}>Manage skills</Button></Stack>
+            <Divider sx={{ my: 2 }} />
+            {skillsList.length > 0 ? <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>{skillsList.map((skill, index) => <Chip key={`${skill}-${index}`} label={skill} color="primary" variant="outlined" />)}</Box> : <Typography variant="body2" color="text.secondary">No skills added yet.</Typography>}
+          </Box>
         </Stack>
-      </Box>
-    </Box> 
       </Box>
       <Dialog open={openEditDetailsDialog} onClose={handleCloseEditDetailsDialog}>
         <DialogTitle fontWeight="bold" >
@@ -632,7 +485,7 @@ const UserProfile = () => {
       )}
           </FormControl>
           <DialogActions>          
-          <Button onClick={handleSaveClick} sx={{mt:2}}color="primary" variant="contained">
+          <Button onClick={() => handleSaveClick("personal")} sx={{mt:2}}color="primary" variant="contained">
             Save
           </Button>
         </DialogActions>          
@@ -696,7 +549,7 @@ const UserProfile = () => {
             <InputLabel>Job Location</InputLabel>
             <Select
               label="Job Location"
-              value={userData.userJobLocation}
+              value={userData.userJobLocation || ""}
               onChange={(e) => handleChange(e, "userJobLocation")}
             >
               <MenuItem value="Hyderabad">Hyderabad</MenuItem>
@@ -714,7 +567,7 @@ const UserProfile = () => {
           </FormControl>
           <DialogActions>
           
-          <Button onClick={handleSaveClick} color="primary" variant="contained">
+          <Button onClick={() => handleSaveClick("work")} color="primary" variant="contained">
             Save
           </Button>
         </DialogActions>
@@ -784,7 +637,7 @@ const UserProfile = () => {
           ))}
         </Box>
         <DialogActions>
-          <Button variant="contained" color="success" onClick={handleSaveClick}>Save</Button>
+          <Button variant="contained" color="success" onClick={() => handleSaveClick("skills")}>Save</Button>
         </DialogActions>
         </DialogContent>
       </Dialog>

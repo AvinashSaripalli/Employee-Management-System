@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Box, Typography, Snackbar, Alert } from '@mui/material';
-import { HiOutlineClipboardDocumentCheck, HiOutlineChartBar, HiOutlineDocumentText, HiOutlineCalendarDays, HiOutlineUserCircle, HiOutlineChatBubbleLeftRight, HiOutlineBriefcase } from 'react-icons/hi2';
+import { HiOutlineClipboardDocumentCheck, HiOutlineChartBar, HiOutlineDocumentText, HiOutlineCalendarDays, HiOutlineUserCircle, HiOutlineChatBubbleLeftRight, HiOutlineBriefcase, HiOutlineUserGroup } from 'react-icons/hi2';
 import AppShell from './AppShell';
 import ApplyLeave from '../leaves/ApplyLeave';
 import MyLeaves from '../leaves/MyLeaves';
 import ManageLeaves from '../leaves/ManageLeaves';
-import EmployeeProfile from '../employees/EmployeeProfile';
+import UserProfile from '../profile/UserProfile';
 import WorkReports from '../reports/WorkReports';
 import TasksProjects from '../tasks/TasksProjects';
 import Messenger from '../messenger/Messenger';
+import Workgroups from '../workgroups/Workgroups';
 import Crm from '../crm/Crm';
 import axios from '../../api/axios';
 
@@ -37,6 +38,12 @@ const Sidebar = () => {
   }, []);
 
   useEffect(() => {
+    const role = localStorage.getItem('userRole');
+    if (!['Admin', 'Manager'].includes(role)) {
+      setCanReviewLeaves(false);
+      return undefined;
+    }
+
     axios.get('/leaves/leave', { params: {
       companyName: localStorage.getItem('companyName'),
       employeeId: localStorage.getItem('userEmployeeId'),
@@ -147,13 +154,14 @@ const Sidebar = () => {
   const renderComponent = () => {
     switch (selectedComponent) {
       case 'Tasks': return <TasksProjects />;
+      case 'Work Groups': return <Workgroups />;
       case 'Work Reports': return <WorkReports />;
       case 'Messenger': return <Messenger />;
       case 'CRM': return <Crm />;
       case 'Apply Leave': return <ApplyLeave />;
       case 'My Leaves': return <MyLeaves />;
       case 'Manage Leaves': return <ManageLeaves />;
-      case 'Profile': return <EmployeeProfile />;
+      case 'Profile': return <UserProfile />;
       default: return <MyLeaves />;
     }
   };
@@ -204,6 +212,10 @@ const Sidebar = () => {
     {
       text: 'Tasks',
       icon: <HiOutlineClipboardDocumentCheck {...iconStyle(selectedComponent === 'Tasks')} />,
+    },
+    {
+      text: 'Work Groups',
+      icon: <HiOutlineUserGroup {...iconStyle(selectedComponent === 'Work Groups')} />,
     },
     {
       text: 'Work Reports',
