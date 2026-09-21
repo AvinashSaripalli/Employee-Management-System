@@ -498,7 +498,7 @@ const ApplyLeave = () => {
 
                 <Grid item xs={12} md={6}>
                   <LocalizationProvider dateAdapter={AdapterDayjs}>
-                    <DateFiCalendar slots={{ day: CustomDay }} />
+                    <DateCalendar slots={{ day: CustomDay }} />
                   </LocalizationProvider>
                   <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
                     <Chip size="small" label="Holiday" sx={{ bgcolor: 'secondary.light' }} />

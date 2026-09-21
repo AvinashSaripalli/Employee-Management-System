@@ -11,6 +11,10 @@ const OPEN_WIDTH = 256;
 const CLOSED_WIDTH = 82;
 const TOPBAR_HEIGHT = 68;
 
+// Corner radius shared by the selected and hover states of sidebar items.
+// Use '0px' for perfectly square, '4px' for slight, '12px' for softer.
+const NAV_ITEM_RADIUS = '8px';
+
 const getInitials = (name = '') =>
   name
     .split(' ')
@@ -87,7 +91,7 @@ const AppShell = ({
               const deadline = task.deadline ? new Date(task.deadline) : null;
               const overdue = deadline && deadline < now;
               return {
-              id: `task-${task.id}`,
+                id: `task-${task.id}`,
                 category: overdue ? 'urgent' : 'task',
                 title: overdue ? 'Task overdue' : 'Task assigned to you',
                 detail: `${task.title || 'Untitled task'}${task.status === 3 ? ' · In progress' : ''}`,
@@ -212,12 +216,12 @@ const AppShell = ({
                   onClick={() => onNavigate(item.text)}
                   sx={{
                     height: 46,
-                    borderRadius: open ? 3 : 0,
+                    borderRadius: open ? NAV_ITEM_RADIUS : 0,
                     px: open ? 2 : 0,
                     justifyContent: open ? 'flex-start' : 'center',
                     position: 'relative',
                     overflow: 'hidden',
-                    '&:hover': { bgcolor: isActive ? 'transparent' : open ? '#F1F5FF' : '#F1F5FF' },
+                    '&:hover': { bgcolor: isActive ? 'transparent' : '#F1F5FF' },
                   }}
                 >
                   {isActive && (
@@ -225,7 +229,7 @@ const AppShell = ({
                       sx={{
                         position: 'absolute',
                         inset: 0,
-                        borderRadius: open ? 3 : 0,
+                        borderRadius: open ? NAV_ITEM_RADIUS : 0,
                         background: 'linear-gradient(135deg, #14286D 0%, #1E3AA8 100%)',
                         boxShadow: open ? '0 6px 16px rgba(20, 40, 109, 0.28)' : 'none',
                         zIndex: 0,
