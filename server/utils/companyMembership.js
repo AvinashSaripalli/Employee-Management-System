@@ -42,6 +42,9 @@ async function ensureCompanyMembership(user, companyName = DEFAULT_COMPANY) {
   if (!isPresent(user.employeeId)) {
     updates.employeeId = await generateEmployeeId(updates.companyName || user.companyName || companyName);
   }
+  if (!isPresent(user.department)) {
+    updates.department = updates.companyName || user.companyName || companyName;
+  }
 
   if (Object.keys(updates).length) {
     await user.update(updates);

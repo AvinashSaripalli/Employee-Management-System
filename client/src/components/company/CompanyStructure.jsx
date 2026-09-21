@@ -233,14 +233,26 @@ const CompanyStructure = () => {
     });
 
     // Root Company card (Bitrix style: Level 1 - first)
-    const rootSupervisors = (depts['Management']?.head ? [depts['Management'].head] : [])
-      .concat(depts['Management']?.managers || [])
-      .concat(users.filter(u => u.role === 'Admin' || (u.role === 'Manager' && !u.department)));
+    const isRootDept = (d) => {
+      const trimmed = (d || '').trim();
+      return !trimmed || trimmed.toLowerCase() === compName.toLowerCase() || trimmed === 'Management';
+    };
 
+    const rootSupervisorsRaw = (depts[compName]?.head ? [depts[compName].head] : [])
+      .concat(depts[compName]?.managers || [])
+      .concat(depts['Management']?.head ? [depts['Management'].head] : [])
+      .concat(depts['Management']?.managers || [])
+      .concat(users.filter(u => u.role === 'Admin' || (u.role === 'Manager' && isRootDept(u.department))));
+
+    const rootSupervisors = Array.from(new Map(rootSupervisorsRaw.map(u => [u.id, u])).values());
     const rootHead = rootSupervisors[0] || users.find(u => u.role === 'Admin') || null;
-    const rootEmployees = (depts['Management']?.members || []).concat(
-      rootSupervisors.slice(1)
-    );
+
+    const rootEmployeesRaw = (depts[compName]?.members || [])
+      .concat(depts['Management']?.members || [])
+      .concat(users.filter(u => u.role !== 'Admin' && u.role !== 'Manager' && isRootDept(u.department)))
+      .concat(rootSupervisors.slice(1));
+
+    const rootEmployees = Array.from(new Map(rootEmployeesRaw.filter(u => !rootHead || u.id !== rootHead.id).map(u => [u.id, u])).values());
 
     // Department cards (Bitrix style: Level 2 - second)
     const makeDepartmentCard = (deptName, visited = new Set()) => {
@@ -275,7 +287,7 @@ const CompanyStructure = () => {
       };
 
     const departmentCards = Object.keys(depts)
-      .filter((dept) => dept !== '' && dept !== 'Management')
+      .filter((dept) => dept !== '' && dept !== 'Management' && dept.toLowerCase() !== compName.toLowerCase())
       .filter((dept) => !depts[dept].record?.parentId)
       .sort((a, b) => a.localeCompare(b))
       .map((deptName) => makeDepartmentCard(deptName));
@@ -285,7 +297,7 @@ const CompanyStructure = () => {
     const unassignedList = (unassignedGroup.head ? [unassignedGroup.head] : [])
       .concat(unassignedGroup.managers)
       .concat(unassignedGroup.members)
-      .filter((user) => !rootSupervisors.some((supervisor) => supervisor.id === user.id));
+      .filter((user) => !rootSupervisors.some((supervisor) => supervisor.id === user.id) && !rootEmployees.some((emp) => emp.id === user.id));
 
     if (unassignedList.length > 0) {
       departmentCards.unshift({
@@ -362,8 +374,7 @@ const CompanyStructure = () => {
   // add one (or more) to this department. The "Unassigned" pool instead
   // allows creating a brand-new employee with no department.
   const handleAddEmployee = (deptName) => {
-    // Never turn the company root or the unassigned pool into a real department.
-    if (!deptName || deptName === 'Unassigned' || deptName === companyName) {
+    if (!deptName || deptName === 'Unassigned') {
       setAddDept('');
       setAddOpen(true);
       return;

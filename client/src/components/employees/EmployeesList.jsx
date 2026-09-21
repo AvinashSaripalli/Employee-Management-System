@@ -2,14 +2,15 @@ import React, { useEffect, useState } from 'react';
 import {
   Typography, Box, Button, TextField, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Paper, Checkbox, IconButton, Menu, MenuItem, Divider, Avatar, InputAdornment,
-  Chip, Tooltip,
+  Chip, Tooltip, Snackbar, Alert, CircularProgress,
 } from '@mui/material';
 import axios from '../../api/axios';
 import EditEmployeeDialog from './EditEmployeeDialog';
 import AddEmployeeDialog from './AddEmployeeDialog';
 import DeleteDialog from './DeleteDialog';
 import ViewEmployeeDialog from './ViewEmployeeDialog';
-import { FiSearch, FiPlus, FiTrash2, FiEye, FiEdit2, FiUser, FiMoreHorizontal, FiChevronUp, FiChevronDown } from 'react-icons/fi';
+import InviteEmployeesDialog from './InviteEmployeesDialog';
+import { FiSearch, FiPlus, FiTrash2, FiEye, FiEdit2, FiUser, FiMoreHorizontal, FiChevronUp, FiChevronDown, FiMail } from 'react-icons/fi';
 
 const EmployeesList = ({ onClose }) => {
   const [openAddUser, setOpenAddUser] = useState(false);
@@ -24,6 +25,60 @@ const EmployeesList = ({ onClose }) => {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewUser, setViewUser] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
+  const [openInviteDialog, setOpenInviteDialog] = useState(false);
+  const [sendingInviteUserId, setSendingInviteUserId] = useState(null);
+  const [bulkSending, setBulkSending] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+
+  const handleResendInvite = async (user, resetPassword = false) => {
+    if (!user) return;
+    setSendingInviteUserId(user.id);
+    const token = localStorage.getItem("token");
+    try {
+      const res = await axios.post(`/users/${user.id}/send-invite`, { resetPassword }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSnackbar({
+        open: true,
+        message: res.data?.message || `Invitation sent to ${user.email}`,
+        severity: res.data?.emailStatus === 'sent' ? 'success' : 'info',
+      });
+    } catch (error) {
+      console.error('Error sending invite:', error);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || `Failed to send invite to ${user.email}`,
+        severity: 'error',
+      });
+    } finally {
+      setSendingInviteUserId(null);
+    }
+  };
+
+  const handleBulkSendInvites = async () => {
+    if (selectedUsers.length === 0) return;
+    setBulkSending(true);
+    const token = localStorage.getItem("token");
+    try {
+      const res = await axios.post('/users/bulk-send-invites', { userIds: selectedUsers }, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setSnackbar({
+        open: true,
+        message: res.data?.message || `Invitations sent to ${selectedUsers.length} employees`,
+        severity: 'success',
+      });
+    } catch (error) {
+      console.error('Error sending bulk invites:', error);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || 'Failed to dispatch bulk invitations',
+        severity: 'error',
+      });
+    } finally {
+      setBulkSending(false);
+    }
+  };
 
   const handleSortByEmployeeId = () => {
     const sortedUsers = [...filteredUsers].sort((a, b) => {
@@ -203,6 +258,18 @@ const EmployeesList = ({ onClose }) => {
             />
             {selectedUsers.length > 0 && (
               <Button
+                variant="outlined"
+                color="primary"
+                onClick={handleBulkSendInvites}
+                disabled={bulkSending}
+                startIcon={bulkSending ? <CircularProgress size={16} /> : <FiMail size={18} />}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Send Invites ({selectedUsers.length})
+              </Button>
+            )}
+            {selectedUsers.length > 0 && (
+              <Button
                 variant="contained"
                 color="error"
                 onClick={handleClickOpenDeleteUser}
@@ -211,6 +278,20 @@ const EmployeesList = ({ onClose }) => {
                 Delete ({selectedUsers.length})
               </Button>
             )}
+            <Button
+              variant="outlined"
+              onClick={() => setOpenInviteDialog(true)}
+              startIcon={<FiMail size={18} />}
+              sx={{
+                borderColor: '#14286D',
+                color: '#14286D',
+                fontWeight: 600,
+                textTransform: 'none',
+                '&:hover': { bgcolor: '#EEF2FF', borderColor: '#14286D' },
+              }}
+            >
+              Invite Members
+            </Button>
             <Button variant="contained" onClick={handleClickOpenAddUser} startIcon={<FiPlus size="18" />}>
               Add Employee
             </Button>
@@ -218,6 +299,14 @@ const EmployeesList = ({ onClose }) => {
         </Box>
         <DeleteDialog open={openDeleteUser} onClose={handleCloseDeleteUser} onDeleteAll={handleDeleteAllSelected} />
         <AddEmployeeDialog open={openAddUser} onClose={handleCloseAddUser} onSave={fetchUsers} employeeId={selectedUser?.employeeId} />
+        <InviteEmployeesDialog
+          open={openInviteDialog}
+          onClose={() => setOpenInviteDialog(false)}
+          onInviteSuccess={() => {
+            fetchUsers();
+            setSnackbar({ open: true, message: 'Invitations processed successfully!', severity: 'success' });
+          }}
+        />
       </Paper>
 
       {/* Table card */}
@@ -261,9 +350,21 @@ const EmployeesList = ({ onClose }) => {
                 <TableCell align="left" sx={{ color: 'text.secondary' }}>{user.designation}</TableCell>
                 <TableCell align="left" sx={{ color: 'text.secondary' }}>{user.email}</TableCell>
                 <TableCell align="center">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0.5 }}>
+                    <Tooltip title="Send invite / onboarding email">
+                      <span>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleResendInvite(user)}
+                          disabled={sendingInviteUserId === user.id}
+                          sx={{ color: 'primary.main' }}
+                        >
+                          {sendingInviteUserId === user.id ? <CircularProgress size={16} /> : <FiMail size={18} />}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
                     <Tooltip title="View profile">
-                      <IconButton size="small" onClick={() => handleViewUser(user)} sx={{ color: 'primary.main' }}>
+                      <IconButton size="small" onClick={() => handleViewUser(user)} sx={{ color: 'text.secondary' }}>
                         <FiEye size="19" />
                       </IconButton>
                     </Tooltip>
@@ -271,21 +372,6 @@ const EmployeesList = ({ onClose }) => {
                       <FiMoreHorizontal size="18" />
                     </IconButton>
                   </Box>
-                  <Menu
-                    anchorEl={anchorEl}
-                    open={Boolean(anchorEl)}
-                    onClose={handleMenuClose}
-                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-                  >
-                    <MenuItem onClick={handleEditMenuClick}>
-                      <FiEdit2 size="16" style={{ marginRight: 8 }} color="#14286D" /> Edit
-                    </MenuItem>
-                    <Divider />
-                    <MenuItem onClick={handleDeleteMenuClick} sx={{ color: 'error.main' }}>
-                      <FiTrash2 size="16" style={{ marginRight: 8 }} /> Delete
-                    </MenuItem>
-                  </Menu>
                 </TableCell>
               </TableRow>
             )) : (
@@ -300,7 +386,47 @@ const EmployeesList = ({ onClose }) => {
         <ViewEmployeeDialog open={viewDialogOpen} onClose={handleViewDialogClose} user={viewUser} />
       </TableContainer>
 
+      {/* Row Context Menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem onClick={() => { handleResendInvite(menuUser); handleMenuClose(); }}>
+          <FiMail size={16} style={{ marginRight: 8 }} color="#14286D" /> Send Invite / Welcome Email
+        </MenuItem>
+        <MenuItem onClick={() => { handleResendInvite(menuUser, true); handleMenuClose(); }}>
+          <FiMail size={16} style={{ marginRight: 8 }} color="#D97706" /> Reset Password & Re-invite
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleEditMenuClick}>
+          <FiEdit2 size={16} style={{ marginRight: 8 }} color="#14286D" /> Edit
+        </MenuItem>
+        <Divider />
+        <MenuItem onClick={handleDeleteMenuClick} sx={{ color: 'error.main' }}>
+          <FiTrash2 size="16" style={{ marginRight: 8 }} /> Delete
+        </MenuItem>
+      </Menu>
+
       <EditEmployeeDialog open={editDialogOpen} onClose={handleEditDialogClose} user={selectedUser} onSave={fetchUsers} />
+
+      {/* Feedback Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          sx={{ borderRadius: 2, boxShadow: '0 4px 14px rgba(0,0,0,0.12)' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

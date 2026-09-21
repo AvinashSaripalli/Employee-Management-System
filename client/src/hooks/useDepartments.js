@@ -4,7 +4,7 @@ import axios from "../api/axios";
 export default function useDepartments() {
   const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(false);
-  const companyName = localStorage.getItem("companyName") || "";
+  const companyName = localStorage.getItem("companyName") || "KN Advisors";
 
   const fetchDepartments = useCallback(async () => {
     if (!companyName) return;
@@ -24,7 +24,13 @@ export default function useDepartments() {
     fetchDepartments();
   }, [fetchDepartments]);
 
-  const departmentNames = departments.map((d) => d.name).filter(Boolean);
+  const departmentNames = useMemo(() => {
+    const raw = departments.map((d) => d.name).filter(Boolean);
+    if (companyName && !raw.some((n) => n.toLowerCase() === companyName.toLowerCase())) {
+      raw.unshift(companyName);
+    }
+    return [...new Set(raw)];
+  }, [departments, companyName]);
 
   // Flatten the department tree depth-first so selects can render
   // hierarchy (indentation). `depth` = nesting level (0 = top-level).
@@ -56,8 +62,13 @@ export default function useDepartments() {
       .sort((a, b) => a.name.localeCompare(b.name))
       .forEach((d) => out.push({ id: d.id, name: d.name, depth: 0, parentId: d.parentId || null, record: d }));
 
+    // Ensure companyName ("KN Advisors") is explicitly present as top-level department
+    if (companyName && !out.some((o) => o.name.toLowerCase() === companyName.toLowerCase())) {
+      out.unshift({ id: 'root-company', name: companyName, depth: 0, parentId: null, record: null });
+    }
+
     return out;
-  }, [departments]);
+  }, [departments, companyName]);
 
   return { departments, departmentNames, departmentOptions, loading, refresh: fetchDepartments };
 }

@@ -1,9 +1,11 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const { User } = require("../models");
 const sequelize = require("../config/database");
 const { Op, fn, col, literal } = require("sequelize");
 const { DEFAULT_COMPANY, generateEmployeeId, ensureCompanyMembership } = require("../utils/companyMembership");
+const { sendInvitationEmail } = require("../utils/mailer");
 require("dotenv").config();
 
 exports.registerUsers = async (req, res) => {
@@ -484,5 +486,282 @@ exports.getUsersList = async (req, res) => {
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Error fetching users' });
+  }
+};
+
+exports.inviteUsers = async (req, res) => {
+  const {
+    users: rawUsers,
+    email,
+    emails,
+    firstName,
+    lastName,
+    role = "Employee",
+    department = DEFAULT_COMPANY,
+    designation = "Associate",
+    customMessage = "",
+    companyName: reqCompanyName,
+  } = req.body;
+
+  const companyName = reqCompanyName || req.user?.companyName || DEFAULT_COMPANY;
+  const portalUrl = req.headers.origin || process.env.CLIENT_URL || "http://localhost:3000";
+  const inviterName = req.user ? `${req.user.firstName || ''} (${req.user.role || 'Admin'})`.trim() : "Management";
+
+  let inviteList = [];
+
+  if (Array.isArray(rawUsers) && rawUsers.length > 0) {
+    inviteList = rawUsers.map((u) => ({
+      email: String(u.email || "").trim(),
+      firstName: String(u.firstName || "").trim(),
+      lastName: String(u.lastName || "").trim(),
+      role: u.role || role,
+      department: u.department || department,
+      designation: u.designation || designation,
+    }));
+  } else if (emails) {
+    const emailArray = Array.isArray(emails)
+      ? emails
+      : String(emails).split(/[\n,;]+/).map((e) => e.trim()).filter(Boolean);
+    inviteList = emailArray.map((e) => ({
+      email: e,
+      firstName: firstName || "",
+      lastName: lastName || "",
+      role,
+      department,
+      designation,
+    }));
+  } else if (email) {
+    inviteList = [{
+      email: String(email).trim(),
+      firstName: firstName || "",
+      lastName: lastName || "",
+      role,
+      department,
+      designation,
+    }];
+  }
+
+  if (inviteList.length === 0) {
+    return res.status(400).json({ success: false, error: "No recipient emails provided" });
+  }
+
+  const results = [];
+  let createdCount = 0;
+  let existingCount = 0;
+  let emailSentCount = 0;
+
+  for (const item of inviteList) {
+    if (!item.email || !item.email.includes("@")) {
+      results.push({ email: item.email, status: "error", error: "Invalid email address" });
+      continue;
+    }
+
+    try {
+      let user = await User.findOne({ where: { email: item.email } });
+      let tempPassword = null;
+      let isExisting = false;
+
+      if (user) {
+        isExisting = true;
+        existingCount++;
+        if (user.exists === 0) {
+          await user.update({ exists: 1 });
+        }
+        const updates = {};
+        if (item.department) updates.department = item.department;
+        if (item.designation) updates.designation = item.designation;
+        if (item.role && item.role !== user.role) updates.role = item.role;
+        if (Object.keys(updates).length) await user.update(updates);
+      } else {
+        const randomPart = crypto.randomBytes(3).toString("hex").toUpperCase();
+        tempPassword = `KN@${randomPart}`;
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        const assignedEmployeeId = await generateEmployeeId(companyName);
+
+        let fName = item.firstName;
+        let lName = item.lastName;
+        if (!fName) {
+          const namePart = item.email.split("@")[0].replace(/[._-]/g, " ");
+          const nameTokens = namePart.split(" ");
+          fName = nameTokens[0] ? (nameTokens[0].charAt(0).toUpperCase() + nameTokens[0].slice(1)) : "Team";
+          lName = nameTokens[1] ? (nameTokens[1].charAt(0).toUpperCase() + nameTokens[1].slice(1)) : "Member";
+        }
+
+        user = await User.create({
+          firstName: fName,
+          lastName: lName || "Member",
+          email: item.email,
+          password: hashedPassword,
+          companyName,
+          role: item.role || "Employee",
+          department: item.department || companyName,
+          designation: item.designation || "Associate",
+          employeeId: assignedEmployeeId,
+          exists: 1,
+        });
+        createdCount++;
+      }
+
+      const mailResult = await sendInvitationEmail({
+        recipientEmail: item.email,
+        recipientName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || "Team Member",
+        companyName,
+        role: user.role,
+        department: user.department,
+        designation: user.designation,
+        employeeId: user.employeeId,
+        tempPassword,
+        portalUrl,
+        customMessage,
+        isExistingUser: isExisting,
+        inviterName,
+      });
+
+      if (mailResult.success) {
+        emailSentCount++;
+      }
+
+      results.push({
+        email: item.email,
+        status: mailResult.success ? "sent" : "smtp_fallback",
+        userId: user.id,
+        employeeId: user.employeeId,
+        tempPassword,
+        isExisting,
+        mailError: mailResult.error || null,
+        inviteLink: portalUrl,
+      });
+    } catch (err) {
+      console.error(`Error processing invite for ${item.email}:`, err);
+      results.push({ email: item.email, status: "error", error: err.message });
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    message: `Processed ${inviteList.length} invitation(s): ${createdCount} created, ${existingCount} existing, ${emailSentCount} emails sent successfully.`,
+    createdCount,
+    existingCount,
+    emailSentCount,
+    results,
+  });
+};
+
+exports.resendInvite = async (req, res) => {
+  const { id } = req.params;
+  const { resetPassword = false, customMessage = "" } = req.body;
+  const portalUrl = req.headers.origin || process.env.CLIENT_URL || "http://localhost:3000";
+  const inviterName = req.user ? `${req.user.firstName || ''} (${req.user.role || 'Admin'})`.trim() : "Management";
+
+  try {
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    let tempPassword = null;
+    if (resetPassword) {
+      const randomPart = crypto.randomBytes(3).toString("hex").toUpperCase();
+      tempPassword = `KN@${randomPart}`;
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      await user.update({ password: hashedPassword });
+    }
+
+    const mailResult = await sendInvitationEmail({
+      recipientEmail: user.email,
+      recipientName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || "Team Member",
+      companyName: user.companyName || DEFAULT_COMPANY,
+      role: user.role,
+      department: user.department,
+      designation: user.designation,
+      employeeId: user.employeeId,
+      tempPassword,
+      portalUrl,
+      customMessage,
+      isExistingUser: !resetPassword,
+      inviterName,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: mailResult.success
+        ? `Invitation email sent successfully to ${user.email}`
+        : `Email dispatched (fallback details generated: ${mailResult.error || 'SMTP issue'})`,
+      emailStatus: mailResult.success ? "sent" : "smtp_fallback",
+      mailError: mailResult.error || null,
+      tempPassword,
+      employeeId: user.employeeId,
+      inviteLink: portalUrl,
+    });
+  } catch (error) {
+    console.error("Error resending invite:", error);
+    res.status(500).json({ success: false, message: "Failed to resend invite", error: error.message });
+  }
+};
+
+exports.bulkSendInvites = async (req, res) => {
+  const { userIds, customMessage = "", resetPassword = false } = req.body;
+  const portalUrl = req.headers.origin || process.env.CLIENT_URL || "http://localhost:3000";
+  const inviterName = req.user ? `${req.user.firstName || ''} (${req.user.role || 'Admin'})`.trim() : "Management";
+
+  if (!Array.isArray(userIds) || userIds.length === 0) {
+    return res.status(400).json({ success: false, message: "No user IDs provided" });
+  }
+
+  try {
+    const users = await User.findAll({
+      where: {
+        id: { [Op.in]: userIds },
+        exists: 1,
+      },
+    });
+
+    const results = [];
+    let sentCount = 0;
+
+    for (const user of users) {
+      let tempPassword = null;
+      if (resetPassword) {
+        const randomPart = crypto.randomBytes(3).toString("hex").toUpperCase();
+        tempPassword = `KN@${randomPart}`;
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        await user.update({ password: hashedPassword });
+      }
+
+      const mailResult = await sendInvitationEmail({
+        recipientEmail: user.email,
+        recipientName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || "Team Member",
+        companyName: user.companyName || DEFAULT_COMPANY,
+        role: user.role,
+        department: user.department,
+        designation: user.designation,
+        employeeId: user.employeeId,
+        tempPassword,
+        portalUrl,
+        customMessage,
+        isExistingUser: !resetPassword,
+        inviterName,
+      });
+
+      if (mailResult.success) sentCount++;
+
+      results.push({
+        userId: user.id,
+        email: user.email,
+        status: mailResult.success ? "sent" : "smtp_fallback",
+        mailError: mailResult.error || null,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Sent invitations to ${sentCount} of ${users.length} selected employees.`,
+      sentCount,
+      total: users.length,
+      results,
+    });
+  } catch (error) {
+    console.error("Error sending bulk invites:", error);
+    res.status(500).json({ success: false, message: "Failed to send bulk invites", error: error.message });
   }
 };

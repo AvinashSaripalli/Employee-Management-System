@@ -20,5 +20,8 @@ router.get('/users-by-departments', verifyToken, userController.getUsersByDepart
 router.put('/users/:id', verifyToken, upload.single('photo'), userController.updateUserDetails);
 router.patch('/users/:id', verifyToken, userController.toggleUserExists);
 router.get('/users/next-employee-id', verifyToken, userController.getNextEmployeeId);
+router.post('/users/invite', verifyToken, userController.inviteUsers);
+router.post('/users/bulk-send-invites', verifyToken, userController.bulkSendInvites);
+router.post('/users/:id/send-invite', verifyToken, userController.resendInvite);
 
 module.exports = router;

@@ -37,7 +37,7 @@ const AssignEmployeeDialog = ({ open, onClose, user, existingDepartments = [], o
   ]
     .forEach((option) => {
       const name = canonicalName(option.name);
-      if (!name || name === 'Unassigned' || name === 'KN Advisors') return;
+      if (!name || name === 'Unassigned') return;
       const key = name.toLowerCase();
       if (!optionMap.has(key)) {
         optionMap.set(key, {

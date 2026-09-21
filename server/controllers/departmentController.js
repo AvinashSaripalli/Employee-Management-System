@@ -50,6 +50,18 @@ exports.getDepartments = async (req, res) => {
       where: { companyName },
       order: [["name", "ASC"]],
     });
+
+    const hasCompanyDept = departments.some((d) => d.name.toLowerCase() === companyName.toLowerCase());
+    if (!hasCompanyDept) {
+      departments.unshift({
+        id: -1,
+        name: companyName,
+        companyName,
+        parentId: null,
+        supervisorId: null,
+      });
+    }
+
     return res.json(departments);
   } catch (error) {
     console.error("Error fetching departments:", error);

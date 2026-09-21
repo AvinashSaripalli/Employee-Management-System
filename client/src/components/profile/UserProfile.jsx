@@ -39,6 +39,9 @@ const UserProfile = () => {
   const [validationErrors, setValidationErrors] = useState({});
 
 
+  const storedCompany = getStoredValue("companyName") || "KN Advisors";
+  const initialDepartment = getStoredValue("userDepartment") || storedCompany;
+
   const [userData, setUserData] = useState({
     userPhoto: getStoredValue("userPhoto"),
     userDesignation: getStoredValue("userDesignation"),
@@ -47,7 +50,7 @@ const UserProfile = () => {
     userJobLocation: getStoredValue("userJobLocation"),
     userLastuserData: getStoredValue("userLastName"),
     userPhoneNumber: getStoredValue("userPhoneNumber"),
-    userDepartment: getStoredValue("userDepartment"),
+    userDepartment: initialDepartment,
     userId: getStoredValue("userId"),
     userTechnicalSkills: getStoredValue("userTechnicalSkills")
     ? getStoredValue("userTechnicalSkills").split(",") 
@@ -56,6 +59,13 @@ const UserProfile = () => {
     userBloodGroup: getStoredValue("userBloodGroup"),
     userGender: getStoredValue("userGender"),
   });
+
+  useEffect(() => {
+    if (!localStorage.getItem("userDepartment") && storedCompany) {
+      localStorage.setItem("userDepartment", storedCompany);
+      setUserData((prev) => ({ ...prev, userDepartment: storedCompany }));
+    }
+  }, [storedCompany]);
 
   const [skillsList, setSkillsList] = useState(
     getStoredValue("userTechnicalSkills")
@@ -341,7 +351,7 @@ const UserProfile = () => {
 
   return (
     <Box sx={{ maxWidth: 1240, mx: "auto", p: { xs: 2, md: 4 }, width: "100%", boxSizing: "border-box" }}>
-      {!userData.userDepartment && (
+      {!getStoredValue("companyName") && (
         <Box sx={{ mb: 2.5, p: 2, bgcolor: "#FFF8E1", border: "1px solid #FFE082", borderRadius: 2 }}>
           <Typography variant="body2" sx={{ color: "#795548", fontWeight: 600 }}>
             Your account is waiting for company assignment. You can still complete your personal details below.
@@ -371,7 +381,7 @@ const UserProfile = () => {
             <Chip label={detailValue(userData.userDesignation)} color="primary" size="small" sx={{ mt: 1.5 }} />
             <Divider sx={{ my: 2.5 }} />
             <Stack spacing={1.5} sx={{ textAlign: "left" }}>
-              <Box><Typography variant="caption" color="text.secondary">Department</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{detailValue(userData.userDepartment)}</Typography></Box>
+              <Box><Typography variant="caption" color="text.secondary">Department</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{detailValue(userData.userDepartment || storedCompany)}</Typography></Box>
               <Box><Typography variant="caption" color="text.secondary">Work location</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{detailValue(userData.userJobLocation)}</Typography></Box>
               <Box><Typography variant="caption" color="text.secondary">Employee ID</Typography><Typography variant="body2" sx={{ fontWeight: 600 }}>{detailValue(localStorage.getItem("userEmployeeId"))}</Typography></Box>
             </Stack>
@@ -524,25 +534,23 @@ const UserProfile = () => {
             <InputLabel>Department</InputLabel>
             <Select
               label="Department"
-              value={userData.userDepartment}
+              value={userData.userDepartment || storedCompany}
               onChange={(e) => handleChange(e, "userDepartment")}
-              disabled
             >
               {departmentNames.length === 0 ? (
-                <MenuItem disabled value="">{userData.userDepartment || "No departments"}</MenuItem>
+                <MenuItem value={storedCompany}>{storedCompany}</MenuItem>
               ) : (
                 departmentNames.map((name) => (
                   <MenuItem key={name} value={name}>{name}</MenuItem>
                 ))
               )}
               {userData.userDepartment && !departmentNames.includes(userData.userDepartment) && (
-                <MenuItem value={userData.userDepartment}>{userData.userDepartment} (legacy)</MenuItem>
+                <MenuItem value={userData.userDepartment}>{userData.userDepartment}</MenuItem>
               )}
             </Select>
             {validationErrors.userDepartment && (
-        <Typography variant="caption" color="error">{validationErrors.userDepartment}</Typography>
-      )}
-
+              <Typography variant="caption" color="error">{validationErrors.userDepartment}</Typography>
+            )}
           </FormControl>
 
           <FormControl fullWidth sx={{ mt: 2 }} error={!!validationErrors.userJobLocation}>

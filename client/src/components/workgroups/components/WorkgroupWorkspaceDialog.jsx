@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -12,25 +12,19 @@ import {
   IconButton,
   Chip,
   Avatar,
-  AvatarGroup,
   Divider,
   TextField,
-  Grid,
   Paper,
-  Card,
-  CardContent,
   LinearProgress,
   List,
   ListItem,
   ListItemAvatar,
   ListItemText,
-  ListItemSecondaryAction,
   Select,
   MenuItem,
   FormControl,
   InputLabel,
   InputAdornment,
-  Tooltip,
   CircularProgress,
   Alert,
   Switch,
@@ -56,7 +50,6 @@ import {
   CalendarToday as CalendarIcon,
   Business as BusinessIcon,
   Assignment as AssignmentIcon,
-  Email as EmailIcon,
 } from '@mui/icons-material';
 import axios from '../../../api/axios';
 
@@ -133,7 +126,6 @@ const WorkgroupWorkspaceDialog = ({
       const allTasks = response.data || [];
       const memberIds = new Set((group.employees || []).map((e) => e.employeeId));
 
-      // Filter tasks associated with members of this workgroup
       const groupTasks = allTasks.filter(
         (t) =>
           memberIds.has(t.responsibleId) ||
@@ -156,7 +148,6 @@ const WorkgroupWorkspaceDialog = ({
     employees.find((e) => e.employeeId === group.leaderId) ||
     employees[0];
 
-  // Filtered members
   const filteredMembers = employees.filter((emp) => {
     const q = memberSearch.trim().toLowerCase();
     if (!q) return true;
@@ -168,7 +159,6 @@ const WorkgroupWorkspaceDialog = ({
     );
   });
 
-  // Task stats
   const completedTasks = tasks.filter((t) => t.status === 5).length;
   const inProgressTasks = tasks.filter((t) => t.status === 3).length;
   const pendingTasks = tasks.filter((t) => [1, 2, 4].includes(t.status)).length;
@@ -180,7 +170,6 @@ const WorkgroupWorkspaceDialog = ({
     return true;
   });
 
-  // Handle Member Role change
   const handleRoleChange = async (targetEmployeeId, newRole) => {
     try {
       await axios.patch(`/workgroups/${group.id}/member-role`, {
@@ -194,7 +183,6 @@ const WorkgroupWorkspaceDialog = ({
     }
   };
 
-  // Remove Member
   const handleRemoveMember = async (emp) => {
     if (!window.confirm(`Remove ${emp.firstName} ${emp.lastName} from ${group.groupName}?`)) return;
     try {
@@ -218,7 +206,6 @@ const WorkgroupWorkspaceDialog = ({
     }
   };
 
-  // Add Members
   const handleAddMembers = async () => {
     if (!selectedNewEmployees.length) return;
     try {
@@ -238,7 +225,6 @@ const WorkgroupWorkspaceDialog = ({
     }
   };
 
-  // Post Announcement
   const handlePostAnnouncement = async () => {
     if (!announcementTitle.trim() || !announcementContent.trim()) return;
     setPostingAnnouncement(true);
@@ -261,7 +247,6 @@ const WorkgroupWorkspaceDialog = ({
     }
   };
 
-  // Delete Announcement
   const handleDeleteAnnouncement = async (announcementId) => {
     try {
       const res = await axios.delete(`/workgroups/${group.id}/announcements/${announcementId}`);
@@ -273,7 +258,6 @@ const WorkgroupWorkspaceDialog = ({
     }
   };
 
-  // Add Resource
   const handleAddResource = async () => {
     if (!newResource.title.trim() || !newResource.url.trim()) return;
     try {
@@ -288,7 +272,6 @@ const WorkgroupWorkspaceDialog = ({
     }
   };
 
-  // Delete Resource
   const handleDeleteResource = async (resourceId) => {
     try {
       const res = await axios.delete(`/workgroups/${group.id}/resources/${resourceId}`);
@@ -300,7 +283,6 @@ const WorkgroupWorkspaceDialog = ({
     }
   };
 
-  // Create Task for Group
   const handleCreateTask = async () => {
     if (!newTask.title.trim() || !newTask.responsibleId) return;
     try {
@@ -340,63 +322,129 @@ const WorkgroupWorkspaceDialog = ({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: 3.5, minHeight: '640px' } }}>
-      {/* Dialog Hero Banner */}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      PaperProps={{
+        sx: {
+          borderRadius: 3.5,
+          height: { xs: '92vh', sm: '85vh' },
+          maxHeight: 880,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          boxShadow: '0 24px 48px -12px rgba(15, 23, 42, 0.25)',
+        },
+      }}
+    >
+      {/* 1. HERO HEADER */}
       <Box
         sx={{
-          p: 3,
-          background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)',
+          px: { xs: 2.5, sm: 3.5 },
+          py: 3,
+          background: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #3730A3 100%)',
           color: '#FFFFFF',
-          position: 'relative',
+          flexShrink: 0,
         }}
       >
-        <IconButton
-          onClick={onClose}
-          sx={{ position: 'absolute', top: 12, right: 12, color: 'rgba(255,255,255,0.7)', '&:hover': { color: '#FFF' } }}
-        >
-          <CloseIcon />
-        </IconButton>
+        {/* Top Row: Chips on Left, Close Button on Right */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Chip
+              label={group.category || 'Project Pod'}
+              size="small"
+              sx={{
+                bgcolor: 'rgba(255,255,255,0.18)',
+                color: '#FFF',
+                fontWeight: 700,
+                fontSize: '0.72rem',
+                border: '1px solid rgba(255,255,255,0.25)',
+              }}
+            />
+            <Chip
+              icon={
+                group.privacyType === 'Public' ? (
+                  <SecurityIcon sx={{ fontSize: '13px !important', color: '#10B981 !important' }} />
+                ) : (
+                  <SecurityIcon sx={{ fontSize: '13px !important', color: '#A5B4FC !important' }} />
+                )
+              }
+              label={group.privacyType}
+              size="small"
+              sx={{
+                bgcolor: group.privacyType === 'Public' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)',
+                color: '#FFF',
+                fontWeight: 700,
+                fontSize: '0.72rem',
+              }}
+            />
+            <Chip
+              label={group.status || 'Active'}
+              size="small"
+              sx={{
+                bgcolor: group.status === 'Archived' ? 'rgba(255,255,255,0.1)' : 'rgba(16, 185, 129, 0.2)',
+                color: '#E2E8F0',
+                fontWeight: 600,
+                fontSize: '0.72rem',
+              }}
+            />
+          </Box>
 
-        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: 1, flexWrap: 'wrap' }}>
-          <Chip
-            label={group.category || 'Project Pod'}
-            size="small"
-            sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#FFF', fontWeight: 600, fontSize: '0.72rem' }}
-          />
-          <Chip
-            label={group.privacyType}
+          <IconButton
+            onClick={onClose}
             size="small"
             sx={{
-              bgcolor: group.privacyType === 'Public' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(99, 102, 241, 0.25)',
-              color: '#FFF',
-              fontWeight: 600,
-              fontSize: '0.72rem',
+              color: 'rgba(255,255,255,0.8)',
+              bgcolor: 'rgba(255,255,255,0.08)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.2)', color: '#FFF' },
             }}
-          />
-          <Chip
-            label={group.status || 'Active'}
-            size="small"
-            sx={{ bgcolor: 'rgba(255,255,255,0.1)', color: '#CBD5E1', fontSize: '0.72rem' }}
-          />
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
         </Box>
 
-        <Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: '-0.02em' }}>
-          {group.groupName || group.partnerCompanyName}
-        </Typography>
-
-        {group.partnerCompanyName && group.partnerCompanyName !== group.groupName && (
-          <Typography variant="body2" sx={{ opacity: 0.8, display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
-            <BusinessIcon sx={{ fontSize: 16 }} /> Partner / Org: {group.partnerCompanyName}
+        {/* Middle: Workgroup Title & Organization Subtitle */}
+        <Box sx={{ mb: 2 }}>
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: 800,
+              fontSize: { xs: '1.25rem', sm: '1.55rem' },
+              lineHeight: 1.25,
+              letterSpacing: '-0.02em',
+              color: '#FFFFFF',
+            }}
+          >
+            {group.groupName || group.partnerCompanyName}
           </Typography>
-        )}
 
-        {/* Quick Action Shortcuts */}
-        <Box sx={{ display: 'flex', gap: 1.5, mt: 2, flexWrap: 'wrap' }}>
+          {group.partnerCompanyName && group.partnerCompanyName !== group.groupName && (
+            <Typography
+              variant="body2"
+              sx={{
+                color: '#CBD5E1',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.8,
+                mt: 0.5,
+                fontSize: '0.85rem',
+              }}
+            >
+              <BusinessIcon sx={{ fontSize: 16, color: '#A5B4FC' }} />
+              Partner / Client Entity: <strong>{group.partnerCompanyName}</strong>
+            </Typography>
+          )}
+        </Box>
+
+        {/* Bottom Row of Header: Quick Actions */}
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
           {onOpenMessenger && (
             <Button
               size="small"
               variant="contained"
-              startIcon={<ChatIcon />}
+              startIcon={<ChatIcon sx={{ fontSize: 16 }} />}
               onClick={() => {
                 onClose();
                 onOpenMessenger(group);
@@ -406,7 +454,11 @@ const WorkgroupWorkspaceDialog = ({
                 '&:hover': { bgcolor: '#4338CA' },
                 borderRadius: 2,
                 textTransform: 'none',
-                fontWeight: 600,
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                px: 2,
+                py: 0.6,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
               }}
             >
               Group Chat
@@ -417,17 +469,21 @@ const WorkgroupWorkspaceDialog = ({
             <Button
               size="small"
               variant="outlined"
-              startIcon={<EditIcon />}
+              startIcon={<EditIcon sx={{ fontSize: 15 }} />}
               onClick={() => {
                 onClose();
                 onEditGroup(group);
               }}
               sx={{
-                color: '#FFF',
-                borderColor: 'rgba(255,255,255,0.4)',
-                '&:hover': { borderColor: '#FFF', bgcolor: 'rgba(255,255,255,0.08)' },
+                color: '#FFFFFF',
+                borderColor: 'rgba(255,255,255,0.35)',
+                '&:hover': { borderColor: '#FFFFFF', bgcolor: 'rgba(255,255,255,0.1)' },
                 borderRadius: 2,
                 textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '0.82rem',
+                px: 2,
+                py: 0.6,
               }}
             >
               Edit Settings
@@ -436,8 +492,15 @@ const WorkgroupWorkspaceDialog = ({
         </Box>
       </Box>
 
-      {/* Tabs Bar */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: '#F8FAFC', px: 2 }}>
+      {/* 2. TAB NAVIGATION BAR */}
+      <Box
+        sx={{
+          borderBottom: '1px solid #E2E8F0',
+          bgcolor: '#FFFFFF',
+          px: { xs: 1.5, sm: 3.5 },
+          flexShrink: 0,
+        }}
+      >
         <Tabs
           value={activeTab}
           onChange={(e, val) => setActiveTab(val)}
@@ -445,12 +508,23 @@ const WorkgroupWorkspaceDialog = ({
           scrollButtons="auto"
           sx={{
             minHeight: 48,
+            '& .MuiTabs-indicator': {
+              height: 3,
+              borderRadius: '3px 3px 0 0',
+              bgcolor: '#4F46E5',
+            },
             '& .MuiTab-root': {
               textTransform: 'none',
               fontWeight: 600,
               fontSize: '0.88rem',
               minHeight: 48,
               py: 0,
+              px: 2,
+              color: '#64748B',
+              '&.Mui-selected': {
+                color: '#4F46E5',
+                fontWeight: 700,
+              },
             },
           }}
         >
@@ -478,74 +552,160 @@ const WorkgroupWorkspaceDialog = ({
         </Tabs>
       </Box>
 
+      {/* Alert Notification if any */}
       {feedback.message && (
-        <Alert
-          severity={feedback.type}
-          onClose={() => setFeedback({ message: '', type: 'info' })}
-          sx={{ m: 2, mb: 0 }}
-        >
-          {feedback.message}
-        </Alert>
+        <Box sx={{ px: { xs: 2, sm: 3.5 }, pt: 2 }}>
+          <Alert
+            severity={feedback.type}
+            onClose={() => setFeedback({ message: '', type: 'info' })}
+            sx={{ borderRadius: 2 }}
+          >
+            {feedback.message}
+          </Alert>
+        </Box>
       )}
 
-      {/* Tab Contents */}
-      <DialogContent sx={{ p: 3, minHeight: 380, bgcolor: '#F8FAFC' }}>
+      {/* 3. SCROLLABLE TAB CONTENTS */}
+      <DialogContent
+        sx={{
+          p: { xs: 2.5, sm: 3.5 },
+          bgcolor: '#F8FAFC',
+          flex: 1,
+          overflowY: 'auto',
+        }}
+      >
         {/* TAB 0: OVERVIEW */}
         {activeTab === 0 && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* Mission / Description */}
-            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFF' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B', mb: 1, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Mission & Objectives
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            {/* Mission / Objectives Card */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 3,
+                borderRadius: 3,
+                border: '1px solid #E2E8F0',
+                bgcolor: '#FFFFFF',
+              }}
+            >
+              <Typography
+                variant="subtitle2"
+                sx={{
+                  fontWeight: 700,
+                  color: '#475569',
+                  mb: 1.2,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  fontSize: '0.75rem',
+                }}
+              >
+                Mission & Scope
               </Typography>
-              <Typography variant="body1" sx={{ color: '#1E293B', lineHeight: 1.6 }}>
-                {group.description || 'No detailed description provided. Click "Edit Settings" to add clear mission statements and deliverable goals for this workgroup.'}
+              <Typography
+                variant="body1"
+                sx={{
+                  color: '#1E293B',
+                  lineHeight: 1.65,
+                  fontSize: '0.92rem',
+                }}
+              >
+                {group.description ||
+                  'No detailed description provided. Click "Edit Settings" to configure the objectives, scope, and key deliverables for this workgroup.'}
               </Typography>
             </Paper>
 
-            {/* Quick KPI stats bar */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(4, 1fr)' }, gap: 2 }}>
+            {/* KPI Metrics 4-Column Row */}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
+                gap: 2,
+              }}
+            >
               {[
-                { label: 'Team Members', value: employees.length, color: '#4F46E5' },
-                { label: 'Active Tasks', value: pendingTasks + inProgressTasks, color: '#0EA5E9' },
-                { label: 'Completed Tasks', value: completedTasks, color: '#10B981' },
-                { label: 'Completion Rate', value: `${completionRate}%`, color: '#8B5CF6' },
-              ].map((s) => (
-                <Paper key={s.label} elevation={0} sx={{ p: 2, borderRadius: 2.5, border: '1px solid #E2E8F0', bgcolor: '#FFF', textAlign: 'center' }}>
-                  <Typography variant="h5" sx={{ fontWeight: 800, color: s.color }}>
-                    {s.value}
+                { label: 'Team Members', value: employees.length, color: '#4F46E5', bg: '#EEF2FF' },
+                { label: 'Active Tasks', value: pendingTasks + inProgressTasks, color: '#0EA5E9', bg: '#E0F2FE' },
+                { label: 'Completed Tasks', value: completedTasks, color: '#10B981', bg: '#ECFDF5' },
+                { label: 'Completion Rate', value: `${completionRate}%`, color: '#8B5CF6', bg: '#F5F3FF' },
+              ].map((metric) => (
+                <Paper
+                  key={metric.label}
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    borderRadius: 2.5,
+                    border: '1px solid #E2E8F0',
+                    bgcolor: '#FFFFFF',
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Typography variant="h5" sx={{ fontWeight: 800, color: metric.color, mb: 0.3 }}>
+                    {metric.value}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600 }}>
-                    {s.label}
+                  <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 600, fontSize: '0.76rem' }}>
+                    {metric.label}
                   </Typography>
                 </Paper>
               ))}
             </Box>
 
-            {/* Leader Highlight Card */}
+            {/* Leadership Highlight */}
             {leaderObj && (
-              <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFF' }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B', mb: 1.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2.5,
+                  borderRadius: 3,
+                  border: '1px solid #E2E8F0',
+                  bgcolor: '#FFFFFF',
+                }}
+              >
+                <Typography
+                  variant="subtitle2"
+                  sx={{
+                    fontWeight: 700,
+                    color: '#475569',
+                    mb: 1.8,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontSize: '0.75rem',
+                  }}
+                >
                   Workgroup Leadership
                 </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.2 }}>
                   <Avatar
                     src={leaderObj.photo ? `${leaderObj.photo}` : undefined}
-                    sx={{ width: 54, height: 54, bgcolor: '#4F46E5', fontSize: '1.2rem' }}
+                    sx={{
+                      width: 52,
+                      height: 52,
+                      bgcolor: '#4F46E5',
+                      fontSize: '1.2rem',
+                      fontWeight: 700,
+                      border: '2px solid #EEF2FF',
+                    }}
                   >
-                    {leaderObj.firstName?.[0] || 'L'}
+                    {leaderObj.firstName?.[0] || <PersonIcon />}
                   </Avatar>
-                  <Box sx={{ flex: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexWrap: 'wrap' }}>
                       <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#1E293B' }}>
                         {leaderObj.firstName} {leaderObj.lastName}
                       </Typography>
-                      <Chip label="Lead Coordinator" size="small" color="primary" sx={{ fontSize: '0.7rem', height: 20 }} />
+                      <Chip
+                        label="Lead Coordinator"
+                        size="small"
+                        color="primary"
+                        sx={{ fontSize: '0.7rem', height: 22, fontWeight: 700 }}
+                      />
                     </Box>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" sx={{ color: '#475569', mt: 0.3 }}>
                       {leaderObj.designation || 'Staff'} • {leaderObj.department || 'Operations'}
                     </Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" sx={{ color: '#94A3B8' }}>
                       {leaderObj.email}
                     </Typography>
                   </Box>
@@ -553,36 +713,74 @@ const WorkgroupWorkspaceDialog = ({
               </Paper>
             )}
 
-            {/* Tags & Metadata */}
-            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFF' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B', mb: 1.5, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Tags & Categorization
+            {/* Tags & Metadata Footer */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2.5,
+                borderRadius: 3,
+                border: '1px solid #E2E8F0',
+                bgcolor: '#FFFFFF',
+              }}
+            >
+              <Typography
+                variant="subtitle2"
+                sx={{
+                  fontWeight: 700,
+                  color: '#475569',
+                  mb: 1.5,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  fontSize: '0.75rem',
+                }}
+              >
+                Domain Keywords & Tags
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2.5 }}>
                 {(group.tags || '')
                   .split(',')
                   .map((t) => t.trim())
                   .filter(Boolean)
                   .map((tag, idx) => (
-                    <Chip key={idx} label={`#${tag}`} sx={{ bgcolor: '#F1F5F9', fontWeight: 600, color: '#334155' }} />
+                    <Chip
+                      key={idx}
+                      label={`#${tag}`}
+                      size="small"
+                      sx={{
+                        bgcolor: '#F1F5F9',
+                        fontWeight: 600,
+                        color: '#334155',
+                        borderRadius: 1.5,
+                      }}
+                    />
                   ))}
                 {!(group.tags || '').trim() && (
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
                     No tags specified yet.
                   </Typography>
                 )}
               </Box>
 
-              <Divider sx={{ my: 1.5 }} />
+              <Divider sx={{ my: 2 }} />
 
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, color: '#64748B', fontSize: '0.85rem' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <CalendarIcon sx={{ fontSize: 16 }} /> Created on:{' '}
-                  <strong>{group.createdOn ? new Date(group.createdOn).toLocaleDateString() : '-'}</strong>
+              <Box
+                sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 2,
+                  color: '#64748B',
+                  fontSize: '0.84rem',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                  <CalendarIcon sx={{ fontSize: 16, color: '#4F46E5' }} />
+                  <span>Created / Kickoff: <strong>{group.createdOn ? new Date(group.createdOn).toLocaleDateString('en-GB') : '-'}</strong></span>
                 </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <SecurityIcon sx={{ fontSize: 16 }} /> Privacy:{' '}
-                  <strong>{group.privacyType}</strong>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                  <SecurityIcon sx={{ fontSize: 16, color: '#10B981' }} />
+                  <span>Access Type: <strong>{group.privacyType}</strong></span>
                 </Box>
               </Box>
             </Paper>
@@ -592,13 +790,27 @@ const WorkgroupWorkspaceDialog = ({
         {/* TAB 1: MEMBERS & ROLES */}
         {activeTab === 1 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            {/* Search and Add Members Bar */}
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 2,
+                flexWrap: 'wrap',
+              }}
+            >
               <TextField
                 size="small"
-                placeholder="Search team members..."
+                placeholder="Search team members by name, designation, or department..."
                 value={memberSearch}
                 onChange={(e) => setMemberSearch(e.target.value)}
-                sx={{ flex: 1, minWidth: 220, bgcolor: '#FFF' }}
+                sx={{
+                  flex: 1,
+                  minWidth: { xs: '100%', sm: 260 },
+                  bgcolor: '#FFFFFF',
+                  borderRadius: 2,
+                }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -607,20 +819,39 @@ const WorkgroupWorkspaceDialog = ({
                   ),
                 }}
               />
+
               {canManage && (
                 <Button
                   variant="contained"
                   size="small"
                   startIcon={<AddIcon />}
                   onClick={() => setAddMemberDialogOpen(true)}
-                  sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    px: 2,
+                    height: 38,
+                    bgcolor: '#4F46E5',
+                    '&:hover': { bgcolor: '#4338CA' },
+                  }}
                 >
                   Add Members
                 </Button>
               )}
             </Box>
 
-            <Paper elevation={0} sx={{ borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFF', overflow: 'hidden' }}>
+            {/* Roster List */}
+            <Paper
+              elevation={0}
+              sx={{
+                borderRadius: 3,
+                border: '1px solid #E2E8F0',
+                bgcolor: '#FFFFFF',
+                overflow: 'hidden',
+              }}
+            >
               <List disablePadding>
                 {filteredMembers.map((emp, index) => {
                   const isEmpLeader = emp.employeeId === group.leaderId;
@@ -629,33 +860,54 @@ const WorkgroupWorkspaceDialog = ({
                   return (
                     <React.Fragment key={emp.employeeId}>
                       {index > 0 && <Divider />}
-                      <ListItem sx={{ py: 1.8, px: 2.5 }}>
-                        <ListItemAvatar>
+                      <ListItem
+                        sx={{
+                          py: 1.8,
+                          px: { xs: 2, sm: 3 },
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 2,
+                        }}
+                      >
+                        <ListItemAvatar sx={{ minWidth: 46 }}>
                           <Avatar
                             src={emp.photo ? `${emp.photo}` : undefined}
-                            sx={{ width: 44, height: 44, bgcolor: '#6366F1' }}
+                            sx={{ width: 44, height: 44, bgcolor: '#4F46E5', fontWeight: 700 }}
                           >
                             {emp.firstName?.[0] || 'M'}
                           </Avatar>
                         </ListItemAvatar>
+
                         <ListItemText
                           primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Typography variant="body1" sx={{ fontWeight: 700, color: '#1E293B' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1E293B' }}>
                                 {emp.firstName} {emp.lastName}
                               </Typography>
                               {emp.employeeId === currentEmployeeId && (
-                                <Chip label="You" size="small" sx={{ height: 20, fontSize: '0.68rem', bgcolor: '#EEF2FF', color: '#4F46E5', fontWeight: 700 }} />
+                                <Chip
+                                  label="You"
+                                  size="small"
+                                  sx={{
+                                    height: 20,
+                                    fontSize: '0.68rem',
+                                    bgcolor: '#EEF2FF',
+                                    color: '#4F46E5',
+                                    fontWeight: 700,
+                                  }}
+                                />
                               )}
                             </Box>
                           }
                           secondary={
-                            <Typography variant="caption" sx={{ color: '#64748B' }}>
-                              {emp.designation || 'Specialist'} • {emp.department || 'Operations'} • {emp.email}
+                            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.3 }}>
+                              {emp.designation || 'Staff'} • {emp.department || 'Operations'} • {emp.email}
                             </Typography>
                           }
                         />
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+
+                        {/* Right-aligned Role Control & Delete */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 'auto', flexShrink: 0 }}>
                           {canManage ? (
                             <Select
                               size="small"
@@ -689,6 +941,7 @@ const WorkgroupWorkspaceDialog = ({
                               color="error"
                               onClick={() => handleRemoveMember(emp)}
                               title="Remove from workgroup"
+                              sx={{ border: '1px solid #FEE2E2', borderRadius: 1.5 }}
                             >
                               <DeleteIcon fontSize="small" />
                             </IconButton>
@@ -698,6 +951,14 @@ const WorkgroupWorkspaceDialog = ({
                     </React.Fragment>
                   );
                 })}
+
+                {filteredMembers.length === 0 && (
+                  <Box sx={{ p: 4, textAlign: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      No team members match your search criteria.
+                    </Typography>
+                  </Box>
+                )}
               </List>
             </Paper>
           </Box>
@@ -706,25 +967,38 @@ const WorkgroupWorkspaceDialog = ({
         {/* TAB 2: TASKS */}
         {activeTab === 2 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            {/* Task Progress header */}
-            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFF' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+            {/* Progress Header */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2.5,
+                borderRadius: 3,
+                border: '1px solid #E2E8F0',
+                bgcolor: '#FFFFFF',
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.2 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1E293B' }}>
                   Team Task Progress ({completedTasks}/{tasks.length} Completed)
                 </Typography>
-                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#4F46E5' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: '#4F46E5', fontSize: '1rem' }}>
                   {completionRate}%
                 </Typography>
               </Box>
               <LinearProgress
                 variant="determinate"
                 value={completionRate}
-                sx={{ height: 8, borderRadius: 4, bgcolor: '#EEF2FF', '& .MuiLinearProgress-bar': { bgcolor: '#4F46E5', borderRadius: 4 } }}
+                sx={{
+                  height: 8,
+                  borderRadius: 4,
+                  bgcolor: '#EEF2FF',
+                  '& .MuiLinearProgress-bar': { bgcolor: '#4F46E5', borderRadius: 4 },
+                }}
               />
             </Paper>
 
             {/* Filter & Add Task buttons */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 {['all', 'active', 'completed'].map((f) => (
                   <Chip
@@ -735,7 +1009,7 @@ const WorkgroupWorkspaceDialog = ({
                     variant={taskFilter === f ? 'filled' : 'outlined'}
                     size="small"
                     onClick={() => setTaskFilter(f)}
-                    sx={{ fontWeight: 600, fontSize: '0.72rem' }}
+                    sx={{ fontWeight: 700, fontSize: '0.72rem', borderRadius: 1.5 }}
                   />
                 ))}
               </Box>
@@ -745,14 +1019,21 @@ const WorkgroupWorkspaceDialog = ({
                 size="small"
                 startIcon={<AddIcon />}
                 onClick={() => setCreateTaskOpen(true)}
-                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  bgcolor: '#4F46E5',
+                  '&:hover': { bgcolor: '#4338CA' },
+                }}
               >
                 Create Task for Group
               </Button>
             </Box>
 
             {loadingTasks ? (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Box sx={{ textAlign: 'center', py: 5 }}>
                 <CircularProgress size={32} />
               </Box>
             ) : displayedTasks.length > 0 ? (
@@ -762,10 +1043,10 @@ const WorkgroupWorkspaceDialog = ({
                     key={t.id}
                     elevation={0}
                     sx={{
-                      p: 2,
+                      p: 2.2,
                       borderRadius: 2.5,
                       border: '1px solid #E2E8F0',
-                      bgcolor: '#FFF',
+                      bgcolor: '#FFFFFF',
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
@@ -773,13 +1054,16 @@ const WorkgroupWorkspaceDialog = ({
                     }}
                   >
                     <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#1E293B', mb: 0.5 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1E293B', mb: 0.5 }}>
                         {t.title}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <span>Due: {t.deadline ? new Date(t.deadline).toLocaleDateString() : 'No deadline'}</span>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}
+                      >
+                        <span>Due: <strong>{t.deadline ? new Date(t.deadline).toLocaleDateString('en-GB') : 'No deadline'}</strong></span>
                         <span>•</span>
-                        <span>Responsible: {t.responsible ? `${t.responsible.firstName} ${t.responsible.lastName}` : 'Unassigned'}</span>
+                        <span>Assignee: <strong>{t.responsible ? `${t.responsible.firstName} ${t.responsible.lastName}` : 'Unassigned'}</strong></span>
                       </Typography>
                     </Box>
 
@@ -788,16 +1072,25 @@ const WorkgroupWorkspaceDialog = ({
                       size="small"
                       color={t.status === 5 ? 'success' : 'primary'}
                       variant="outlined"
-                      sx={{ fontWeight: 600, fontSize: '0.72rem' }}
+                      sx={{ fontWeight: 700, fontSize: '0.72rem', borderRadius: 1.5 }}
                     />
                   </Paper>
                 ))}
               </Box>
             ) : (
-              <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: 3, border: '1px dashed #CBD5E1', bgcolor: '#FFF' }}>
-                <AssignmentIcon sx={{ fontSize: 36, color: '#94A3B8', mb: 1 }} />
-                <Typography variant="body2" color="text.secondary">
-                  No tasks found matching current filter for this workgroup.
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 5,
+                  textAlign: 'center',
+                  borderRadius: 3,
+                  border: '1px dashed #CBD5E1',
+                  bgcolor: '#FFFFFF',
+                }}
+              >
+                <AssignmentIcon sx={{ fontSize: 40, color: '#94A3B8', mb: 1 }} />
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                  No tasks found matching this filter for the workgroup team.
                 </Typography>
               </Paper>
             )}
@@ -807,16 +1100,24 @@ const WorkgroupWorkspaceDialog = ({
         {/* TAB 3: ANNOUNCEMENTS & NOTICEBOARD */}
         {activeTab === 3 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            {/* Post Announcement Form */}
-            <Paper elevation={0} sx={{ p: 2.5, borderRadius: 3, border: '1px solid #E2E8F0', bgcolor: '#FFF' }}>
+            {/* Post Notice Form */}
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2.5,
+                borderRadius: 3,
+                border: '1px solid #E2E8F0',
+                bgcolor: '#FFFFFF',
+              }}
+            >
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1E293B', mb: 1.5 }}>
-                Post Team Notice or Update
+                Post Team Notice or Meeting Update
               </Typography>
               <TextField
                 fullWidth
                 size="small"
-                label="Headline / Title"
-                placeholder="e.g. Q3 Sprint Kickoff, Client Review Feedback"
+                label="Notice Headline"
+                placeholder="e.g. Q3 Sprint Kickoff, Client Feedback Notes"
                 value={announcementTitle}
                 onChange={(e) => setAnnouncementTitle(e.target.value)}
                 sx={{ mb: 1.5 }}
@@ -825,8 +1126,8 @@ const WorkgroupWorkspaceDialog = ({
                 fullWidth
                 multiline
                 rows={2}
-                label="Content & Details"
-                placeholder="Share key updates, action items, or meeting notes..."
+                label="Message / Action Items"
+                placeholder="Share key deliverables, milestones, or team updates..."
                 value={announcementContent}
                 onChange={(e) => setAnnouncementContent(e.target.value)}
                 sx={{ mb: 1.5 }}
@@ -848,16 +1149,22 @@ const WorkgroupWorkspaceDialog = ({
                   size="small"
                   onClick={handlePostAnnouncement}
                   disabled={postingAnnouncement || !announcementTitle.trim() || !announcementContent.trim()}
-                  sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+                  sx={{
+                    borderRadius: 2,
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    bgcolor: '#4F46E5',
+                    '&:hover': { bgcolor: '#4338CA' },
+                  }}
                 >
                   {postingAnnouncement ? 'Posting...' : 'Post Notice'}
                 </Button>
               </Box>
             </Paper>
 
-            {/* List of Announcements */}
+            {/* Announcements Feed */}
             {announcements.length > 0 ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.8 }}>
                 {announcements.map((post) => (
                   <Paper
                     key={post.id}
@@ -866,21 +1173,32 @@ const WorkgroupWorkspaceDialog = ({
                       p: 2.5,
                       borderRadius: 3,
                       border: post.pinned ? '2px solid #818CF8' : '1px solid #E2E8F0',
-                      bgcolor: post.pinned ? '#FAF5FF' : '#FFF',
+                      bgcolor: post.pinned ? '#FAF5FF' : '#FFFFFF',
                       position: 'relative',
                     }}
                   >
                     {post.pinned && (
                       <Chip
                         icon={<PinIcon sx={{ fontSize: '13px !important', color: '#9333EA !important' }} />}
-                        label="Pinned Notice"
+                        label="Pinned"
                         size="small"
-                        sx={{ position: 'absolute', top: 12, right: 12, bgcolor: '#F3E8FF', color: '#7E22CE', fontWeight: 700, fontSize: '0.68rem' }}
+                        sx={{
+                          position: 'absolute',
+                          top: 14,
+                          right: 14,
+                          bgcolor: '#F3E8FF',
+                          color: '#7E22CE',
+                          fontWeight: 700,
+                          fontSize: '0.68rem',
+                        }}
                       />
                     )}
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 1 }}>
-                      <Avatar src={post.authorPhoto || undefined} sx={{ width: 32, height: 32, bgcolor: '#4F46E5', fontSize: '0.8rem' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.2 }}>
+                      <Avatar
+                        src={post.authorPhoto || undefined}
+                        sx={{ width: 34, height: 34, bgcolor: '#4F46E5', fontSize: '0.85rem', fontWeight: 700 }}
+                      >
                         {post.authorName?.[0] || 'U'}
                       </Avatar>
                       <Box>
@@ -893,7 +1211,7 @@ const WorkgroupWorkspaceDialog = ({
                       </Box>
                     </Box>
 
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0F172A', mb: 0.5 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0F172A', mb: 0.6 }}>
                       {post.title}
                     </Typography>
                     <Typography variant="body2" sx={{ color: '#334155', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
@@ -916,8 +1234,17 @@ const WorkgroupWorkspaceDialog = ({
                 ))}
               </Box>
             ) : (
-              <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: 3, border: '1px dashed #CBD5E1', bgcolor: '#FFF' }}>
-                <AnnouncementIcon sx={{ fontSize: 36, color: '#94A3B8', mb: 1 }} />
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 5,
+                  textAlign: 'center',
+                  borderRadius: 3,
+                  border: '1px dashed #CBD5E1',
+                  bgcolor: '#FFFFFF',
+                }}
+              >
+                <AnnouncementIcon sx={{ fontSize: 40, color: '#94A3B8', mb: 1 }} />
                 <Typography variant="body2" color="text.secondary">
                   No announcements yet. Post the first update to keep your team aligned!
                 </Typography>
@@ -930,7 +1257,16 @@ const WorkgroupWorkspaceDialog = ({
         {activeTab === 4 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <Typography
+                variant="subtitle2"
+                sx={{
+                  fontWeight: 700,
+                  color: '#475569',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  fontSize: '0.75rem',
+                }}
+              >
                 Shared Documents, Design & Repositories
               </Typography>
               <Button
@@ -938,23 +1274,36 @@ const WorkgroupWorkspaceDialog = ({
                 size="small"
                 startIcon={<AddIcon />}
                 onClick={() => setAddResourceOpen(true)}
-                sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 600 }}
+                sx={{
+                  borderRadius: 2,
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  bgcolor: '#4F46E5',
+                  '&:hover': { bgcolor: '#4338CA' },
+                }}
               >
                 Add Resource
               </Button>
             </Box>
 
             {resources.length > 0 ? (
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+                  gap: 2,
+                }}
+              >
                 {resources.map((item) => (
                   <Paper
                     key={item.id}
                     elevation={0}
                     sx={{
-                      p: 2,
+                      p: 2.2,
                       borderRadius: 3,
                       border: '1px solid #E2E8F0',
-                      bgcolor: '#FFF',
+                      bgcolor: '#FFFFFF',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
@@ -968,8 +1317,8 @@ const WorkgroupWorkspaceDialog = ({
                     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1 }}>
                       <Box
                         sx={{
-                          width: 40,
-                          height: 40,
+                          width: 38,
+                          height: 38,
                           borderRadius: 2,
                           bgcolor: '#F1F5F9',
                           display: 'flex',
@@ -1004,17 +1353,17 @@ const WorkgroupWorkspaceDialog = ({
                       </Typography>
                     )}
 
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto', pt: 1, borderTop: '1px solid #F1F5F9' }}>
-                      <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.7rem' }}>
-                        Added by {item.addedByName || 'Team member'}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto', pt: 1.2, borderTop: '1px solid #F1F5F9' }}>
+                      <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '0.72rem' }}>
+                        By {item.addedByName || 'Team member'}
                       </Typography>
                       <Button
                         size="small"
                         href={item.url.startsWith('http') ? item.url : `https://${item.url}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
-                        sx={{ textTransform: 'none', fontWeight: 600, fontSize: '0.75rem' }}
+                        endIcon={<OpenInNewIcon sx={{ fontSize: 13 }} />}
+                        sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.75rem', color: '#4F46E5' }}
                       >
                         Open
                       </Button>
@@ -1023,8 +1372,17 @@ const WorkgroupWorkspaceDialog = ({
                 ))}
               </Box>
             ) : (
-              <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: 3, border: '1px dashed #CBD5E1', bgcolor: '#FFF' }}>
-                <LinkIcon sx={{ fontSize: 36, color: '#94A3B8', mb: 1 }} />
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 5,
+                  textAlign: 'center',
+                  borderRadius: 3,
+                  border: '1px dashed #CBD5E1',
+                  bgcolor: '#FFFFFF',
+                }}
+              >
+                <LinkIcon sx={{ fontSize: 40, color: '#94A3B8', mb: 1 }} />
                 <Typography variant="body2" color="text.secondary">
                   No shared resources or links yet. Connect team Figma boards, repositories, or Google Drive folders.
                 </Typography>
@@ -1034,15 +1392,34 @@ const WorkgroupWorkspaceDialog = ({
         )}
       </DialogContent>
 
-      <DialogActions sx={{ p: 2, bgcolor: '#FFF', borderTop: '1px solid #E2E8F0' }}>
-        <Button onClick={onClose} variant="outlined" sx={{ borderRadius: 2, textTransform: 'none' }}>
+      {/* 4. DIALOG ACTIONS FOOTER */}
+      <DialogActions
+        sx={{
+          px: { xs: 2.5, sm: 3.5 },
+          py: 2,
+          bgcolor: '#FFFFFF',
+          borderTop: '1px solid #E2E8F0',
+          justifyContent: 'flex-end',
+          flexShrink: 0,
+        }}
+      >
+        <Button
+          onClick={onClose}
+          variant="outlined"
+          sx={{
+            borderRadius: 2,
+            textTransform: 'none',
+            fontWeight: 600,
+            px: 2.5,
+          }}
+        >
           Close Workspace
         </Button>
       </DialogActions>
 
-      {/* Sub-Dialog: Add Members */}
+      {/* SUB-DIALOG: ADD MEMBERS */}
       <Dialog open={addMemberDialogOpen} onClose={() => setAddMemberDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Add Members to {group.groupName}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Add Members to {group.groupName}</DialogTitle>
         <DialogContent dividers>
           <Autocomplete
             multiple
@@ -1050,20 +1427,29 @@ const WorkgroupWorkspaceDialog = ({
             getOptionLabel={(option) => `${option.firstName} ${option.lastName} (${option.designation || 'Staff'})`}
             value={selectedNewEmployees}
             onChange={(e, val) => setSelectedNewEmployees(val)}
-            renderInput={(params) => <TextField {...params} placeholder="Select colleagues to add..." label="Select Employees" />}
+            renderInput={(params) => (
+              <TextField {...params} placeholder="Select colleagues to add..." label="Select Employees" />
+            )}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAddMemberDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddMembers} disabled={!selectedNewEmployees.length}>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setAddMemberDialogOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleAddMembers}
+            disabled={!selectedNewEmployees.length}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
             Add to Group
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Sub-Dialog: Add Resource */}
+      {/* SUB-DIALOG: ADD RESOURCE */}
       <Dialog open={addResourceOpen} onClose={() => setAddResourceOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Add Shared Link / Resource</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Add Shared Link / Resource</DialogTitle>
         <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
             label="Resource Title"
@@ -1104,17 +1490,24 @@ const WorkgroupWorkspaceDialog = ({
             onChange={(e) => setNewResource({ ...newResource, description: e.target.value })}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAddResourceOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddResource} disabled={!newResource.title.trim() || !newResource.url.trim()}>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setAddResourceOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleAddResource}
+            disabled={!newResource.title.trim() || !newResource.url.trim()}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
             Save Resource
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Sub-Dialog: Create Task */}
+      {/* SUB-DIALOG: CREATE TASK */}
       <Dialog open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Create Task for Workgroup</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>Create Task for Workgroup</DialogTitle>
         <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
             label="Task Title"
@@ -1166,9 +1559,16 @@ const WorkgroupWorkspaceDialog = ({
             </Select>
           </FormControl>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateTaskOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleCreateTask} disabled={!newTask.title.trim() || !newTask.responsibleId}>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setCreateTaskOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateTask}
+            disabled={!newTask.title.trim() || !newTask.responsibleId}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
             Assign Task
           </Button>
         </DialogActions>
