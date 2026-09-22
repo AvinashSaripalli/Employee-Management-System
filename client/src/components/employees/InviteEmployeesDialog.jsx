@@ -434,38 +434,34 @@ const InviteEmployeesDialog = ({ open, onClose, onInviteSuccess }) => {
                     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                   }}
                 >
-                  {/* Mock Email Header */}
-                  <Box sx={{ background: 'linear-gradient(135deg, #14286D 0%, #1E3A8A 100%)', p: 2, textAlign: 'center', color: '#FFFFFF' }}>
-                    <Box
+                  {/* Vaultix-Style Brand Mark */}
+                  <Box sx={{ p: 2.5, pb: 1, textAlign: 'center', bgcolor: '#FFFFFF' }}>
+                    <Typography
                       sx={{
-                        display: 'inline-block',
-                        bgcolor: '#FFFFFF',
-                        color: '#14286D',
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: 1.5,
-                        fontWeight: 800,
-                        fontSize: '0.85rem',
-                        mb: 0.5,
+                        fontFamily: "'Segoe UI',Arial,sans-serif",
+                        fontSize: '22px',
+                        fontWeight: 700,
+                        color: '#0F172A',
+                        letterSpacing: '0.5px',
                       }}
                     >
-                      KN
-                    </Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#FFFFFF' }}>
-                      KN Advisors
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.8)' }}>
-                      Employee Portal Invitation
+                      <span style={{ color: '#14286D' }}>KN</span> Advisors
                     </Typography>
                   </Box>
 
+                  {/* Title with left accent bar matching Vaultix */}
+                  <Box sx={{ px: 2.5, mb: 1.5 }}>
+                    <Box sx={{ borderLeft: '4px solid #14286D', bgcolor: '#F8FAFC', p: 1.5, borderRadius: 1.5 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0F172A', fontSize: '1rem' }}>
+                        You're Invited to Join KN Advisors!
+                      </Typography>
+                    </Box>
+                  </Box>
+
                   {/* Mock Email Body */}
-                  <Box sx={{ p: 2 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, mb: 1 }}>
-                      Hello, {firstName || 'Team Member'}! 👋
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1.5 }}>
-                      You've been invited to join the team on the KN Advisors Employee Management System.
+                  <Box sx={{ px: 2.5, pb: 2.5 }}>
+                    <Typography variant="body2" sx={{ color: '#475569', lineHeight: 1.6, mb: 1.5 }}>
+                      Hello {firstName || 'Team Member'}! You have been registered by the administration on the <strong>KN Advisors</strong> Employee Portal.
                     </Typography>
 
                     {customMessage && (

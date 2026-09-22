@@ -350,21 +350,9 @@ const EmployeesList = ({ onClose }) => {
                 <TableCell align="left" sx={{ color: 'text.secondary' }}>{user.designation}</TableCell>
                 <TableCell align="left" sx={{ color: 'text.secondary' }}>{user.email}</TableCell>
                 <TableCell align="center">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0.5 }}>
-                    <Tooltip title="Send invite / onboarding email">
-                      <span>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleResendInvite(user)}
-                          disabled={sendingInviteUserId === user.id}
-                          sx={{ color: 'primary.main' }}
-                        >
-                          {sendingInviteUserId === user.id ? <CircularProgress size={16} /> : <FiMail size={18} />}
-                        </IconButton>
-                      </span>
-                    </Tooltip>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                     <Tooltip title="View profile">
-                      <IconButton size="small" onClick={() => handleViewUser(user)} sx={{ color: 'text.secondary' }}>
+                      <IconButton size="small" onClick={() => handleViewUser(user)} sx={{ color: 'primary.main' }}>
                         <FiEye size="19" />
                       </IconButton>
                     </Tooltip>

@@ -4,7 +4,8 @@ const http = require('http');
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-require('dotenv').config();
+require('dotenv').config({ override: true });
+// Reloaded with active MAIL_PASS
 
 const { verifyToken } = require('./middleware/authMiddleware');
 
