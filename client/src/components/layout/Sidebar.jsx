@@ -64,6 +64,7 @@ const Sidebar = () => {
       case 'Messenger': return <Messenger />;
       case 'CRM': return <Crm />;
       case 'Manage Leaves': return <ManageLeaves />;
+      case 'Time & Attendance':
       case 'Attendance': return <Attendance />;
       case 'Work Reports':
       case 'Reports': return <Reports />;
@@ -107,8 +108,8 @@ const Sidebar = () => {
       icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves')} />,
     },
     {
-      text: 'Attendance',
-      icon: <HiOutlineClock {...iconStyle(selectedComponent === 'Attendance')} />,
+      text: 'Time & Attendance',
+      icon: <HiOutlineClock {...iconStyle(selectedComponent === 'Time & Attendance' || selectedComponent === 'Attendance')} />,
     },
     {
       text: 'Work Reports',

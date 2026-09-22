@@ -55,7 +55,7 @@ function Login() {
         setSnackbar({ open: true, message: "Login successful!", severity: "success" });
 
         setTimeout(() => {
-          if (role === "Manager" || role === "Admin") {
+          if (role === "Admin") {
             navigate("/sidebar");
           } else {
             navigate("/employeesidebar");

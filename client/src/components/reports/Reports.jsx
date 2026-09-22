@@ -10,8 +10,6 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import SettingsIcon from '@mui/icons-material/Settings';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
-import PushPinIcon from '@mui/icons-material/PushPin';
-import PushPinOutlinedIcon from '@mui/icons-material/PushPinOutlined';
 import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
@@ -62,9 +60,9 @@ const Reports = () => {
   const [savingFeedback, setSavingFeedback] = useState(false);
   const [notice, setNotice] = useState('');
   const [showDueBanner, setShowDueBanner] = useState(true);
-  const [isPinned, setIsPinned] = useState(false);
-  const [showKpiCards, setShowKpiCards] = useState(true);
   const [collapsedDepts, setCollapsedDepts] = useState({});
+  const [leaves, setLeaves] = useState([]);
+  const [viewLeaveDialog, setViewLeaveDialog] = useState(null);
 
   const tableContainerRef = useRef(null);
 
@@ -81,7 +79,7 @@ const Reports = () => {
       ? 'KN Advisors'
       : storedCompany;
 
-  // Fetch all reports, users, and attendances for company (and filtered by department for supervisor)
+  // Fetch all reports, users, attendances, and approved leaves for company
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -92,7 +90,10 @@ const Reports = () => {
         params.supervisorDepartment = userDepartment;
       }
 
-      const [reportsRes, usersRes, attendanceRes] = await Promise.all([
+      const from = selectedMonth.startOf('month').format('YYYY-MM-DD');
+      const to = selectedMonth.endOf('month').format('YYYY-MM-DD');
+
+      const [reportsRes, usersRes, attendanceRes, leavesRes] = await Promise.all([
         axios.get('/reports', { params }).catch((err) => {
           console.error('Error in /reports:', err);
           return { data: [] };
@@ -105,19 +106,24 @@ const Reports = () => {
           console.error('Error in /attendance:', err);
           return { data: [] };
         }),
+        axios.get('/leaves/calendar', { params: { companyName, from, to } }).catch((err) => {
+          console.error('Error in /leaves/calendar:', err);
+          return { data: [] };
+        }),
       ]);
 
       setReports(reportsRes.data || []);
       setAttendances(attendanceRes.data || []);
       const activeUsers = (usersRes.data || []).filter((u) => u.exists !== 0);
       setUsers(activeUsers);
+      setLeaves(leavesRes.data || []);
     } catch (err) {
       console.error('Error loading reports data:', err);
       setError(err.response?.data?.error || 'Failed to load reports');
     } finally {
       setLoading(false);
     }
-  }, [companyName, isSupervisor, userDepartment]);
+  }, [companyName, isSupervisor, userDepartment, selectedMonth]);
 
   useEffect(() => {
     fetchData();
@@ -206,6 +212,25 @@ const Reports = () => {
     });
     return map;
   }, [attendances]);
+
+  // Map approved leaves by employee & dateKey
+  const leavesByEmpAndDate = useMemo(() => {
+    const map = {};
+    leaves.forEach((leave) => {
+      const empId = leave.employeeId ? String(leave.employeeId).trim().toLowerCase() : '';
+      const empName = (leave.employee_name || (leave.employee ? `${leave.employee.firstName || ''} ${leave.employee.lastName || ''}`.trim() : '')).trim().toLowerCase();
+      const start = dayjs(leave.start_date);
+      const end = dayjs(leave.end_date);
+      let curr = start;
+      while (curr.isBefore(end) || curr.isSame(end, 'day')) {
+        const dateKey = curr.format('YYYY-MM-DD');
+        if (empId) map[`${empId}_${dateKey}`] = leave;
+        if (empName) map[`${empName}_${dateKey}`] = leave;
+        curr = curr.add(1, 'day');
+      }
+    });
+    return map;
+  }, [leaves]);
 
   // Group employees by department with search and supervisor filtering
   const groupedDepartments = useMemo(() => {
@@ -484,22 +509,6 @@ const Reports = () => {
               sx={{ bgcolor: '#f1f5f9', color: '#475569', fontWeight: 700, fontSize: '11px' }}
             />
           )}
-
-          <Tooltip title={isPinned ? 'Unpin page' : 'Pin page'}>
-            <IconButton
-              size="small"
-              onClick={() => setIsPinned(!isPinned)}
-              sx={{
-                p: 0.5,
-                color: isPinned ? '#0284c7' : '#94a3b8',
-                transform: isPinned ? 'rotate(0deg)' : 'rotate(45deg)',
-                transition: 'all 0.2s',
-                '&:hover': { color: '#0284c7' },
-              }}
-            >
-              {isPinned ? <PushPinIcon sx={{ fontSize: 19 }} /> : <PushPinOutlinedIcon sx={{ fontSize: 19 }} />}
-            </IconButton>
-          </Tooltip>
         </Box>
 
         {/* Header Action Buttons */}
@@ -543,170 +552,6 @@ const Reports = () => {
           </Button>
         </Box>
       </Box>
-
-      {/* KPI Metric Overview Cards */}
-      {showKpiCards && (
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-            gap: 1.5,
-            mb: 2.5,
-          }}
-        >
-          {/* Total Reports */}
-          <Paper
-            elevation={0}
-            sx={{
-              p: 1.75,
-              borderRadius: '10px',
-              border: '1px solid #e2e8f0',
-              bgcolor: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.75,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-            }}
-          >
-            <Box
-              sx={{
-                width: 42,
-                height: 42,
-                borderRadius: '8px',
-                bgcolor: '#e0f2fe',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#0284c7',
-              }}
-            >
-              <AssignmentTurnedInIcon sx={{ fontSize: 22 }} />
-            </Box>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', fontSize: '11px' }}>
-                Total Reports
-              </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-                {monthKpis.totalReports}
-              </Typography>
-            </Box>
-          </Paper>
-
-          {/* Clock-Ins Tracked */}
-          <Paper
-            elevation={0}
-            sx={{
-              p: 1.75,
-              borderRadius: '10px',
-              border: '1px solid #e2e8f0',
-              bgcolor: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.75,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-            }}
-          >
-            <Box
-              sx={{
-                width: 42,
-                height: 42,
-                borderRadius: '8px',
-                bgcolor: '#ecfdf5',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#059669',
-              }}
-            >
-              <AccessTimeIcon sx={{ fontSize: 22 }} />
-            </Box>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', fontSize: '11px' }}>
-                Clock-In Sessions
-              </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-                {monthKpis.totalClockIns}
-              </Typography>
-            </Box>
-          </Paper>
-
-          {/* Reviewed Rate */}
-          <Paper
-            elevation={0}
-            sx={{
-              p: 1.75,
-              borderRadius: '10px',
-              border: '1px solid #e2e8f0',
-              bgcolor: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.75,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-            }}
-          >
-            <Box
-              sx={{
-                width: 42,
-                height: 42,
-                borderRadius: '8px',
-                bgcolor: '#fef3c7',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#d97706',
-              }}
-            >
-              <RateReviewOutlinedIcon sx={{ fontSize: 22 }} />
-            </Box>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', fontSize: '11px' }}>
-                Feedback Rate
-              </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-                {monthKpis.reviewRate}
-              </Typography>
-            </Box>
-          </Paper>
-
-          {/* Active Contributors */}
-          <Paper
-            elevation={0}
-            sx={{
-              p: 1.75,
-              borderRadius: '10px',
-              border: '1px solid #e2e8f0',
-              bgcolor: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1.75,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-            }}
-          >
-            <Box
-              sx={{
-                width: 42,
-                height: 42,
-                borderRadius: '8px',
-                bgcolor: '#f3e8ff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#7c3aed',
-              }}
-            >
-              <PeopleAltOutlinedIcon sx={{ fontSize: 22 }} />
-            </Box>
-            <Box>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', fontSize: '11px' }}>
-                Active Members
-              </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-                {monthKpis.activeContributors}
-              </Typography>
-            </Box>
-          </Paper>
-        </Box>
-      )}
 
       {/* Latest Report Alert Strip */}
       {latestReport && (
@@ -1008,10 +853,6 @@ const Reports = () => {
               <MenuItem onClick={handleExportCSV} sx={{ fontSize: '13px', gap: 1.5, py: 1 }}>
                 <DownloadIcon fontSize="small" sx={{ color: '#0284c7' }} /> Export CSV
               </MenuItem>
-              <MenuItem onClick={() => { setShowKpiCards(!showKpiCards); setSettingsAnchor(null); }} sx={{ fontSize: '13px', gap: 1.5, py: 1 }}>
-                <CheckCircleOutlineIcon fontSize="small" sx={{ color: '#64748b' }} />
-                {showKpiCards ? 'Hide Overview Cards' : 'Show Overview Cards'}
-              </MenuItem>
               <Divider sx={{ my: 0.5 }} />
               <MenuItem onClick={() => { fetchData(); setSettingsAnchor(null); }} sx={{ fontSize: '13px', gap: 1.5, py: 1 }}>
                 <RefreshIcon fontSize="small" sx={{ color: '#64748b' }} /> Refresh Data
@@ -1078,9 +919,9 @@ const Reports = () => {
                     color: '#1e3a5f',
                     fontWeight: 700,
                     fontSize: '13px',
-                    width: 230,
-                    minWidth: 230,
-                    maxWidth: 230,
+                    width: 250,
+                    minWidth: 250,
+                    maxWidth: 250,
                     position: 'sticky',
                     left: 0,
                     zIndex: 4,
@@ -1163,9 +1004,9 @@ const Reports = () => {
                       bgcolor: day.isToday ? '#e0f2fe' : '#dff0f8',
                       color: '#1e3a5f',
                       fontWeight: 600,
-                      width: 52,
-                      minWidth: 52,
-                      maxWidth: 52,
+                      width: 58,
+                      minWidth: 58,
+                      maxWidth: 58,
                       borderRight: '1px solid #cbdde9',
                       borderBottom: '1px solid #cbdde9',
                       px: 0.2,
@@ -1305,9 +1146,9 @@ const Reports = () => {
                                 sx={{
                                   py: 1,
                                   px: 1.5,
-                                  width: 240,
-                                  minWidth: 240,
-                                  maxWidth: 240,
+                                  width: 250,
+                                  minWidth: 250,
+                                  maxWidth: 250,
                                   position: 'sticky',
                                   left: 0,
                                   zIndex: 2,
@@ -1321,8 +1162,8 @@ const Reports = () => {
                                   <Avatar
                                     src={emp.photo || ''}
                                     sx={{
-                                      width: 28,
-                                      height: 28,
+                                      width: 30,
+                                      height: 30,
                                       fontSize: '11px',
                                       fontWeight: 700,
                                       bgcolor: '#0284c7',
@@ -1332,17 +1173,18 @@ const Reports = () => {
                                   >
                                     {initials}
                                   </Avatar>
-                                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                                  <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'nowrap' }}>
                                       <Typography
                                         sx={{
-                                          fontSize: '12.5px',
+                                          fontSize: '13px',
                                           color: '#0b66c3',
                                           fontWeight: 600,
                                           overflow: 'hidden',
                                           textOverflow: 'ellipsis',
                                           whiteSpace: 'nowrap',
                                           cursor: 'pointer',
+                                          lineHeight: 1.2,
                                           '&:hover': { textDecoration: 'underline' },
                                         }}
                                         title={emp.name}
@@ -1368,11 +1210,12 @@ const Reports = () => {
                                           }}
                                           sx={{
                                             height: 16,
-                                            fontSize: '9.5px',
+                                            fontSize: '9px',
                                             fontWeight: 700,
                                             bgcolor: '#e0f2fe',
                                             color: '#0369a1',
                                             cursor: 'pointer',
+                                            flexShrink: 0,
                                             '&:hover': { bgcolor: '#bae6fd' },
                                           }}
                                         />
@@ -1380,12 +1223,12 @@ const Reports = () => {
                                     </Box>
 
                                     {/* Department & Designation Information */}
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, flexWrap: 'wrap', mt: 0.35 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, flexWrap: 'nowrap', mt: 0.35, minWidth: 0, overflow: 'hidden' }}>
                                       <Chip
                                         label={emp.department || 'General'}
                                         size="small"
                                         sx={{
-                                          height: 17,
+                                          height: 18,
                                           fontSize: '9.5px',
                                           fontWeight: 700,
                                           bgcolor: '#e0f2fe',
@@ -1393,22 +1236,25 @@ const Reports = () => {
                                           border: '1px solid #bae6fd',
                                           borderRadius: '4px',
                                           px: 0.5,
+                                          flexShrink: 0,
                                           '& .MuiChip-label': { px: 0.5 },
                                         }}
                                       />
                                       <Typography
                                         variant="caption"
                                         sx={{
-                                          fontSize: '10.5px',
+                                          fontSize: '11px',
                                           color: '#64748b',
-                                          display: 'block',
                                           lineHeight: 1.1,
                                           overflow: 'hidden',
                                           textOverflow: 'ellipsis',
                                           whiteSpace: 'nowrap',
+                                          minWidth: 0,
+                                          flex: 1,
                                         }}
+                                        title={emp.designation || ''}
                                       >
-                                        {emp.employeeId ? `${emp.employeeId} · ` : ''}{emp.designation || ''}
+                                        {emp.designation || ''}
                                       </Typography>
                                     </Box>
                                   </Box>
@@ -1484,13 +1330,23 @@ const Reports = () => {
                                   (nameKey && attendancesByEmpAndDate[nameKey]) ||
                                   null;
 
+                                // Check for approved leave
+                                const leave =
+                                  (idKey && leavesByEmpAndDate[idKey]) ||
+                                  (nameKey && leavesByEmpAndDate[nameKey]) ||
+                                  null;
+
                                 return (
                                   <TableCell
                                     key={day.dateKey}
                                     align="center"
                                     sx={{
                                       p: '2px',
-                                      height: 38,
+                                      height: 44,
+                                      width: 58,
+                                      minWidth: 58,
+                                      maxWidth: 58,
+                                      verticalAlign: 'middle',
                                       borderRight: '1px solid #edf2f7',
                                       borderBottom: '1px solid #edf2f7',
                                       bgcolor: day.isToday
@@ -1523,50 +1379,54 @@ const Reports = () => {
                                         }
                                         arrow
                                       >
-                                        <Button
-                                          size="small"
+                                        <Box
                                           onClick={() => setViewReport(report)}
                                           sx={{
-                                            minWidth: 'auto',
-                                            px: 0.75,
-                                            py: 0.25,
-                                            bgcolor: report.feedback && report.feedback !== 'Pending' ? '#94a3b8' : '#adb5bd',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            width: 48,
+                                            height: 24,
+                                            mx: 'auto',
+                                            borderRadius: '4px',
+                                            bgcolor: report.feedback && report.feedback !== 'Pending' ? '#94a3b8' : '#0284c7',
                                             color: '#ffffff',
-                                            fontSize: '11px',
-                                            fontWeight: 600,
-                                            lineHeight: 1.15,
-                                            textTransform: 'none',
-                                            borderRadius: '3px',
-                                            boxShadow: 'none',
+                                            fontSize: '10px',
+                                            fontWeight: 700,
+                                            cursor: 'pointer',
+                                            userSelect: 'none',
                                             transition: 'all 0.15s ease',
                                             '&:hover': {
-                                              bgcolor: '#64748b',
-                                              transform: 'translateY(-1px)',
-                                              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                              bgcolor: report.feedback && report.feedback !== 'Pending' ? '#64748b' : '#0369a1',
+                                              transform: 'scale(1.04)',
+                                              boxShadow: '0 2px 4px rgba(2, 132, 199, 0.2)',
                                             },
                                           }}
                                         >
                                           Report
-                                        </Button>
+                                        </Box>
                                       </Tooltip>
                                     ) : attendance ? (
                                       <Tooltip
                                         title={
                                           <Box sx={{ p: 0.5 }}>
-                                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#fef08a', display: 'block' }}>
-                                              Clocked In ({attendance.clockInTime})
+                                            <Typography variant="caption" sx={{ fontWeight: 800, color: '#fef08a', display: 'block' }}>
+                                              Report Not Yet Submitted
                                             </Typography>
-                                            {attendance.clockOutTime ? (
-                                              <Typography variant="caption" sx={{ color: '#e2e8f0', display: 'block' }}>
-                                                Clocked Out: {attendance.clockOutTime} (Worked: {attendance.workedTime || '—'})
-                                              </Typography>
-                                            ) : (
-                                              <Typography variant="caption" sx={{ color: '#86efac', display: 'block' }}>
-                                                Currently Active Shift
+                                            <Typography variant="caption" sx={{ color: '#ffffff', display: 'block', mt: 0.2 }}>
+                                              🕒 Clock In: {attendance.clockInTime}
+                                              {attendance.clockOutTime ? ` · Out: ${attendance.clockOutTime}` : ' (Working)'}
+                                            </Typography>
+                                            {attendance.workedTime && (
+                                              <Typography variant="caption" sx={{ color: '#93c5fd', display: 'block' }}>
+                                                Worked: {attendance.workedTime}
                                               </Typography>
                                             )}
-                                            <Typography variant="caption" sx={{ color: '#cbd5e1', fontSize: '10px' }}>
-                                              Work report not yet submitted
+                                            <Typography variant="caption" sx={{ color: '#fca5a5', display: 'block', mt: 0.3, fontSize: '10.5px', fontWeight: 600 }}>
+                                              ⚠️ Work report not yet submitted
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'block', mt: 0.2, fontSize: '10px' }}>
+                                              Click to view session details
                                             </Typography>
                                           </Box>
                                         }
@@ -1575,25 +1435,90 @@ const Reports = () => {
                                         <Box
                                           onClick={() => setViewAttendanceOnly({ attendance, emp, date: day.dateKey })}
                                           sx={{
-                                            display: 'inline-flex',
+                                            display: 'flex',
+                                            flexDirection: 'column',
                                             alignItems: 'center',
-                                            px: 0.6,
-                                            py: 0.2,
-                                            borderRadius: '3px',
-                                            bgcolor: '#fef3c7',
-                                            color: '#92400e',
-                                            fontSize: '10px',
-                                            fontWeight: 700,
+                                            justifyContent: 'center',
+                                            width: 48,
+                                            height: 24,
+                                            mx: 'auto',
+                                            borderRadius: '4px',
+                                            bgcolor: '#fffbeb',
                                             border: '1px solid #fde68a',
                                             cursor: 'pointer',
-                                            lineHeight: 1.1,
-                                            '&:hover': { bgcolor: '#fde68a' },
+                                            userSelect: 'none',
+                                            transition: 'all 0.15s ease',
+                                            '&:hover': {
+                                              bgcolor: '#fef3c7',
+                                              borderColor: '#f59e0b',
+                                              transform: 'scale(1.04)',
+                                              boxShadow: '0 2px 4px rgba(180, 83, 9, 0.15)',
+                                            },
                                           }}
                                         >
-                                          🕒 {attendance.clockInTime ? attendance.clockInTime.slice(0, 5) : 'In'}
+                                          <Typography sx={{ fontSize: '7.5px', fontWeight: 800, color: '#b45309', lineHeight: 1 }}>
+                                            Not
+                                          </Typography>
+                                          <Typography sx={{ fontSize: '7.5px', fontWeight: 800, color: '#b45309', lineHeight: 1, mt: 0.15 }}>
+                                            Submitted
+                                          </Typography>
                                         </Box>
                                       </Tooltip>
-                                    ) : null}
+                                    ) : leave ? (
+                                      <Tooltip
+                                        title={
+                                          <Box sx={{ p: 0.5 }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 800, color: '#fca5a5', display: 'block' }}>
+                                              On Leave (Approved)
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: '#ffffff', display: 'block', mt: 0.2 }}>
+                                              Type: {leave.leave_type || 'Leave'} {leave.half_day ? `(${leave.half_day_session || 'Half Day'})` : ''}
+                                            </Typography>
+                                            {leave.reason && (
+                                              <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'block', mt: 0.2, fontStyle: 'italic' }}>
+                                                &ldquo;{leave.reason}&rdquo;
+                                              </Typography>
+                                            )}
+                                            <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mt: 0.3, fontSize: '10px' }}>
+                                              {formatDate(leave.start_date)} to {formatDate(leave.end_date)}
+                                            </Typography>
+                                          </Box>
+                                        }
+                                        arrow
+                                      >
+                                        <Box
+                                          onClick={() => setViewLeaveDialog({ leave, emp, date: day.dateKey })}
+                                          sx={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            width: 48,
+                                            height: 24,
+                                            mx: 'auto',
+                                            borderRadius: '4px',
+                                            bgcolor: '#fef2f2',
+                                            border: '1px solid #fecaca',
+                                            cursor: 'pointer',
+                                            userSelect: 'none',
+                                            transition: 'all 0.15s ease',
+                                            '&:hover': {
+                                              bgcolor: '#fee2e2',
+                                              borderColor: '#f87171',
+                                              transform: 'scale(1.04)',
+                                              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.15)',
+                                            },
+                                          }}
+                                        >
+                                          <Typography sx={{ fontSize: '8px', fontWeight: 800, color: '#dc2626', lineHeight: 1 }}>
+                                            On Leave
+                                          </Typography>
+                                        </Box>
+                                      </Tooltip>
+                                    ) : (
+                                      <Typography sx={{ fontSize: '11px', color: day.isWeekend ? '#cbd5e1' : '#e2e8f0', userSelect: 'none', lineHeight: '24px' }}>
+                                        —
+                                      </Typography>
+                                    )}
                                   </TableCell>
                                 );
                               })}
@@ -1852,8 +1777,8 @@ const Reports = () => {
         PaperProps={{ sx: { borderRadius: '12px' } }}
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>
-            Attendance Record
+          <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '16px', color: '#b45309' }}>
+            Report Not Yet Submitted
           </Typography>
           <IconButton size="small" onClick={() => setViewAttendanceOnly(null)}>
             <CloseIcon fontSize="small" />
@@ -1879,7 +1804,7 @@ const Reports = () => {
                   Worked Time: <strong>{viewAttendanceOnly.attendance?.workedTime}</strong>
                 </Typography>
               )}
-              <Alert severity="info" sx={{ mt: 1, fontSize: '12.5px' }}>
+              <Alert severity="warning" sx={{ mt: 1, fontSize: '12.5px' }}>
                 This employee clocked in on this date, but has not yet submitted their daily work report.
               </Alert>
             </Stack>
@@ -1887,6 +1812,58 @@ const Reports = () => {
         </DialogContent>
         <DialogActions sx={{ px: 2.5, py: 1.5 }}>
           <Button onClick={() => setViewAttendanceOnly(null)} sx={{ textTransform: 'none', fontWeight: 600 }}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Approved Leave Details Dialog */}
+      <Dialog
+        open={!!viewLeaveDialog}
+        onClose={() => setViewLeaveDialog(null)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '12px' } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, fontSize: '16px', color: '#dc2626' }}>
+            On Approved Leave
+          </Typography>
+          <IconButton size="small" onClick={() => setViewLeaveDialog(null)}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ py: 2 }}>
+          {viewLeaveDialog && (
+            <Stack spacing={1.5}>
+              <Typography variant="body2" sx={{ color: '#334155' }}>
+                Employee: <strong>{viewLeaveDialog.emp?.name}</strong>
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#334155' }}>
+                Leave Type: <strong>{viewLeaveDialog.leave?.leave_type || 'Leave'}</strong>
+                {viewLeaveDialog.leave?.half_day ? ` (${viewLeaveDialog.leave?.half_day_session || 'Half Day'})` : ''}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#334155' }}>
+                Period: <strong>{formatDate(viewLeaveDialog.leave?.start_date)}</strong> to <strong>{formatDate(viewLeaveDialog.leave?.end_date)}</strong>
+              </Typography>
+              {viewLeaveDialog.leave?.days && (
+                <Typography variant="body2" sx={{ color: '#334155' }}>
+                  Total Duration: <strong>{viewLeaveDialog.leave.days} day(s)</strong>
+                </Typography>
+              )}
+              {viewLeaveDialog.leave?.reason && (
+                <Typography variant="body2" sx={{ color: '#334155' }}>
+                  Reason: <em>&ldquo;{viewLeaveDialog.leave.reason}&rdquo;</em>
+                </Typography>
+              )}
+              <Alert severity="success" sx={{ mt: 1, fontSize: '12.5px' }}>
+                This leave has been officially approved. The employee is on approved leave for this date.
+              </Alert>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 2.5, py: 1.5 }}>
+          <Button onClick={() => setViewLeaveDialog(null)} sx={{ textTransform: 'none', fontWeight: 600 }}>
             Close
           </Button>
         </DialogActions>

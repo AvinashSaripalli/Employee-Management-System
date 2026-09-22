@@ -23,6 +23,7 @@ import Messenger from '../messenger/Messenger';
 import Workgroups from '../workgroups/Workgroups';
 import Crm from '../crm/Crm';
 import Attendance from '../attendance/Attendance';
+import Reports from '../reports/Reports';
 import WorkReportFormDialog from '../reports/WorkReportFormDialog';
 import axios from '../../api/axios';
 
@@ -233,13 +234,22 @@ const Sidebar = () => {
     }, 350);
   };
 
+  const userRole = localStorage.getItem('userRole') || 'Employee';
+  const isSupervisor = userRole === 'Manager';
+
   const renderComponent = () => {
     switch (selectedComponent) {
-      case 'Tasks': return <TasksProjects />;
+      case 'Tasks':
+      case 'Tasks and Projects': return <TasksProjects />;
       case 'Work Groups': return <Workgroups />;
+      case 'Time & Attendance':
       case 'Attendance':
-      case 'My Attendance': return <Attendance />;
-      case 'Work Reports': return <WorkReports />;
+      case 'My Attendance':
+      case 'My Work Time': return <Attendance />;
+      case 'Work Reports':
+      case 'My Work Reports': return <WorkReports />;
+      case 'Department Reports':
+      case 'Reports': return <Reports />;
       case 'Messenger': return <Messenger />;
       case 'CRM': return <Crm />;
       case 'Apply Leave': return <ApplyLeave />;
@@ -269,7 +279,7 @@ const Sidebar = () => {
       {todayRecord?.clockInTime && (
         <Tooltip title="Click to view all your clock-in & clock-out times">
           <Box
-            onClick={() => handleListItemOnClick('My Attendance')}
+            onClick={() => handleListItemOnClick(isSupervisor ? 'Time & Attendance' : 'My Work Time')}
             sx={{
               display: { xs: 'none', sm: 'flex' },
               alignItems: 'center',
@@ -333,48 +343,95 @@ const Sidebar = () => {
   );
 
   const iconStyle = (active) => ({ size: 22, color: active ? '#fff' : undefined });
-  const navItems = [
-    {
-      text: 'Tasks',
-      icon: <HiOutlineClipboardDocumentCheck {...iconStyle(selectedComponent === 'Tasks')} />,
-    },
-    {
-      text: 'Work Groups',
-      icon: <HiOutlineUserGroup {...iconStyle(selectedComponent === 'Work Groups')} />,
-    },
-    {
-      text: 'My Attendance',
-      icon: <HiOutlineClock {...iconStyle(selectedComponent === 'My Attendance' || selectedComponent === 'Attendance')} />,
-    },
-    {
-      text: 'Work Reports',
-      icon: <HiOutlineChartBar {...iconStyle(selectedComponent === 'Work Reports')} />,
-    },
-    {
-      text: 'Messenger',
-      icon: <HiOutlineChatBubbleLeftRight {...iconStyle(selectedComponent === 'Messenger')} />,
-    },
-    {
-      text: 'CRM',
-      icon: <HiOutlineBriefcase {...iconStyle(selectedComponent === 'CRM')} />,
-    },
-    {
-      text: 'Apply Leave',
-      icon: <HiOutlineDocumentText {...iconStyle(selectedComponent === 'Apply Leave')} />,
-    },
-    {
-      text: 'My Leaves',
-      icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'My Leaves')} />,
-    },
-    ...(canReviewLeaves ? [{
-      text: 'Manage Leaves',
-      icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves')} />,
-    }] : []),
-    {
-      text: 'Profile',
-      icon: <HiOutlineUserCircle {...iconStyle(selectedComponent === 'Profile')} />,
-    },
-  ];
+  const navItems = isSupervisor
+    ? [
+        {
+          text: 'Tasks',
+          icon: <HiOutlineClipboardDocumentCheck {...iconStyle(selectedComponent === 'Tasks' || selectedComponent === 'Tasks and Projects')} />,
+        },
+        {
+          text: 'Work Groups',
+          icon: <HiOutlineUserGroup {...iconStyle(selectedComponent === 'Work Groups')} />,
+        },
+        {
+          text: 'Time & Attendance',
+          icon: <HiOutlineClock {...iconStyle(selectedComponent === 'Time & Attendance' || selectedComponent === 'Attendance' || selectedComponent === 'My Work Time')} />,
+        },
+        {
+          text: 'Department Reports',
+          icon: <HiOutlineChartBar {...iconStyle(selectedComponent === 'Department Reports' || selectedComponent === 'Reports')} />,
+        },
+        {
+          text: 'My Work Reports',
+          icon: <HiOutlineDocumentText {...iconStyle(selectedComponent === 'My Work Reports' || selectedComponent === 'Work Reports')} />,
+        },
+        {
+          text: 'Messenger',
+          icon: <HiOutlineChatBubbleLeftRight {...iconStyle(selectedComponent === 'Messenger')} />,
+        },
+        {
+          text: 'CRM',
+          icon: <HiOutlineBriefcase {...iconStyle(selectedComponent === 'CRM')} />,
+        },
+        {
+          text: 'Apply Leave',
+          icon: <HiOutlineDocumentText {...iconStyle(selectedComponent === 'Apply Leave')} />,
+        },
+        {
+          text: 'My Leaves',
+          icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'My Leaves')} />,
+        },
+        {
+          text: 'Manage Leaves',
+          icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves')} />,
+        },
+        {
+          text: 'Profile',
+          icon: <HiOutlineUserCircle {...iconStyle(selectedComponent === 'Profile')} />,
+        },
+      ]
+    : [
+        {
+          text: 'Tasks',
+          icon: <HiOutlineClipboardDocumentCheck {...iconStyle(selectedComponent === 'Tasks')} />,
+        },
+        {
+          text: 'Work Groups',
+          icon: <HiOutlineUserGroup {...iconStyle(selectedComponent === 'Work Groups')} />,
+        },
+        {
+          text: 'My Work Time',
+          icon: <HiOutlineClock {...iconStyle(selectedComponent === 'My Work Time' || selectedComponent === 'My Attendance' || selectedComponent === 'Attendance')} />,
+        },
+        {
+          text: 'Work Reports',
+          icon: <HiOutlineChartBar {...iconStyle(selectedComponent === 'Work Reports')} />,
+        },
+        {
+          text: 'Messenger',
+          icon: <HiOutlineChatBubbleLeftRight {...iconStyle(selectedComponent === 'Messenger')} />,
+        },
+        {
+          text: 'CRM',
+          icon: <HiOutlineBriefcase {...iconStyle(selectedComponent === 'CRM')} />,
+        },
+        {
+          text: 'Apply Leave',
+          icon: <HiOutlineDocumentText {...iconStyle(selectedComponent === 'Apply Leave')} />,
+        },
+        {
+          text: 'My Leaves',
+          icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'My Leaves')} />,
+        },
+        ...(canReviewLeaves ? [{
+          text: 'Manage Leaves',
+          icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves')} />,
+        }] : []),
+        {
+          text: 'Profile',
+          icon: <HiOutlineUserCircle {...iconStyle(selectedComponent === 'Profile')} />,
+        },
+      ];
 
   return (
     <>

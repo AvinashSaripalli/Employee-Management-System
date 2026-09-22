@@ -12,6 +12,18 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+const AdminRoute = ({ children }) => {
+  const token = localStorage.getItem('token');
+  const role = localStorage.getItem('userRole');
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  if (role !== 'Admin') {
+    return <Navigate to="/employeesidebar" replace />;
+  }
+  return children;
+};
+
 const HomeRedirect = () => {
   const token = localStorage.getItem('token');
   const role = localStorage.getItem('userRole');
@@ -19,7 +31,9 @@ const HomeRedirect = () => {
   if (!token) {
     return <Navigate to="/login" replace />;
   }
-  if (role === 'Manager' || role === 'Admin') {
+  // Only Admin has access to the full company admin portal
+  // Department Supervisors / Managers are employees and use the employee portal
+  if (role === 'Admin') {
     return <Navigate to="/sidebar" replace />;
   }
   return <Navigate to="/employeesidebar" replace />;
@@ -35,9 +49,9 @@ function App() {
         <Route
           path="/sidebar"
           element={
-            <ProtectedRoute>
+            <AdminRoute>
               <Sidebar />
-            </ProtectedRoute>
+            </AdminRoute>
           }
         />
         <Route
