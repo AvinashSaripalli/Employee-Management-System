@@ -123,6 +123,19 @@ User.hasMany(Leave, {
   constraints: false,
 });
 
+Report.belongsTo(User, {
+  foreignKey: "employeeId",
+  targetKey: "employeeId",
+  as: "employee",
+  constraints: false,
+});
+User.hasMany(Report, {
+  foreignKey: "employeeId",
+  sourceKey: "employeeId",
+  as: "reports",
+  constraints: false,
+});
+
 module.exports = {
   sequelize,
   User,

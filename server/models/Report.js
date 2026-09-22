@@ -12,6 +12,10 @@ const Report = sequelize.define(
     employeeId: {
       type: DataTypes.STRING,
     },
+    employeeName: {
+      type: DataTypes.STRING,
+      field: "employee_name",
+    },
     companyName: {
       type: DataTypes.STRING,
     },
@@ -33,8 +37,27 @@ const Report = sequelize.define(
       type: DataTypes.FLOAT,
       field: "hours_worked",
     },
+    clockInTime: {
+      type: DataTypes.TIME,
+      field: "clock_in_time",
+    },
+    clockOutTime: {
+      type: DataTypes.TIME,
+      field: "clock_out_time",
+    },
+    status: {
+      type: DataTypes.STRING,
+      defaultValue: "Submitted",
+    },
     feedback: {
       type: DataTypes.TEXT,
+      defaultValue: "Pending",
+    },
+    updatedAt: {
+      type: DataTypes.DATE,
+      field: "updated_at",
+      allowNull: true,
+      defaultValue: DataTypes.NOW,
     },
   },
   {
@@ -42,6 +65,11 @@ const Report = sequelize.define(
     underscored: true,
     createdAt: "created_at",
     updatedAt: false,
+    hooks: {
+      beforeUpdate: (report) => {
+        report.updatedAt = new Date();
+      },
+    },
   }
 );
 

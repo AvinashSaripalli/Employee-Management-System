@@ -1,7 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Box, Typography, Snackbar, Alert } from '@mui/material';
-import { HiOutlineClipboardDocumentCheck, HiOutlineChartBar, HiOutlineDocumentText, HiOutlineCalendarDays, HiOutlineUserCircle, HiOutlineChatBubbleLeftRight, HiOutlineBriefcase, HiOutlineUserGroup } from 'react-icons/hi2';
+import { Button, Box, Typography, Snackbar, Alert, Tooltip } from '@mui/material';
+import {
+  HiOutlineClipboardDocumentCheck,
+  HiOutlineChartBar,
+  HiOutlineDocumentText,
+  HiOutlineCalendarDays,
+  HiOutlineUserCircle,
+  HiOutlineChatBubbleLeftRight,
+  HiOutlineBriefcase,
+  HiOutlineUserGroup,
+  HiOutlineClock,
+} from 'react-icons/hi2';
 import AppShell from './AppShell';
 import ApplyLeave from '../leaves/ApplyLeave';
 import MyLeaves from '../leaves/MyLeaves';
@@ -12,6 +22,8 @@ import TasksProjects from '../tasks/TasksProjects';
 import Messenger from '../messenger/Messenger';
 import Workgroups from '../workgroups/Workgroups';
 import Crm from '../crm/Crm';
+import Attendance from '../attendance/Attendance';
+import WorkReportFormDialog from '../reports/WorkReportFormDialog';
 import axios from '../../api/axios';
 
 const Sidebar = () => {
@@ -22,11 +34,13 @@ const Sidebar = () => {
   const [userPhoto, setUserPhoto] = useState('');
   const [userName, setUserName] = useState('');
   const [clockedIn, setClockedIn] = useState(false);
+  const [todayRecord, setTodayRecord] = useState(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [clockInterval, setClockInterval] = useState(null);
   const [showContinueWorking, setShowContinueWorking] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [canReviewLeaves, setCanReviewLeaves] = useState(false);
+  const [openReportDialog, setOpenReportDialog] = useState(false);
 
   const navigate = useNavigate();
 
@@ -52,45 +66,107 @@ const Sidebar = () => {
   }, []);
 
   const startTimer = () => {
+    if (clockInterval) clearInterval(clockInterval);
     const interval = setInterval(() => {
       setElapsedSeconds((prev) => prev + 1);
     }, 1000);
     setClockInterval(interval);
   };
 
+  // Restore active clock-in session on mount
+  useEffect(() => {
+    const employeeId = localStorage.getItem('userEmployeeId');
+    const storedCompany = localStorage.getItem('companyName');
+    const companyName =
+      !storedCompany || storedCompany === 'null' || storedCompany === 'undefined'
+        ? 'KN Advisors'
+        : storedCompany;
+
+    if (!employeeId) return;
+
+    axios
+      .get('/attendance/status', { params: { employeeId, companyName } })
+      .then((res) => {
+        if (res.data?.clockedIn && res.data?.activeRecord) {
+          const active = res.data.activeRecord;
+          setClockedIn(true);
+          setTodayRecord(active);
+          setShowContinueWorking(false);
+
+          if (active.clockInTime) {
+            const [ch, cm, cs] = active.clockInTime.split(':').map(Number);
+            const now = new Date();
+            const startD = active.clockInDate ? new Date(`${active.clockInDate}T00:00:00`) : new Date();
+            startD.setHours(ch || 0, cm || 0, cs || 0, 0);
+
+            const diffSecs = Math.max(0, Math.floor((now.getTime() - startD.getTime()) / 1000));
+            setElapsedSeconds(diffSecs);
+          }
+          startTimer();
+        } else if (res.data?.dateRecords && res.data.dateRecords.length > 0) {
+          const lastRecord = res.data.dateRecords[res.data.dateRecords.length - 1];
+          setTodayRecord(lastRecord);
+        }
+      })
+      .catch((err) => console.error('Error checking active clock-in status:', err));
+
+    return () => {
+      if (clockInterval) clearInterval(clockInterval);
+    };
+  }, []);
+
+  const getLocalDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getLocalTimeString = () => {
+    const d = new Date();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+  };
+
   const handleClockIn = () => {
     setLoading(true);
 
-    const formatDateForMySQL = (date) => {
-      return date.toISOString().slice(0, 10);
-    };
-
-    const formatTimeForMySQL = (date) => {
-      return date.toTimeString().split(' ')[0];
-    };
+    const storedCompany = localStorage.getItem('companyName');
+    const effectiveCompany =
+      !storedCompany || storedCompany === 'null' || storedCompany === 'undefined'
+        ? 'KN Advisors'
+        : storedCompany;
 
     const userDetails = {
-      companyName: localStorage.getItem('companyName'),
+      companyName: effectiveCompany,
       department: localStorage.getItem('userDepartment'),
       firstName: localStorage.getItem('userFirstName'),
       lastName: localStorage.getItem('userLastName'),
       email: localStorage.getItem('userEmail'),
       employeeId: localStorage.getItem('userEmployeeId'),
       designation: localStorage.getItem('userDesignation'),
-      clockInDate: formatDateForMySQL(new Date()),
-      clockInTime: formatTimeForMySQL(new Date()),
+      clockInDate: getLocalDateString(),
+      clockInTime: getLocalTimeString(),
     };
 
     axios.post('/attendance/clock-in', userDetails)
-      .then(() => {
+      .then((res) => {
         setClockedIn(true);
         setShowContinueWorking(false);
+        setElapsedSeconds(0);
+        setTodayRecord(res.data?.activeRecord || {
+          clockInTime: userDetails.clockInTime,
+          clockInDate: userDetails.clockInDate,
+        });
         startTimer();
         setLoading(false);
       })
       .catch((error) => {
         console.error('Clock-in failed:', error);
-        alert('Failed to clock in. Please try again.');
+        alert(error.response?.data?.error || 'Failed to clock in. Please try again.');
         setClockedIn(false);
         setLoading(false);
       });
@@ -100,16 +176,17 @@ const Sidebar = () => {
     setLoading(true);
     clearInterval(clockInterval);
 
-    const formatTimeForMySQL = (date) => {
-      return date.toTimeString().split(' ')[0];
-    };
-
     const totalWorkedTime = formatElapsedTime(elapsedSeconds);
+    const storedCompany = localStorage.getItem('companyName');
+    const effectiveCompany =
+      !storedCompany || storedCompany === 'null' || storedCompany === 'undefined'
+        ? 'KN Advisors'
+        : storedCompany;
 
     const clockOutData = {
       employeeId: localStorage.getItem('userEmployeeId'),
-      companyName: localStorage.getItem('companyName'),
-      clockOutTime: formatTimeForMySQL(new Date()),
+      companyName: effectiveCompany,
+      clockOutTime: getLocalTimeString(),
       workedTime: totalWorkedTime,
     };
 
@@ -118,14 +195,19 @@ const Sidebar = () => {
         setClockedIn(false);
         setShowContinueWorking(true);
         setSnackbarOpen(true);
+        setTodayRecord((prev) => ({
+          ...(prev || {}),
+          clockOutTime: clockOutData.clockOutTime,
+          workedTime: totalWorkedTime,
+        }));
         localStorage.setItem('workedTime', totalWorkedTime);
-        console.log('Total Worked Time:', totalWorkedTime);
         setClockInterval(null);
         setLoading(false);
+        setOpenReportDialog(true);
       })
       .catch((error) => {
         console.error('Clock-out failed:', error);
-        alert('Failed to clock out. Please try again.');
+        alert(error.response?.data?.error || 'Failed to clock out. Please try again.');
         setLoading(false);
       });
   };
@@ -155,6 +237,8 @@ const Sidebar = () => {
     switch (selectedComponent) {
       case 'Tasks': return <TasksProjects />;
       case 'Work Groups': return <Workgroups />;
+      case 'Attendance':
+      case 'My Attendance': return <Attendance />;
       case 'Work Reports': return <WorkReports />;
       case 'Messenger': return <Messenger />;
       case 'CRM': return <Crm />;
@@ -182,6 +266,47 @@ const Sidebar = () => {
 
   const clockWidget = (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      {todayRecord?.clockInTime && (
+        <Tooltip title="Click to view all your clock-in & clock-out times">
+          <Box
+            onClick={() => handleListItemOnClick('My Attendance')}
+            sx={{
+              display: { xs: 'none', sm: 'flex' },
+              alignItems: 'center',
+              gap: 0.75,
+              px: 1.25,
+              py: 0.5,
+              bgcolor: clockedIn ? '#ecfdf5' : '#f8fafc',
+              border: '1px solid',
+              borderColor: clockedIn ? '#a7f3d0' : '#e2e8f0',
+              borderRadius: '20px',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              '&:hover': {
+                bgcolor: clockedIn ? '#d1fae5' : '#f1f5f9',
+                borderColor: clockedIn ? '#6ee7b7' : '#cbd5e1',
+              },
+            }}
+          >
+            <Box
+              sx={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                bgcolor: clockedIn ? '#10b981' : '#64748b',
+              }}
+            />
+            <Typography sx={{ fontSize: '11.5px', fontWeight: 700, color: clockedIn ? '#065f46' : '#475569' }}>
+              {clockedIn
+                ? `In: ${todayRecord.clockInTime}`
+                : todayRecord.clockOutTime
+                ? `In: ${todayRecord.clockInTime} · Out: ${todayRecord.clockOutTime}`
+                : `In: ${todayRecord.clockInTime}`}
+            </Typography>
+          </Box>
+        </Tooltip>
+      )}
+
       <Button
         size="small"
         variant={showContinueWorking ? 'contained' : clockedIn ? 'contained' : 'contained'}
@@ -216,6 +341,10 @@ const Sidebar = () => {
     {
       text: 'Work Groups',
       icon: <HiOutlineUserGroup {...iconStyle(selectedComponent === 'Work Groups')} />,
+    },
+    {
+      text: 'My Attendance',
+      icon: <HiOutlineClock {...iconStyle(selectedComponent === 'My Attendance' || selectedComponent === 'Attendance')} />,
     },
     {
       text: 'Work Reports',
@@ -275,6 +404,16 @@ const Sidebar = () => {
           Now you can submit your work report
         </Alert>
       </Snackbar>
+
+      <WorkReportFormDialog
+        open={openReportDialog}
+        onClose={() => setOpenReportDialog(false)}
+        dialogTitle="Clock-Out Work Report"
+        onSubmitted={() => {
+          setOpenReportDialog(false);
+          setSelectedComponent('Work Reports');
+        }}
+      />
     </>
   );
 };

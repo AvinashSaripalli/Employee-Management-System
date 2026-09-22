@@ -1,220 +1,1512 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from '../../api/axios';
 import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Paper, Typography, Chip, CircularProgress, Box, TablePagination,
-  FormControl, InputLabel, Select, MenuItem
+  FormControl, Select, MenuItem, TextField, InputAdornment, Button,
+  Avatar, Tooltip, Stack, Alert, IconButton, Dialog, DialogTitle,
+  DialogContent, DialogActions, ToggleButtonGroup, ToggleButton, Divider
 } from '@mui/material';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
-} from 'recharts';
+import SearchIcon from '@mui/icons-material/Search';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import DownloadIcon from '@mui/icons-material/Download';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
+import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
+import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import TodayIcon from '@mui/icons-material/Today';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import CalendarViewMonthIcon from '@mui/icons-material/CalendarViewMonth';
+import ViewListIcon from '@mui/icons-material/ViewList';
+import CloseIcon from '@mui/icons-material/Close';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import dayjs from 'dayjs';
+import { downloadCSV, formatHours, formatDate } from '../../utils/reportUtils';
 
 const Attendance = () => {
   const [attendances, setAttendances] = useState([]);
-  const [filteredAttendances, setFilteredAttendances] = useState([]);
-  const [stats, setStats] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [filter, setFilter] = useState('all');
 
-  const fetchAttendance = async () => {
-    const companyName = localStorage.getItem('companyName');
+  // View Controls
+  const [viewMode, setViewMode] = useState('matrix'); // 'matrix' (Department Matrix like Work Reports) or 'list' (Chronological table)
+  const [selectedMonth, setSelectedMonth] = useState(dayjs());
+  const [deptFilter, setDeptFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [collapsedDepts, setCollapsedDepts] = useState({});
+  const [detailModal, setDetailModal] = useState(null);
+
+  // List View Pagination & Filters
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [dateFilter, setDateFilter] = useState('all'); // 'all', 'today', 'week', 'month'
+
+  const tableContainerRef = useRef(null);
+
+  // User Role & Context
+  const userRole = localStorage.getItem('userRole') || 'Employee';
+  const userDepartment = localStorage.getItem('userDepartment') || '';
+  const userEmployeeId = localStorage.getItem('userEmployeeId') || '';
+  const isSupervisor = userRole === 'Manager';
+  const isAdmin = userRole === 'Admin';
+  const isEmployee = !isAdmin && !isSupervisor;
+
+  const storedCompany = localStorage.getItem('companyName');
+  const companyName =
+    !storedCompany || storedCompany === 'null' || storedCompany === 'undefined'
+      ? 'KN Advisors'
+      : storedCompany;
+
+  // Fetch Attendance, Users, and Reports
+  const fetchData = useCallback(async () => {
+    setLoading(true);
     try {
-      const [attendanceRes, statsRes] = await Promise.all([
-        axios.get('/attendance', { params: { companyName } }),
-        axios.get('/attendance/stats', { params: { companyName } })
+      const params = { companyName };
+      if (isSupervisor && userDepartment) {
+        params.role = 'Manager';
+        params.supervisorDepartment = userDepartment;
+      } else if (isEmployee && userEmployeeId) {
+        params.role = 'Employee';
+        params.employeeId = userEmployeeId;
+      }
+
+      const [attRes, usersRes, reportsRes] = await Promise.all([
+        axios.get('/attendance', { params }).catch((err) => {
+          console.error('Error fetching attendance:', err);
+          return { data: [] };
+        }),
+        axios.get('/users', { params }).catch((err) => {
+          console.error('Error fetching users:', err);
+          return { data: [] };
+        }),
+        axios.get('/reports', { params }).catch((err) => {
+          console.error('Error fetching reports:', err);
+          return { data: [] };
+        }),
       ]);
 
-      setAttendances(attendanceRes.data);
-      setFilteredAttendances(attendanceRes.data);
-      setStats(statsRes.data);
-      console.log("Fetched data successfully");
+      setAttendances(attRes.data || []);
+      const activeUsers = (usersRes.data || []).filter((u) => u.exists !== 0);
+      setUsers(activeUsers);
+      setReports(reportsRes.data || []);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error loading attendance data:', error);
     } finally {
       setLoading(false);
-      setStatsLoading(false);
     }
-  };
+  }, [companyName, isSupervisor, userDepartment, isEmployee, userEmployeeId]);
 
   useEffect(() => {
-    fetchAttendance();
+    fetchData();
+  }, [fetchData]);
+
+  // Days in selected month
+  const daysInMonth = useMemo(() => {
+    const total = selectedMonth.daysInMonth();
+    const days = [];
+    for (let d = 1; d <= total; d++) {
+      const dateObj = selectedMonth.date(d);
+      days.push({
+        dayNumber: d,
+        weekday: dateObj.format('dd'), // 'Mo', 'Tu', 'We', etc.
+        dateKey: dateObj.format('YYYY-MM-DD'),
+        isWeekend: dateObj.day() === 0 || dateObj.day() === 6,
+        isToday: dateObj.isSame(dayjs(), 'day'),
+      });
+    }
+    return days;
+  }, [selectedMonth]);
+
+  // Unique departments for filter dropdown
+  const departments = useMemo(() => {
+    if (isSupervisor && userDepartment) return [userDepartment];
+    const set = new Set();
+    users.forEach((u) => {
+      const d = (u.department || '').trim();
+      if (d && d !== 'null' && d !== 'undefined') set.add(d);
+    });
+    attendances.forEach((a) => {
+      const d = (a.department || '').trim();
+      if (d && d !== 'null' && d !== 'undefined') set.add(d);
+    });
+    return Array.from(set).sort();
+  }, [users, attendances, isSupervisor, userDepartment]);
+
+  // Map attendances for O(1) instant cell lookup: key = `${empId}_${dateKey}` and `${name}_${dateKey}`
+  const attendancesByEmpAndDate = useMemo(() => {
+    const map = {};
+    attendances.forEach((att) => {
+      const dateKey = String(att.clockInDate || '').slice(0, 10);
+      const empId = att.employeeId ? String(att.employeeId).trim().toLowerCase() : '';
+      const fullName = `${att.firstName || ''} ${att.lastName || ''}`.trim().toLowerCase();
+
+      if (empId && dateKey) {
+        map[`${empId}_${dateKey}`] = att;
+      }
+      if (fullName && dateKey) {
+        map[`${fullName}_${dateKey}`] = att;
+      }
+    });
+    return map;
+  }, [attendances]);
+
+  // Map reports for O(1) instant lookup
+  const reportsByEmpAndDate = useMemo(() => {
+    const map = {};
+    reports.forEach((rep) => {
+      const dateKey = String(rep.date || '').slice(0, 10);
+      const empId = rep.employeeId ? String(rep.employeeId).trim().toLowerCase() : '';
+      const empName = `${rep.firstName || ''} ${rep.lastName || ''}`.trim().toLowerCase();
+
+      if (empId && dateKey) {
+        map[`${empId}_${dateKey}`] = rep;
+      }
+      if (empName && dateKey) {
+        map[`${empName}_${dateKey}`] = rep;
+      }
+    });
+    return map;
+  }, [reports]);
+
+  // Grouped employees by department for Matrix View
+  const groupedDepartments = useMemo(() => {
+    const map = {};
+    const q = searchQuery.trim().toLowerCase();
+
+    // Group from users
+    users.forEach((user) => {
+      const dept = (user.department || '').trim() || 'General';
+
+      // Role check: supervisor only sees their department
+      if (isSupervisor && userDepartment) {
+        if (dept.toLowerCase() !== userDepartment.toLowerCase()) return;
+      } else if (deptFilter !== 'all' && dept.toLowerCase() !== deptFilter.toLowerCase()) {
+        return;
+      }
+
+      // If employee, only include the logged-in employee
+      if (isEmployee && userEmployeeId) {
+        if (String(user.employeeId || '').toLowerCase() !== userEmployeeId.toLowerCase()) return;
+      }
+
+      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.employeeId || 'Employee';
+      const empId = (user.employeeId || '').toLowerCase();
+      const desig = (user.designation || '').toLowerCase();
+
+      if (q && !fullName.toLowerCase().includes(q) && !empId.includes(q) && !desig.includes(q)) {
+        return;
+      }
+
+      if (!map[dept]) map[dept] = [];
+      map[dept].push({
+        id: user.id,
+        employeeId: user.employeeId || String(user.id),
+        name: fullName,
+        designation: user.designation,
+        department: dept,
+        photo: user.photo,
+        role: user.role,
+      });
+    });
+
+    // Also include any employees found in attendance who might not be in the users table
+    attendances.forEach((att) => {
+      const dept = (att.department || '').trim() || 'General';
+
+      if (isSupervisor && userDepartment) {
+        if (dept.toLowerCase() !== userDepartment.toLowerCase()) return;
+      } else if (deptFilter !== 'all' && dept.toLowerCase() !== deptFilter.toLowerCase()) {
+        return;
+      }
+
+      if (isEmployee && userEmployeeId) {
+        if (String(att.employeeId || '').toLowerCase() !== userEmployeeId.toLowerCase()) return;
+      }
+
+      const fullName = `${att.firstName || ''} ${att.lastName || ''}`.trim() || att.employeeId || 'Employee';
+      const empId = (att.employeeId || '').toLowerCase();
+      const desig = (att.designation || '').toLowerCase();
+
+      if (q && !fullName.toLowerCase().includes(q) && !empId.includes(q) && !desig.includes(q)) {
+        return;
+      }
+
+      if (!map[dept]) map[dept] = [];
+      const exists = map[dept].some((e) => e.employeeId.toLowerCase() === empId);
+      if (!exists && att.employeeId) {
+        map[dept].push({
+          id: att.id,
+          employeeId: att.employeeId,
+          name: fullName,
+          designation: att.designation,
+          department: dept,
+          photo: null,
+          role: 'Employee',
+        });
+      }
+    });
+
+    // Sort employees alphabetically by name
+    Object.keys(map).forEach((d) => {
+      map[d].sort((a, b) => a.name.localeCompare(b.name));
+    });
+
+    return map;
+  }, [users, attendances, isSupervisor, userDepartment, isEmployee, userEmployeeId, deptFilter, searchQuery]);
+
+  // Horizontal scroll to a specific day number in Matrix View
+  const scrollToDay = useCallback((dayNum) => {
+    if (!tableContainerRef.current) return;
+    const targetOffset = Math.max(0, (dayNum - 4) * 60);
+    tableContainerRef.current.scrollTo({ left: targetOffset, behavior: 'smooth' });
   }, []);
 
+  // Auto-scroll to today if current month is selected
   useEffect(() => {
+    if (viewMode === 'matrix' && selectedMonth.isSame(dayjs(), 'month')) {
+      const timer = setTimeout(() => {
+        scrollToDay(dayjs().date());
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [viewMode, selectedMonth, scrollToDay]);
+
+  // Calculate monthly stats for a specific employee
+  const getEmployeeMonthStats = useCallback((emp) => {
+    const monthKey = selectedMonth.format('YYYY-MM');
+    const empId = emp.employeeId ? String(emp.employeeId).trim().toLowerCase() : '';
+    const empName = emp.name ? emp.name.trim().toLowerCase() : '';
+
+    const monthRecords = attendances.filter((a) => {
+      const aDate = String(a.clockInDate || '').slice(0, 7);
+      if (aDate !== monthKey) return false;
+      const aId = String(a.employeeId || '').trim().toLowerCase();
+      const aName = `${a.firstName || ''} ${a.lastName || ''}`.trim().toLowerCase();
+      return (empId && aId === empId) || (empName && aName === empName);
+    });
+
+    let totalSeconds = 0;
+    monthRecords.forEach((a) => {
+      if (a.workedTime && typeof a.workedTime === 'string') {
+        const parts = a.workedTime.split(':').map(Number);
+        if (parts.length === 3 && !parts.some(isNaN)) {
+          totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+      }
+    });
+
+    const totalHoursNum = totalSeconds / 3600;
+    const hrs = Math.floor(totalHoursNum);
+    const mins = Math.round((totalHoursNum - hrs) * 60);
+    const formattedHours = `${hrs}h ${mins}m`;
+
+    return {
+      totalShifts: monthRecords.length,
+      totalHours: formattedHours,
+    };
+  }, [attendances, selectedMonth]);
+
+  // Month-level High-level KPIs
+  const monthKpis = useMemo(() => {
+    const monthKey = selectedMonth.format('YYYY-MM');
+    const monthRecords = attendances.filter((a) => {
+      if (isSupervisor && userDepartment) {
+        if ((a.department || '').trim().toLowerCase() !== userDepartment.toLowerCase()) return false;
+      }
+      if (isEmployee && userEmployeeId) {
+        if ((a.employeeId || '').trim().toLowerCase() !== userEmployeeId.toLowerCase()) return false;
+      }
+      return String(a.clockInDate || '').slice(0, 7) === monthKey;
+    });
+
+    const totalClockIns = monthRecords.length;
+    const currentlyActive = monthRecords.filter((a) => !a.clockOutTime).length;
+    const completedSessions = monthRecords.filter((a) => a.clockOutTime).length;
+    const uniqueEmployees = new Set(monthRecords.map((a) => a.employeeId || `${a.firstName}_${a.lastName}`)).size;
+
+    let totalSeconds = 0;
+    monthRecords.forEach((a) => {
+      if (a.workedTime && typeof a.workedTime === 'string') {
+        const parts = a.workedTime.split(':').map(Number);
+        if (parts.length === 3 && !parts.some(isNaN)) {
+          totalSeconds += parts[0] * 3600 + parts[1] * 60 + parts[2];
+        }
+      }
+    });
+
+    const totalHoursNum = totalSeconds / 3600;
+    const hrs = Math.floor(totalHoursNum);
+    const mins = Math.round((totalHoursNum - hrs) * 60);
+    const formattedTotalHours = `${hrs}h ${mins}m`;
+    const avgHoursPerDay = totalClockIns > 0 ? (totalHoursNum / totalClockIns).toFixed(1) + 'h' : '0h';
+
+    return {
+      totalClockIns,
+      currentlyActive,
+      completedSessions,
+      uniqueEmployees,
+      formattedTotalHours,
+      avgHoursPerDay,
+    };
+  }, [attendances, selectedMonth, isSupervisor, userDepartment, isEmployee, userEmployeeId]);
+
+  // Filtered records for List View
+  const filteredList = useMemo(() => {
     const today = new Date();
     const startOfWeek = new Date(today);
     startOfWeek.setDate(today.getDate() - today.getDay());
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const q = searchQuery.trim().toLowerCase();
 
-    const filtered = attendances.filter((attendance) => {
-      const clockInDate = new Date(attendance.clockInDate);
-      if (filter === 'today') {
-        return (
-          clockInDate.getDate() === today.getDate() &&
-          clockInDate.getMonth() === today.getMonth() &&
-          clockInDate.getFullYear() === today.getFullYear()
-        );
-      } else if (filter === 'week') {
-        return clockInDate >= startOfWeek && clockInDate <= today;
-      } else if (filter === 'month') {
-        return clockInDate >= startOfMonth && clockInDate <= today;
-      }
-      return true;
-    });
+    return attendances
+      .filter((item) => {
+        if (isEmployee && userEmployeeId) {
+          return (item.employeeId || '').toLowerCase() === userEmployeeId.toLowerCase();
+        }
+        if (isSupervisor && userDepartment) {
+          return (item.department || '').trim().toLowerCase() === userDepartment.trim().toLowerCase();
+        }
+        if (deptFilter !== 'all') {
+          return (item.department || '').trim().toLowerCase() === deptFilter.trim().toLowerCase();
+        }
+        return true;
+      })
+      .filter((item) => {
+        if (!item.clockInDate) return true;
+        const recordDate = new Date(item.clockInDate);
 
-    setFilteredAttendances(filtered);
-    setPage(0);
-  }, [filter, attendances]);
+        if (dateFilter === 'today') {
+          return (
+            recordDate.getDate() === today.getDate() &&
+            recordDate.getMonth() === today.getMonth() &&
+            recordDate.getFullYear() === today.getFullYear()
+          );
+        } else if (dateFilter === 'week') {
+          return recordDate >= startOfWeek && recordDate <= today;
+        } else if (dateFilter === 'month') {
+          return recordDate >= startOfMonth && recordDate <= today;
+        }
+        return true;
+      })
+      .filter((item) => {
+        if (!q) return true;
+        const fullName = `${item.firstName || ''} ${item.lastName || ''}`.toLowerCase();
+        const empId = (item.employeeId || '').toLowerCase();
+        const dept = (item.department || '').toLowerCase();
+        const d = (item.clockInDate || '').toLowerCase();
+        return fullName.includes(q) || empId.includes(q) || dept.includes(q) || d.includes(q);
+      });
+  }, [attendances, isEmployee, userEmployeeId, isSupervisor, userDepartment, deptFilter, dateFilter, searchQuery]);
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-GB');
+  const paginatedList = filteredList.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  const toggleDeptCollapse = (dept) => {
+    setCollapsedDepts((prev) => ({ ...prev, [dept]: !prev[dept] }));
   };
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const handleFilterChange = (event) => {
-    setFilter(event.target.value);
-  };
-
-  const processChartData = () => {
-    return stats.map(item => ({
-      name: new Date(item.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-      onTime: item.late ,
-      late: -item.onTime,
-      total: item.total
-    }));
+  const handleExportCSV = () => {
+    const rows = [
+      ['Date', 'Employee ID', 'Employee Name', 'Department', 'Designation', 'Clock In Time', 'Clock Out Time', 'Worked Time', 'Status'],
+      ...filteredList.map((a) => [
+        a.clockInDate || '',
+        a.employeeId || '',
+        `${a.firstName || ''} ${a.lastName || ''}`.trim(),
+        a.department || '',
+        a.designation || '',
+        a.clockInTime || '',
+        a.clockOutTime || '',
+        a.workedTime || (a.clockOutTime ? '-' : 'Active'),
+        a.clockOutTime ? 'Completed' : 'Working',
+      ]),
+    ];
+    const filename = isEmployee
+      ? `my-attendance-${selectedMonth.format('YYYY-MM')}.csv`
+      : `attendance-${selectedMonth.format('YYYY-MM')}.csv`;
+    downloadCSV(filename, rows);
   };
 
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 5, }}>
-      <Box sx={{ maxWidth: 1400, width: '100%' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'black' }}>
-            Attendance
+    <Box sx={{ p: { xs: 1.5, md: 3 }, bgcolor: '#f4f7f9', minHeight: '100vh' }}>
+      {/* Top Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a', letterSpacing: '-0.4px', display: 'flex', alignItems: 'center', gap: 1 }}>
+            {isEmployee ? 'My Attendance & Clock-In Times' : 'Attendance & Work Time Tracker'}
+            {isEmployee && (
+              <Chip
+                label={`My Records · ${userEmployeeId || 'Employee'}`}
+                size="small"
+                sx={{ bgcolor: '#ecfdf5', color: '#047857', fontWeight: 700, fontSize: '11px' }}
+              />
+            )}
+            {isSupervisor && (
+              <Chip
+                label={`${userDepartment} Supervisor View`}
+                size="small"
+                sx={{ bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 700, fontSize: '11px' }}
+              />
+            )}
+            {isAdmin && (
+              <Chip
+                label="Admin View · All Departments"
+                size="small"
+                sx={{ bgcolor: '#f1f5f9', color: '#475569', fontWeight: 700, fontSize: '11px' }}
+              />
+            )}
           </Typography>
-          <FormControl sx={{ width: 150, background: "#fff", borderRadius: 2, boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }}>
-            <Select
-              value={filter}
-              onChange={handleFilterChange}
-              displayEmpty
-              sx={{
-                fontSize: "14px",
-                fontWeight: "500",
-                height: 40,
-                color: "#333",
-                padding: "6px 12px",
-                "& .MuiSelect-icon": { color: "#777" },
-                "&:hover": { backgroundColor: "#f1f3f5" },
-              }}
-            >
-              <MenuItem value="all">All</MenuItem>
-              <MenuItem value="today">Today</MenuItem>
-              <MenuItem value="week">This Week</MenuItem>
-              <MenuItem value="month">This Month</MenuItem>
-            </Select>
-          </FormControl>
+          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '13px', mt: 0.25 }}>
+            {isEmployee
+              ? 'View your daily clock-in, clock-out times, worked hours, and shift history.'
+              : isSupervisor
+              ? `Department matrix view of clock-in, clock-out, and daily work times for ${userDepartment} employees.`
+              : "Organization-wide department matrix view of daily clock-in, clock-out, and work times across all teams."}
+          </Typography>
         </Box>
 
-        <Box sx={{ display: 'flex', flexDirection: 'row', gap: 2, flexWrap: 'wrap' }}>
-          {!statsLoading && stats.length > 0 && (
-            <Box sx={{ flex: '1 1 250px', p: 2, backgroundColor: 'white', borderRadius: 2, boxShadow: "rgba(0, 0, 0, 0.1) 0px 2px 12px" , height:'350px'}}>
-              <Typography variant="h6" sx={{ mb: 2 }}>Attendance Trends (Last 7 Days)</Typography>
-              <ResponsiveContainer width="100%" height={320}>
-                <BarChart
-                  data={processChartData()}
-                  margin={{ top: 10, right: 30, left: -25, bottom: 5 }}
-                  stackOffset="sign"
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" fontSize={13} />
-                  <YAxis fontSize={13} />
-                  <Tooltip
-                    cursor={{ fill: "transparent" }}
-                    formatter={(value, name) => {
-                      if (name === 'Late (> 09:30)') return Math.abs(value);
-                      return value;
-                    }}
-                  />
-                  <Legend />
-                  <Bar dataKey="onTime" name="Late ClockIn" fill="#F44336" stackId="a" barSize={35} />
-                  <Bar dataKey="late" name="Early ClockIn" fill="#4CAF50" stackId="a" barSize={35} />
-                </BarChart>
-              </ResponsiveContainer>
-            </Box>
-          )}
+        {/* Top Header Controls: Refresh, Export, View Toggle */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+          <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(_, next) => next && setViewMode(next)}
+            size="small"
+            sx={{ bgcolor: '#ffffff', height: 33 }}
+          >
+            <ToggleButton value="matrix" sx={{ textTransform: 'none', fontWeight: 600, fontSize: '12px', px: 1.2 }}>
+              <CalendarViewMonthIcon sx={{ fontSize: 16, mr: 0.5 }} />
+              Matrix View
+            </ToggleButton>
+            <ToggleButton value="list" sx={{ textTransform: 'none', fontWeight: 600, fontSize: '12px', px: 1.2 }}>
+              <ViewListIcon sx={{ fontSize: 16, mr: 0.5 }} />
+              Detailed List
+            </ToggleButton>
+          </ToggleButtonGroup>
 
-          <Box sx={{ flex: '1 1 600px', minWidth: 0 }}>
-            {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
-                <CircularProgress />
-              </Box>
-            ) : (
-              <>
-                <TableContainer component={Paper} sx={{maxHeight: '462px', borderRadius: 2, overflow: 'hidden', boxShadow: "rgba(0, 0, 0, 0.1) 0px 2px 12px" }}>
-                  <Table stickyHeader>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell align="left" sx={{ color: '#000', fontWeight: 'bold' }}>Name</TableCell>
-                        <TableCell sx={{ color: '#000', fontWeight: 'bold' }}>Department</TableCell>
-                        <TableCell align="center"sx={{ color: '#000', fontWeight: 'bold' }}>ClockIn_Date</TableCell>
-                        <TableCell align="center"sx={{ color: '#000', fontWeight: 'bold' }}>ClockIn_Time</TableCell>
-                        <TableCell align="center" sx={{ color: '#000', fontWeight: 'bold' }}>Status</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {filteredAttendances.length > 0 ? (
-                        filteredAttendances
-                          .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                          .map((attendance, index) => (
-                            <TableRow key={index}>
-                              <TableCell align="left">{attendance.lastName} {attendance.firstName}</TableCell>
-                              <TableCell>{attendance.department}</TableCell>
-                              <TableCell align="center">{formatDate(attendance.clockInDate)}</TableCell>
-                              <TableCell align="center">{attendance.clockInTime}</TableCell>
-                              <TableCell align="center">
-                                <Chip
-                                  label={attendance.clockInTime ? "Working" : "Not Working"}
-                                  color={attendance.clockInTime ? "success" : "default"}
-                                  sx={{ width: "100px", minWidth: "unset" }}
-                                />
-                              </TableCell>
-                            </TableRow>
-                          ))
-                      ) : (
-                        <TableRow>
-                          <TableCell colSpan={5} align="center">
-                            No attendance records found
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<RefreshIcon sx={{ fontSize: 16 }} />}
+            onClick={fetchData}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '13px',
+              borderRadius: '7px',
+              borderColor: '#cbd5e1',
+              color: '#475569',
+              bgcolor: '#ffffff',
+              height: 33,
+              '&:hover': { bgcolor: '#f8fafc', borderColor: '#94a3b8' },
+            }}
+          >
+            Refresh
+          </Button>
 
-                <TablePagination
-                  rowsPerPageOptions={[5, 10, 25]}
-                  component="div"
-                  count={filteredAttendances.length}
-                  rowsPerPage={rowsPerPage}
-                  page={page}
-                  onPageChange={handleChangePage}
-                  onRowsPerPageChange={handleChangeRowsPerPage}
-                />
-              </>
+          <Button
+            size="small"
+            variant="contained"
+            startIcon={<DownloadIcon sx={{ fontSize: 16 }} />}
+            onClick={handleExportCSV}
+            disabled={!filteredList.length}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 700,
+              fontSize: '13px',
+              borderRadius: '7px',
+              bgcolor: '#0284c7',
+              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              height: 33,
+              '&:hover': { bgcolor: '#0369a1' },
+            }}
+          >
+            Export CSV
+          </Button>
+        </Box>
+      </Box>
+
+      {/* KPI Overview Cards */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+          gap: 1.5,
+          mb: 2.5,
+        }}
+      >
+        <Paper elevation={0} sx={{ p: 1.75, borderRadius: '10px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.75 }}>
+          <Box sx={{ width: 42, height: 42, borderRadius: '8px', bgcolor: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
+            <AccessTimeIcon sx={{ fontSize: 22 }} />
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px' }}>
+              {isEmployee ? 'Total Shifts Logged' : 'Total Shifts Recorded'}
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
+              {monthKpis.totalClockIns}
+            </Typography>
+          </Box>
+        </Paper>
+
+        <Paper elevation={0} sx={{ p: 1.75, borderRadius: '10px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.75 }}>
+          <Box sx={{ width: 42, height: 42, borderRadius: '8px', bgcolor: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
+            <CheckCircleOutlineIcon sx={{ fontSize: 22 }} />
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px' }}>
+              Currently Active
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#059669', lineHeight: 1.2 }}>
+              {isEmployee
+                ? (monthKpis.currentlyActive > 0 ? 'Working Now' : 'Clocked Out')
+                : `${monthKpis.currentlyActive} working`}
+            </Typography>
+          </Box>
+        </Paper>
+
+        <Paper elevation={0} sx={{ p: 1.75, borderRadius: '10px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.75 }}>
+          <Box sx={{ width: 42, height: 42, borderRadius: '8px', bgcolor: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d97706' }}>
+            <AccessTimeIcon sx={{ fontSize: 22 }} />
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px' }}>
+              {isEmployee ? 'Total Hours Worked' : 'Total Hours Logged'}
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
+              {monthKpis.formattedTotalHours}
+            </Typography>
+          </Box>
+        </Paper>
+
+        <Paper elevation={0} sx={{ p: 1.75, borderRadius: '10px', border: '1px solid #e2e8f0', bgcolor: '#ffffff', display: 'flex', alignItems: 'center', gap: 1.75 }}>
+          <Box sx={{ width: 42, height: 42, borderRadius: '8px', bgcolor: '#f3e8ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c3aed' }}>
+            <PeopleAltOutlinedIcon sx={{ fontSize: 22 }} />
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px' }}>
+              {isEmployee ? 'Avg Daily Shift' : 'Employees Tracked'}
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
+              {isEmployee ? monthKpis.avgHoursPerDay : monthKpis.uniqueEmployees}
+            </Typography>
+          </Box>
+        </Paper>
+      </Box>
+
+      {/* Main Container Card */}
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: '10px',
+          border: '1px solid #dcdfe4',
+          bgcolor: '#ffffff',
+          overflow: 'hidden',
+          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)',
+        }}
+      >
+        {/* Toolbar: Month Navigation, Search, Department Filter */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            px: 2,
+            py: 1.25,
+            borderBottom: '1px solid #edf1f5',
+            gap: 1.5,
+          }}
+        >
+          {/* Month Selector + Jump to Today (For Matrix View) */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <IconButton
+              size="small"
+              onClick={() => setSelectedMonth((prev) => prev.subtract(1, 'month'))}
+              sx={{ p: 0.6, color: '#475569', borderRadius: '6px', border: '1px solid #e2e8f0', '&:hover': { bgcolor: '#f1f5f9' } }}
+            >
+              <ChevronLeftIcon fontSize="small" />
+            </IconButton>
+
+            <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: '#1e293b', px: 1, minWidth: 140, textAlign: 'center', userSelect: 'none' }}>
+              {selectedMonth.format('MMMM YYYY')}
+            </Typography>
+
+            <IconButton
+              size="small"
+              onClick={() => setSelectedMonth((prev) => prev.add(1, 'month'))}
+              sx={{ p: 0.6, color: '#475569', borderRadius: '6px', border: '1px solid #e2e8f0', '&:hover': { bgcolor: '#f1f5f9' } }}
+            >
+              <ChevronRightIcon fontSize="small" />
+            </IconButton>
+
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<TodayIcon sx={{ fontSize: 16 }} />}
+              onClick={() => {
+                setSelectedMonth(dayjs());
+                if (viewMode === 'matrix') scrollToDay(dayjs().date());
+              }}
+              sx={{
+                ml: 1,
+                fontSize: '12px',
+                fontWeight: 700,
+                textTransform: 'none',
+                borderRadius: '6px',
+                borderColor: '#cbd5e1',
+                color: '#0284c7',
+                bgcolor: '#f0f9ff',
+                py: 0.4,
+                '&:hover': { bgcolor: '#e0f2fe', borderColor: '#0284c7' },
+              }}
+            >
+              Today ({dayjs().format('DD MMM')})
+            </Button>
+          </Box>
+
+          {/* Search Field */}
+          <Box sx={{ flex: 1, maxWidth: 300, minWidth: 180 }}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder="Search employee, ID, or dept..."
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon sx={{ color: '#94a3b8', fontSize: 18 }} />
+                  </InputAdornment>
+                ),
+                sx: {
+                  fontSize: '13px',
+                  height: 33,
+                  bgcolor: '#f8fafc',
+                  borderRadius: '6px',
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: '#e2e8f0' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#cbd5e1' },
+                },
+              }}
+            />
+          </Box>
+
+          {/* Department selector (Admin only) / Supervisor Badge */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            {isAdmin && (
+              <Select
+                size="small"
+                value={deptFilter}
+                onChange={(e) => { setDeptFilter(e.target.value); setPage(0); }}
+                displayEmpty
+                startAdornment={<FilterAltOutlinedIcon sx={{ fontSize: 16, color: '#94a3b8', mr: 0.5 }} />}
+                sx={{
+                  fontSize: '13px',
+                  height: 33,
+                  minWidth: 160,
+                  bgcolor: '#ffffff',
+                  borderRadius: '6px',
+                  '& .MuiSelect-select': { py: 0.5, px: 1 },
+                }}
+              >
+                <MenuItem value="all" sx={{ fontSize: '13px' }}>All Departments</MenuItem>
+                {departments.map((d) => (
+                  <MenuItem key={d} value={d} sx={{ fontSize: '13px' }}>{d}</MenuItem>
+                ))}
+              </Select>
+            )}
+
+            {isSupervisor && (
+              <Chip
+                label={`Department: ${userDepartment}`}
+                size="small"
+                sx={{ bgcolor: '#f1f5f9', color: '#0f172a', fontWeight: 700, fontSize: '12px', height: 33, px: 1, borderRadius: '6px', border: '1px solid #cbd5e1' }}
+              />
+            )}
+
+            {/* List View Date Quick Filter (only shown in List View) */}
+            {viewMode === 'list' && (
+              <Select
+                size="small"
+                value={dateFilter}
+                onChange={(e) => { setDateFilter(e.target.value); setPage(0); }}
+                sx={{
+                  fontSize: '13px',
+                  height: 33,
+                  minWidth: 130,
+                  bgcolor: '#ffffff',
+                  borderRadius: '6px',
+                  '& .MuiSelect-select': { py: 0.5, px: 1 },
+                }}
+              >
+                <MenuItem value="all" sx={{ fontSize: '13px' }}>All Dates</MenuItem>
+                <MenuItem value="today" sx={{ fontSize: '13px' }}>Today</MenuItem>
+                <MenuItem value="week" sx={{ fontSize: '13px' }}>This Week</MenuItem>
+                <MenuItem value="month" sx={{ fontSize: '13px' }}>This Month</MenuItem>
+              </Select>
             )}
           </Box>
         </Box>
-      </Box>
+
+        {/* ======================================================= */}
+        {/* VIEW 1: BITRIX24-STYLE DEPARTMENT MONTHLY MATRIX VIEW    */}
+        {/* ======================================================= */}
+        {viewMode === 'matrix' ? (
+          <TableContainer
+            ref={tableContainerRef}
+            sx={{
+              maxHeight: 'calc(100vh - 350px)',
+              overflowX: 'auto',
+              position: 'relative',
+            }}
+          >
+            <Table stickyHeader size="small" sx={{ borderCollapse: 'separate', minWidth: '100%' }}>
+              <TableHead>
+                <TableRow>
+                  {/* Sticky Employee Profile Column */}
+                  <TableCell
+                    sx={{
+                      fontWeight: 700,
+                      color: '#1e3a5f',
+                      bgcolor: '#dff0f8',
+                      fontSize: '13px',
+                      py: 1,
+                      px: 2,
+                      width: 250,
+                      minWidth: 250,
+                      maxWidth: 250,
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 4,
+                      borderRight: '2px solid #b8d5e5',
+                      borderBottom: '1px solid #cbdde9',
+                    }}
+                  >
+                    Employee
+                  </TableCell>
+
+                  {/* Monthly Summary Column */}
+                  <TableCell
+                    align="center"
+                    sx={{
+                      fontWeight: 700,
+                      color: '#1e3a5f',
+                      bgcolor: '#dff0f8',
+                      fontSize: '12px',
+                      py: 1,
+                      px: 1,
+                      width: 100,
+                      minWidth: 100,
+                      borderRight: '2px solid #b8d5e5',
+                      borderBottom: '1px solid #cbdde9',
+                    }}
+                  >
+                    Month Total
+                  </TableCell>
+
+                  {/* Day Columns (1..31) */}
+                  {daysInMonth.map((day) => (
+                    <TableCell
+                      key={day.dateKey}
+                      align="center"
+                      onClick={() => scrollToDay(day.dayNumber)}
+                      sx={{
+                        bgcolor: day.isToday ? '#e0f2fe' : '#dff0f8',
+                        color: '#1e3a5f',
+                        fontWeight: 600,
+                        width: 58,
+                        minWidth: 58,
+                        maxWidth: 58,
+                        borderRight: '1px solid #cbdde9',
+                        borderBottom: '1px solid #cbdde9',
+                        px: 0.2,
+                        py: 0.6,
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        transition: 'background-color 0.15s',
+                        '&:hover': { bgcolor: '#bae6fd' },
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          lineHeight: 1.2,
+                          color: day.isToday ? '#0284c7' : '#1e3a5f',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minWidth: 22,
+                          height: 22,
+                          borderRadius: day.isToday ? '12px' : 0,
+                          bgcolor: day.isToday ? '#ffffff' : 'transparent',
+                          boxShadow: day.isToday ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        }}
+                      >
+                        {day.dayNumber}
+                      </Box>
+                      <Box sx={{ fontSize: '10px', fontWeight: 600, color: day.isWeekend ? '#94a3b8' : '#475569', mt: 0.2 }}>
+                        {day.weekday}
+                      </Box>
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={2 + daysInMonth.length} align="center" sx={{ py: 8 }}>
+                      <CircularProgress size={32} />
+                    </TableCell>
+                  </TableRow>
+                ) : Object.keys(groupedDepartments).length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={2 + daysInMonth.length} align="center" sx={{ py: 8, color: '#64748b', fontSize: '14px' }}>
+                      No employee attendance records found matching your selection.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  Object.entries(groupedDepartments).map(([departmentName, departmentEmployees]) => {
+                    const isCollapsed = Boolean(collapsedDepts[departmentName]);
+
+                    return (
+                      <React.Fragment key={departmentName}>
+                        {/* Department Header Row */}
+                        <TableRow
+                          onClick={() => toggleDeptCollapse(departmentName)}
+                          sx={{
+                            bgcolor: '#f4f6f8',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                            '&:hover': { bgcolor: '#edf0f3' },
+                          }}
+                        >
+                          <TableCell
+                            colSpan={2 + daysInMonth.length}
+                            sx={{
+                              py: 0.8,
+                              px: 1.5,
+                              fontWeight: 700,
+                              fontSize: '12px',
+                              color: '#334155',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.4px',
+                              borderTop: '1px solid #e2e8f0',
+                              borderBottom: '1px solid #e2e8f0',
+                              position: 'sticky',
+                              left: 0,
+                              zIndex: 2,
+                              bgcolor: 'inherit',
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, position: 'sticky', left: 16 }}>
+                              {isCollapsed ? (
+                                <KeyboardArrowRightIcon sx={{ fontSize: 18, color: '#0284c7' }} />
+                              ) : (
+                                <KeyboardArrowDownIcon sx={{ fontSize: 18, color: '#0284c7' }} />
+                              )}
+                              <Typography sx={{ fontWeight: 800, fontSize: '12px', color: '#0f172a', letterSpacing: '0.4px' }}>
+                                DEPARTMENT: {departmentName.toUpperCase()}
+                              </Typography>
+                              <Chip
+                                label={`${departmentEmployees.length} employees`}
+                                size="small"
+                                sx={{ height: 18, fontSize: '10px', fontWeight: 700, bgcolor: '#0284c7', color: '#ffffff' }}
+                              />
+                            </Box>
+                          </TableCell>
+                        </TableRow>
+
+                        {/* Employee Rows under this Department */}
+                        {!isCollapsed &&
+                          departmentEmployees.map((emp) => {
+                            const stats = getEmployeeMonthStats(emp);
+                            const initials = emp.name
+                              .split(' ')
+                              .map((p) => p[0])
+                              .join('')
+                              .slice(0, 2)
+                              .toUpperCase();
+
+                            return (
+                              <TableRow
+                                key={emp.employeeId || emp.id}
+                                sx={{
+                                  '&:hover': {
+                                    bgcolor: '#f8fafc',
+                                    '& .sticky-emp-col': { bgcolor: '#f8fafc' },
+                                  },
+                                }}
+                              >
+                                {/* Sticky Employee Name Column */}
+                                <TableCell
+                                  className="sticky-emp-col"
+                                  sx={{
+                                    py: 1,
+                                    px: 1.75,
+                                    width: 250,
+                                    minWidth: 250,
+                                    maxWidth: 250,
+                                    position: 'sticky',
+                                    left: 0,
+                                    zIndex: 2,
+                                    bgcolor: '#ffffff',
+                                    borderRight: '2px solid #e2e8f0',
+                                    borderBottom: '1px solid #edf2f7',
+                                    boxShadow: '2px 0 4px rgba(0,0,0,0.02)',
+                                  }}
+                                >
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                                    <Avatar
+                                      sx={{
+                                        width: 28,
+                                        height: 28,
+                                        fontSize: '11px',
+                                        fontWeight: 700,
+                                        bgcolor: '#0284c7',
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      {initials}
+                                    </Avatar>
+                                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                                      <Typography
+                                        sx={{
+                                          fontSize: '13px',
+                                          fontWeight: 600,
+                                          color: '#0f172a',
+                                          lineHeight: 1.2,
+                                          whiteSpace: 'nowrap',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                        }}
+                                      >
+                                        {emp.name}
+                                      </Typography>
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, flexWrap: 'wrap', mt: 0.35 }}>
+                                        <Chip
+                                          label={emp.department || 'General'}
+                                          size="small"
+                                          sx={{
+                                            height: 17,
+                                            fontSize: '9.5px',
+                                            fontWeight: 700,
+                                            bgcolor: '#e0f2fe',
+                                            color: '#0284c7',
+                                            border: '1px solid #bae6fd',
+                                            borderRadius: '4px',
+                                            px: 0.5,
+                                            '& .MuiChip-label': { px: 0.5 },
+                                          }}
+                                        />
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            fontSize: '10.5px',
+                                            color: '#64748b',
+                                            lineHeight: 1.1,
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                          }}
+                                        >
+                                          {emp.employeeId ? `${emp.employeeId} · ` : ''}{emp.designation || ''}
+                                        </Typography>
+                                      </Box>
+                                    </Box>
+                                  </Box>
+                                </TableCell>
+
+                                {/* Month Total Worked Time */}
+                                <TableCell
+                                  align="center"
+                                  sx={{
+                                    py: 1,
+                                    px: 0.75,
+                                    borderRight: '2px solid #e2e8f0',
+                                    borderBottom: '1px solid #edf2f7',
+                                  }}
+                                >
+                                  <Chip
+                                    label={stats.totalHours}
+                                    size="small"
+                                    sx={{
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                      bgcolor: stats.totalShifts > 0 ? '#ecfdf5' : '#f1f5f9',
+                                      color: stats.totalShifts > 0 ? '#047857' : '#94a3b8',
+                                      height: 22,
+                                    }}
+                                  />
+                                </TableCell>
+
+                                {/* Date Cells: Daily Clock-In / Clock-Out Work Times */}
+                                {daysInMonth.map((day) => {
+                                  const eId = emp.employeeId ? String(emp.employeeId).trim().toLowerCase() : '';
+                                  const eName = emp.name ? emp.name.trim().toLowerCase() : '';
+
+                                  const idKey = eId ? `${eId}_${day.dateKey}` : null;
+                                  const nameKey = eName ? `${eName}_${day.dateKey}` : null;
+
+                                  const att =
+                                    (idKey && attendancesByEmpAndDate[idKey]) ||
+                                    (nameKey && attendancesByEmpAndDate[nameKey]) ||
+                                    null;
+
+                                  const report =
+                                    (idKey && reportsByEmpAndDate[idKey]) ||
+                                    (nameKey && reportsByEmpAndDate[nameKey]) ||
+                                    null;
+
+                                  const isCompleted = att && att.clockOutTime;
+                                  const isActiveWorking = att && !att.clockOutTime;
+
+                                  return (
+                                    <TableCell
+                                      key={day.dateKey}
+                                      align="center"
+                                      sx={{
+                                        p: '3px',
+                                        height: 42,
+                                        width: 58,
+                                        minWidth: 58,
+                                        maxWidth: 58,
+                                        borderRight: '1px solid #edf2f7',
+                                        borderBottom: '1px solid #edf2f7',
+                                        bgcolor: day.isToday
+                                          ? '#f0f9ff'
+                                          : day.isWeekend
+                                          ? '#fafbfc'
+                                          : 'transparent',
+                                      }}
+                                    >
+                                      {isCompleted ? (
+                                        <Tooltip
+                                          title={
+                                            <Box sx={{ p: 0.5, fontSize: '11.5px' }}>
+                                              <Typography variant="caption" sx={{ fontWeight: 800, color: '#f8fafc', display: 'block' }}>
+                                                {formatDate(day.dateKey)} · Completed Shift
+                                              </Typography>
+                                              <Typography variant="caption" sx={{ color: '#86efac', display: 'block', mt: 0.3 }}>
+                                                🟢 Clock In: <b>{att.clockInTime}</b>
+                                              </Typography>
+                                              <Typography variant="caption" sx={{ color: '#fca5a5', display: 'block' }}>
+                                                🔴 Clock Out: <b>{att.clockOutTime}</b>
+                                              </Typography>
+                                              <Typography variant="caption" sx={{ color: '#93c5fd', display: 'block', mt: 0.2 }}>
+                                                ⏱️ Worked: <b>{att.workedTime}</b>
+                                              </Typography>
+                                              {report && (
+                                                <Typography variant="caption" sx={{ color: '#fef08a', display: 'block', mt: 0.3 }}>
+                                                  📝 Report: {report.taskName}
+                                                </Typography>
+                                              )}
+                                              <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'block', mt: 0.5, fontSize: '10px' }}>
+                                                Click to view full shift details
+                                              </Typography>
+                                            </Box>
+                                          }
+                                          arrow
+                                        >
+                                          <Box
+                                            onClick={() => setDetailModal({ attendance: att, employee: emp, date: day.dateKey, report })}
+                                            sx={{
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              px: 0.5,
+                                              py: 0.3,
+                                              borderRadius: '4px',
+                                              bgcolor: '#e0f2fe',
+                                              border: '1px solid #bae6fd',
+                                              cursor: 'pointer',
+                                              transition: 'all 0.15s ease',
+                                              '&:hover': {
+                                                bgcolor: '#bae6fd',
+                                                transform: 'scale(1.04)',
+                                                boxShadow: '0 2px 5px rgba(2, 132, 199, 0.2)',
+                                              },
+                                            }}
+                                          >
+                                            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: '#0369a1', lineHeight: 1.1 }}>
+                                              {att.workedTime ? att.workedTime.slice(0, 5) : 'Done'}
+                                            </Typography>
+                                            <Typography sx={{ fontSize: '8.5px', color: '#0284c7', lineHeight: 1.1, mt: 0.2 }}>
+                                              {att.clockInTime ? att.clockInTime.slice(0, 5) : ''}
+                                            </Typography>
+                                          </Box>
+                                        </Tooltip>
+                                      ) : isActiveWorking ? (
+                                        <Tooltip
+                                          title={
+                                            <Box sx={{ p: 0.5, fontSize: '11.5px' }}>
+                                              <Typography variant="caption" sx={{ fontWeight: 800, color: '#86efac', display: 'block' }}>
+                                                Active Working Now
+                                              </Typography>
+                                              <Typography variant="caption" sx={{ color: '#f8fafc', display: 'block', mt: 0.3 }}>
+                                                🟢 Clock In: <b>{att.clockInTime}</b>
+                                              </Typography>
+                                              <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'block', mt: 0.5, fontSize: '10px' }}>
+                                                Click to view details
+                                              </Typography>
+                                            </Box>
+                                          }
+                                          arrow
+                                        >
+                                          <Box
+                                            onClick={() => setDetailModal({ attendance: att, employee: emp, date: day.dateKey, report })}
+                                            sx={{
+                                              display: 'flex',
+                                              flexDirection: 'column',
+                                              alignItems: 'center',
+                                              justifyContent: 'center',
+                                              px: 0.5,
+                                              py: 0.3,
+                                              borderRadius: '4px',
+                                              bgcolor: '#ecfdf5',
+                                              border: '1px solid #a7f3d0',
+                                              cursor: 'pointer',
+                                              transition: 'all 0.15s ease',
+                                              '&:hover': {
+                                                bgcolor: '#d1fae5',
+                                                transform: 'scale(1.04)',
+                                              },
+                                            }}
+                                          >
+                                            <Typography sx={{ fontSize: '9.5px', fontWeight: 800, color: '#059669', lineHeight: 1.1 }}>
+                                              Active
+                                            </Typography>
+                                            <Typography sx={{ fontSize: '8.5px', color: '#047857', lineHeight: 1.1, mt: 0.2 }}>
+                                              {att.clockInTime ? att.clockInTime.slice(0, 5) : ''}
+                                            </Typography>
+                                          </Box>
+                                        </Tooltip>
+                                      ) : (
+                                        <Typography sx={{ fontSize: '11px', color: day.isWeekend ? '#cbd5e1' : '#e2e8f0', userSelect: 'none' }}>
+                                          —
+                                        </Typography>
+                                      )}
+                                    </TableCell>
+                                  );
+                                })}
+                              </TableRow>
+                            );
+                          })}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        ) : (
+          /* ======================================================= */
+          /* VIEW 2: DETAILED CHRONOLOGICAL LIST VIEW (TABLE)        */
+          /* ======================================================= */
+          <>
+            <TableContainer sx={{ maxHeight: 'calc(100vh - 350px)' }}>
+              <Table stickyHeader size="small">
+                <TableHead>
+                  <TableRow>
+                    {!isEmployee && (
+                      <>
+                        <TableCell sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                          Employee
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                          Department
+                        </TableCell>
+                      </>
+                    )}
+                    <TableCell align={isEmployee ? 'left' : 'center'} sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1, pl: isEmployee ? 2.5 : 1 }}>
+                      Date
+                    </TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                      Clock In Time
+                    </TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                      Clock Out Time
+                    </TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                      Worked Duration
+                    </TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                      Status
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={isEmployee ? 5 : 7} align="center" sx={{ py: 8 }}>
+                        <CircularProgress size={32} />
+                      </TableCell>
+                    </TableRow>
+                  ) : paginatedList.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={isEmployee ? 5 : 7} align="center" sx={{ py: 8, color: 'text.secondary', fontSize: '14px' }}>
+                        No attendance records found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedList.map((item) => {
+                      const fullName = `${item.firstName || ''} ${item.lastName || ''}`.trim() || item.employeeId || 'Employee';
+                      const initials = fullName.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+                      const isActive = !item.clockOutTime;
+
+                      return (
+                        <TableRow
+                          key={item.id}
+                          hover
+                          onClick={() => setDetailModal({ attendance: item, employee: { name: fullName, employeeId: item.employeeId, department: item.department, designation: item.designation }, date: item.clockInDate })}
+                          sx={{ cursor: 'pointer' }}
+                        >
+                          {!isEmployee && (
+                            <>
+                              <TableCell sx={{ py: 1 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                                  <Avatar sx={{ width: 28, height: 28, fontSize: '11px', fontWeight: 700, bgcolor: '#0284c7' }}>
+                                    {initials}
+                                  </Avatar>
+                                  <Box>
+                                    <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
+                                      {fullName}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ fontSize: '11px', color: '#64748b' }}>
+                                      {item.employeeId} {item.designation ? `· ${item.designation}` : ''}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </TableCell>
+
+                              <TableCell sx={{ py: 1 }}>
+                                <Chip
+                                  label={item.department || 'General'}
+                                  size="small"
+                                  sx={{
+                                    fontSize: '11px',
+                                    fontWeight: 700,
+                                    bgcolor: '#e0f2fe',
+                                    color: '#0284c7',
+                                    border: '1px solid #bae6fd',
+                                    borderRadius: '4px',
+                                  }}
+                                />
+                              </TableCell>
+                            </>
+                          )}
+
+                          <TableCell align={isEmployee ? 'left' : 'center'} sx={{ py: 1, fontSize: '13px', fontWeight: 600, color: '#0f172a', pl: isEmployee ? 2.5 : 1 }}>
+                            {item.clockInDate ? formatDate(item.clockInDate) : '—'}
+                          </TableCell>
+
+                          <TableCell align="center" sx={{ py: 1 }}>
+                            <Chip
+                              label={item.clockInTime || '—'}
+                              size="small"
+                              sx={{ fontSize: '12px', fontWeight: 700, bgcolor: '#ecfdf5', color: '#047857' }}
+                            />
+                          </TableCell>
+
+                          <TableCell align="center" sx={{ py: 1 }}>
+                            {item.clockOutTime ? (
+                              <Chip
+                                label={item.clockOutTime}
+                                size="small"
+                                sx={{ fontSize: '12px', fontWeight: 600, bgcolor: '#f1f5f9', color: '#475569' }}
+                              />
+                            ) : (
+                              <Chip
+                                label="Working Now"
+                                size="small"
+                                sx={{ fontSize: '11px', fontWeight: 700, bgcolor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}
+                              />
+                            )}
+                          </TableCell>
+
+                          <TableCell align="center" sx={{ py: 1, fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                            {item.workedTime || (isActive ? 'In session' : '—')}
+                          </TableCell>
+
+                          <TableCell align="center" sx={{ py: 1 }}>
+                            <Chip
+                              label={isActive ? 'Active Working' : 'Completed'}
+                              size="small"
+                              sx={{
+                                height: 22,
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                bgcolor: isActive ? '#ecfdf5' : '#f8fafc',
+                                color: isActive ? '#059669' : '#64748b',
+                                border: '1px solid',
+                                borderColor: isActive ? '#a7f3d0' : '#e2e8f0',
+                              }}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            <TablePagination
+              rowsPerPageOptions={[5, 10, 20, 50]}
+              component="div"
+              count={filteredList.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+              sx={{ borderTop: '1px solid #edf1f5' }}
+            />
+          </>
+        )}
+      </Paper>
+
+      {/* ======================================================= */}
+      {/* SHIFT & ATTENDANCE DETAIL DIALOG                         */}
+      {/* ======================================================= */}
+      <Dialog
+        open={Boolean(detailModal)}
+        onClose={() => setDetailModal(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '12px', p: 1 } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AccessTimeIcon sx={{ color: '#0284c7', fontSize: 24 }} />
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a' }}>
+              Attendance & Shift Details
+            </Typography>
+          </Box>
+          <IconButton size="small" onClick={() => setDetailModal(null)}>
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </DialogTitle>
+
+        <DialogContent dividers sx={{ py: 2 }}>
+          {detailModal && (
+            <Stack spacing={2.5}>
+              {/* Employee Summary Card */}
+              <Paper variant="outlined" sx={{ p: 2, borderRadius: '8px', bgcolor: '#f8fafc', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Avatar sx={{ width: 44, height: 44, bgcolor: '#0284c7', fontWeight: 700, fontSize: '15px' }}>
+                  {(detailModal.employee?.name || detailModal.attendance?.firstName || 'E')
+                    .split(' ')
+                    .map((p) => p[0])
+                    .join('')
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </Avatar>
+                <Box>
+                  <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
+                    {detailModal.employee?.name || `${detailModal.attendance?.firstName || ''} ${detailModal.attendance?.lastName || ''}`.trim()}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#64748b', fontSize: '12px' }}>
+                    ID: {detailModal.attendance?.employeeId || detailModal.employee?.employeeId} · Department: {detailModal.attendance?.department || detailModal.employee?.department}
+                  </Typography>
+                  {detailModal.employee?.designation && (
+                    <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '11px' }}>
+                      Designation: {detailModal.employee.designation}
+                    </Typography>
+                  )}
+                </Box>
+              </Paper>
+
+              {/* Shift Timing Details */}
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
+                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '8px', bgcolor: '#ecfdf5', borderColor: '#a7f3d0' }}>
+                  <Typography variant="caption" sx={{ color: '#065f46', fontWeight: 700, textTransform: 'uppercase', fontSize: '10.5px' }}>
+                    Clock-In Time
+                  </Typography>
+                  <Typography variant="h6" sx={{ color: '#047857', fontWeight: 800, mt: 0.2 }}>
+                    {detailModal.attendance?.clockInTime || '—'}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#059669', fontSize: '11px' }}>
+                    Date: {formatDate(detailModal.attendance?.clockInDate || detailModal.date)}
+                  </Typography>
+                </Paper>
+
+                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: '8px', bgcolor: detailModal.attendance?.clockOutTime ? '#f8fafc' : '#fef3c7', borderColor: detailModal.attendance?.clockOutTime ? '#e2e8f0' : '#fde68a' }}>
+                  <Typography variant="caption" sx={{ color: detailModal.attendance?.clockOutTime ? '#475569' : '#92400e', fontWeight: 700, textTransform: 'uppercase', fontSize: '10.5px' }}>
+                    Clock-Out Time
+                  </Typography>
+                  <Typography variant="h6" sx={{ color: detailModal.attendance?.clockOutTime ? '#0f172a' : '#d97706', fontWeight: 800, mt: 0.2 }}>
+                    {detailModal.attendance?.clockOutTime || 'Active (Working)'}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#64748b', fontSize: '11px' }}>
+                    {detailModal.attendance?.clockOutTime ? 'Shift Completed' : 'Shift currently in progress'}
+                  </Typography>
+                </Paper>
+              </Box>
+
+              {/* Work Duration & Status */}
+              <Paper variant="outlined" sx={{ p: 1.75, borderRadius: '8px', bgcolor: '#ffffff' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px' }}>
+                      Total Worked Duration
+                    </Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a', mt: 0.2 }}>
+                      {detailModal.attendance?.workedTime || (detailModal.attendance?.clockOutTime ? '—' : 'In Session')}
+                    </Typography>
+                  </Box>
+                  <Chip
+                    label={detailModal.attendance?.clockOutTime ? 'Completed Shift' : 'Working Now'}
+                    sx={{
+                      fontWeight: 700,
+                      bgcolor: detailModal.attendance?.clockOutTime ? '#f1f5f9' : '#ecfdf5',
+                      color: detailModal.attendance?.clockOutTime ? '#475569' : '#059669',
+                      border: '1px solid',
+                      borderColor: detailModal.attendance?.clockOutTime ? '#e2e8f0' : '#a7f3d0',
+                    }}
+                  />
+                </Box>
+              </Paper>
+
+              {/* Associated Work Report If Submitted */}
+              {detailModal.report ? (
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: '8px', bgcolor: '#f0f9ff', borderColor: '#bae6fd' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <AssignmentTurnedInIcon sx={{ color: '#0284c7', fontSize: 20 }} />
+                    <Typography sx={{ fontWeight: 700, fontSize: '13px', color: '#0369a1' }}>
+                      Associated Work Report
+                    </Typography>
+                  </Box>
+                  <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                    {detailModal.report.taskName}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.2 }}>
+                    Reported Hours: {formatHours(detailModal.report.hoursWorked)} · Feedback: {detailModal.report.feedback || 'Pending'}
+                  </Typography>
+                  {detailModal.report.workDescription && (
+                    <Typography variant="body2" sx={{ fontSize: '12px', color: '#334155', mt: 1, whiteSpace: 'pre-wrap', bgcolor: '#ffffff', p: 1.25, borderRadius: '6px', border: '1px solid #e0f2fe' }}>
+                      {detailModal.report.workDescription}
+                    </Typography>
+                  )}
+                </Paper>
+              ) : (
+                <Alert severity="info" sx={{ fontSize: '12px' }}>
+                  No work report submitted for this day yet.
+                </Alert>
+              )}
+            </Stack>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 2, py: 1.5 }}>
+          <Button onClick={() => setDetailModal(null)} sx={{ textTransform: 'none', fontWeight: 600, color: '#64748b' }}>
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

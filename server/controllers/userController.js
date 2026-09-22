@@ -152,9 +152,15 @@ exports.getUnassignedUsers = async (req, res) => {
 };
 
 exports.loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const email = String(req.body.email || "").trim();
+  const password = String(req.body.password || "");
   try {
-    const user = await User.findOne({ where: { email, exists: 1 } });
+    const user = await User.findOne({
+      where: {
+        email: { [Op.iLike]: email },
+        exists: 1,
+      },
+    });
     if (!user) {
       return res.status(401).json({ success: false, message: "Invalid credentials" });
     }
@@ -251,12 +257,17 @@ exports.updateUserPhoto = async (req, res) => {
 exports.getUsers = async (req, res) => {
   const { companyName, role } = req.query;
 
-  if (!companyName) {
-    return res.status(400).json({ error: 'Company name is required' });
-  }
+  const rawCompany = String(companyName || "").trim();
+  const effectiveCompany =
+    !rawCompany || rawCompany === "null" || rawCompany === "undefined"
+      ? "KN Advisors"
+      : rawCompany;
 
   try {
-    let where = { companyName, exists: 1 };
+    let where = { exists: 1 };
+    if (effectiveCompany) {
+      where.companyName = { [Op.iLike]: effectiveCompany };
+    }
     if (role !== 'Manager') {
       where.role = { [Op.in]: ['Employee', 'Manager', 'Admin'] };
     }
