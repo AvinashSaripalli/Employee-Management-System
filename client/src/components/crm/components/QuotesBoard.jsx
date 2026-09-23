@@ -17,18 +17,29 @@ export default function QuotesBoard({ quotes, accounts, opps, onCreate, onEdit, 
         <Button variant="contained" startIcon={<FiPlus size={14}/>} onClick={onCreate} sx={{ bgcolor:'#14286D', textTransform:'none', borderRadius:2 }}>New Quote</Button>
       </Box>
       <TableContainer sx={{ maxHeight:440 }}>
-        <Table size="small" stickyHeader>
-          <TableHead><TableRow><TableCell>Quote</TableCell><TableCell>Opportunity</TableCell><TableCell>Account</TableCell><TableCell align="right">Amount</TableCell><TableCell>Discount</TableCell><TableCell>Status</TableCell><TableCell>Valid Until</TableCell><TableCell align="center">Actions</TableCell></TableRow></TableHead>
+        <Table size="small" stickyHeader sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
+          <TableHead>
+            <TableRow>
+              <TableCell align="left" sx={{ py: 1.25 }}>Quote</TableCell>
+              <TableCell align="left" sx={{ py: 1.25 }}>Opportunity</TableCell>
+              <TableCell align="left" sx={{ py: 1.25 }}>Account</TableCell>
+              <TableCell align="right" sx={{ width: 120, py: 1.25 }}>Amount</TableCell>
+              <TableCell align="center" sx={{ width: 100, py: 1.25 }}>Discount</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Status</TableCell>
+              <TableCell align="center" sx={{ width: 120, py: 1.25 }}>Valid Until</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
           <TableBody>
             {filtered.map(x=>(
               <TableRow key={x.id} hover>
-                <TableCell><Stack direction="row" spacing={1} alignItems="center"><Box sx={{ width:30, height:30, borderRadius:1.5, bgcolor:'#E0F2FE', display:'flex', alignItems:'center', justifyContent:'center' }}><FiFileText size={14} color="#0284C7"/></Box><Box><Typography fontWeight={700} fontSize={13}>{x.title}</Typography><Typography variant="caption" color="text.secondary">#{x.id}</Typography></Box></Stack></TableCell>
-                <TableCell>{oppTitle(x.opportunityId)}</TableCell>
-                <TableCell>{accName(x.accountId)}</TableCell>
+                <TableCell align="left"><Stack direction="row" spacing={1} alignItems="center"><Box sx={{ width:30, height:30, borderRadius:1.5, bgcolor:'#E0F2FE', display:'flex', alignItems:'center', justifyContent:'center' }}><FiFileText size={14} color="#0284C7"/></Box><Box><Typography fontWeight={700} fontSize={13}>{x.title}</Typography><Typography variant="caption" color="text.secondary">#{x.id}</Typography></Box></Stack></TableCell>
+                <TableCell align="left">{oppTitle(x.opportunityId)}</TableCell>
+                <TableCell align="left">{accName(x.accountId)}</TableCell>
                 <TableCell align="right"><Typography fontWeight={700} fontSize={13}>${Number(x.amount).toLocaleString()}</Typography></TableCell>
-                <TableCell>{x.discount? `${x.discount}%`:'—'}</TableCell>
-                <TableCell><Chip size="small" label={x.status} color={statusColor(x.status)} sx={{ height:18, fontSize:11, fontWeight:600 }}/></TableCell>
-                <TableCell>{x.validUntil? new Date(x.validUntil).toLocaleDateString(): '—'}</TableCell>
+                <TableCell align="center">{x.discount? `${x.discount}%`:'—'}</TableCell>
+                <TableCell align="center"><Chip size="small" label={x.status} color={statusColor(x.status)} sx={{ height:18, fontSize:11, fontWeight:600 }}/></TableCell>
+                <TableCell align="center">{x.validUntil? new Date(x.validUntil).toLocaleDateString(): '—'}</TableCell>
                 <TableCell align="center">
                   <IconButton size="small" onClick={()=>onEdit(x)}><FiEdit2 size={14}/></IconButton>
                   <IconButton size="small" color="error" onClick={()=>onDelete(x)}><FiTrash2 size={14}/></IconButton>

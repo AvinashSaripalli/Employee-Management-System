@@ -182,11 +182,20 @@ const theme = createTheme({
         root: {
           borderBottom: '1px solid #EDF0F7',
           color: 'inherit',
+          verticalAlign: 'middle',
+          padding: '12px 16px',
         },
         head: {
           fontWeight: 700,
           color: '#14286D',
           backgroundColor: '#F6F8FE',
+          verticalAlign: 'middle',
+          fontSize: '0.8125rem',
+          letterSpacing: '0.02em',
+          padding: '12px 16px',
+        },
+        sizeSmall: {
+          padding: '8px 12px',
         },
       },
     },

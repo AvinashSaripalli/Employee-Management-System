@@ -47,8 +47,22 @@ const ViewEmployeeDialog = ({ open, onClose, user }) => {
           <Box sx={{ display: 'flex', marginLeft:'30px' ,flexDirection: 'row' ,  }}>
 
             <CardContent sx={{ flex: '1 0 auto',}}>
-              <ListItem>
+              <ListItem sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography variant='h6' fontWeight={'bold'}>{user.lastName} {user.firstName}</Typography>
+                <Chip
+                  size="small"
+                  label={user.departmentRole === 'Supervisor' ? 'Supervisor' : 'Member'}
+                  sx={{
+                    height: 20,
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    bgcolor: user.departmentRole === 'Supervisor' ? '#ECFDF5' : '#F8FAFC',
+                    color: user.departmentRole === 'Supervisor' ? '#047857' : '#64748B',
+                    border: user.departmentRole === 'Supervisor' ? '1px solid #A7F3D0' : '1px solid #E2E8F0',
+                    borderRadius: '4px',
+                    px: 0.5,
+                  }}
+                />
               </ListItem>
               <ListItem>
                 <Typography variant="body1"><span style={{fontWeight:'bold'}}>Email: </span> {user.email}</Typography>

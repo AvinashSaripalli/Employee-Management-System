@@ -53,6 +53,10 @@ export const leaveIdentityParams = () => {
   return {
     employeeId: clean(localStorage.getItem('userEmployeeId')),
     companyName: clean(localStorage.getItem('companyName')),
+    userRole: clean(localStorage.getItem('userRole')),
+    userId: clean(localStorage.getItem('userId')),
+    departmentRole: clean(localStorage.getItem('departmentRole')),
+    department: clean(localStorage.getItem('userDepartment')),
   };
 };
 

@@ -17,19 +17,29 @@ export default function ActivitiesBoard({ activities, onCreate, onToggle, onDele
         <Button size="small" variant="contained" startIcon={<FiPlus size={14}/>} onClick={onCreate} sx={{ bgcolor:'#14286D', textTransform:'none', borderRadius:2 }}>Add Activity</Button>
       </Box>
       <TableContainer sx={{ maxHeight:420 }}>
-        <Table size="small" stickyHeader>
-          <TableHead><TableRow><TableCell>Done</TableCell><TableCell>Type</TableCell><TableCell>Subject</TableCell><TableCell>Related</TableCell><TableCell>Due</TableCell><TableCell>Owner</TableCell><TableCell align="center">Actions</TableCell></TableRow></TableHead>
+        <Table size="small" stickyHeader sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
+          <TableHead>
+            <TableRow>
+              <TableCell align="center" sx={{ width: 50, py: 1.25 }}>Done</TableCell>
+              <TableCell align="center" sx={{ width: 120, py: 1.25 }}>Type</TableCell>
+              <TableCell align="left" sx={{ py: 1.25 }}>Subject</TableCell>
+              <TableCell align="left" sx={{ width: 140, py: 1.25 }}>Related</TableCell>
+              <TableCell align="center" sx={{ width: 120, py: 1.25 }}>Due</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Owner</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
           <TableBody>
             {filtered.map(a=>{
               const overdue = a.dueDate && !a.done && new Date(a.dueDate) < new Date();
               return (
                 <TableRow key={a.id} hover sx={{ bgcolor: overdue? '#FFF7ED': undefined }}>
-                  <TableCell><Checkbox size="small" checked={!!a.done} onChange={()=>onToggle(a)} /></TableCell>
-                  <TableCell><Chip icon={iconFor(a.type)} label={a.type} size="small" sx={{ height:20, fontSize:11 }} /></TableCell>
-                  <TableCell><Typography fontWeight={600} fontSize={13}>{a.subject}</Typography><Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth:260, display:'block' }}>{a.description||''}</Typography></TableCell>
-                  <TableCell>{a.relatedType? `${a.relatedType}#${a.relatedId}`:'—'}</TableCell>
-                  <TableCell sx={{ color: overdue?'#DC2626':undefined }}>{a.dueDate? new Date(a.dueDate).toLocaleDateString(): '—'}</TableCell>
-                  <TableCell>{a.createdBy||'—'}</TableCell>
+                  <TableCell align="center"><Checkbox size="small" checked={!!a.done} onChange={()=>onToggle(a)} /></TableCell>
+                  <TableCell align="center"><Chip icon={iconFor(a.type)} label={a.type} size="small" sx={{ height:20, fontSize:11 }} /></TableCell>
+                  <TableCell align="left"><Typography fontWeight={600} fontSize={13}>{a.subject}</Typography><Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth:260, display:'block' }}>{a.description||''}</Typography></TableCell>
+                  <TableCell align="left">{a.relatedType? `${a.relatedType}#${a.relatedId}`:'—'}</TableCell>
+                  <TableCell align="center" sx={{ color: overdue?'#DC2626':undefined }}>{a.dueDate? new Date(a.dueDate).toLocaleDateString(): '—'}</TableCell>
+                  <TableCell align="center">{a.createdBy||'—'}</TableCell>
                   <TableCell align="center">
                     <IconButton size="small" onClick={()=>onEdit(a)}><FiEdit2 size={13}/></IconButton>
                     <IconButton size="small" color="error" onClick={()=>onDelete(a)}><FiTrash2 size={13}/></IconButton>

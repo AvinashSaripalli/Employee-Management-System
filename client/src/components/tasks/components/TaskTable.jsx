@@ -48,17 +48,17 @@ export default function TaskTable({ tasks, loading, selectedIds, setSelectedIds,
       </Box>
 
       <TableContainer sx={{ maxHeight: 560, overflowY: 'auto', '&::-webkit-scrollbar': { width: 6, height: 6 }, '&::-webkit-scrollbar-thumb': { bgcolor: '#CBD5E1', borderRadius: 3 } }}>
-        <Table stickyHeader size="small" sx={{ '& .MuiTableCell-head': { bgcolor: '#F8FAFD', backdropFilter: 'blur(6px)', borderBottom: '1px solid #E8EEF9' } }}>
+        <Table stickyHeader size="small" sx={{ '& td, & th': { verticalAlign: 'middle' }, '& .MuiTableCell-head': { bgcolor: '#F8FAFD', backdropFilter: 'blur(6px)', borderBottom: '1px solid #E8EEF9' } }}>
           <TableHead>
             <TableRow>
-              <TableCell padding="checkbox" sx={{ width: 44 }}><Checkbox size="small" checked={allChecked} indeterminate={indeterminate} onChange={toggleAll} sx={{ color: '#64748B', '&.Mui-checked': { color: '#14286D' } }} /></TableCell>
-              <TableCell sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569', py: 1.5 }}>Task</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569' }}>Assignee</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569' }}>Priority</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569' }}>Deadline</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569' }}>Status</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569' }}>Progress</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569', width: 120 }}>Actions</TableCell>
+              <TableCell padding="checkbox" sx={{ width: 44, textAlign: 'center' }}><Checkbox size="small" checked={allChecked} indeterminate={indeterminate} onChange={toggleAll} sx={{ color: '#64748B', '&.Mui-checked': { color: '#14286D' } }} /></TableCell>
+              <TableCell align="left" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569', py: 1.5 }}>Task</TableCell>
+              <TableCell align="left" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569', py: 1.5 }}>Assignee</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569', py: 1.5 }}>Priority</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569', py: 1.5 }}>Deadline</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569', py: 1.5 }}>Status</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569', py: 1.5 }}>Progress</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase', color: '#475569', width: 120, py: 1.5 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -139,14 +139,14 @@ export default function TaskTable({ tasks, loading, selectedIds, setSelectedIds,
                     </Box>
                   </TableCell>
 
-                  <TableCell align="center">
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                  <TableCell align="left">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Badge overlap="circular" badgeContent={isSelected ? <FiCheckCircle size={10} color="#fff" /> : null} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} sx={{ '& .MuiBadge-badge': { bgcolor: '#16A34A', width: 14, height: 14, border: '2px solid #fff' } }}>
                         <Avatar src={task.responsible?.photo || undefined} sx={{ width: 30, height: 30, fontSize: 12, fontWeight: 700, bgcolor: task.responsible ? '#E0E7FF' : '#F1F5F9', color: '#3730A3', border: '2px solid #fff', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                           {task.responsible ? `${task.responsible.firstName[0]}${task.responsible.lastName[0]}` : '?'}
                         </Avatar>
                       </Badge>
-                      <Box sx={{ textAlign: 'left', minWidth: 0, maxWidth: 110 }}>
+                      <Box sx={{ textAlign: 'left', minWidth: 0, maxWidth: 120 }}>
                         <Typography variant="caption" fontWeight={700} fontSize={12} noWrap>{task.responsible ? `${task.responsible.firstName} ${task.responsible.lastName}` : 'Unassigned'}</Typography>
                         <Typography variant="caption" color="text.secondary" fontSize={10} noWrap display="block">{task.responsible?.designation || '—'}</Typography>
                       </Box>

@@ -148,7 +148,7 @@ exports.clockOut = async (req, res) => {
 };
 
 exports.getAllAttendances = async (req, res) => {
-  const { companyName, department, role, supervisorDepartment, employeeId } = req.query;
+  const { companyName, department, role, supervisorDepartment, employeeId, departmentRole } = req.query;
 
   const rawCompany = String(companyName || '').trim();
   const effectiveCompany =
@@ -162,23 +162,25 @@ exports.getAllAttendances = async (req, res) => {
       where.companyName = { [Op.iLike]: effectiveCompany };
     }
 
+    const isDeptSupervisor = departmentRole === 'Supervisor' || role === 'Manager';
+
     // Role-based visibility:
-    if (role === 'Employee' || (employeeId && role !== 'Admin' && role !== 'Manager')) {
-      // Regular employee can only view their own attendance records
+    if (role === 'Admin') {
+      // Admin: optional department filter
+      if (department && department !== 'all') {
+        where.department = { [Op.iLike]: department.trim() };
+      }
       if (employeeId) {
         where.employeeId = employeeId;
       }
-    } else if (role === 'Manager') {
-      // Department Supervisor / Manager can only view their department
+    } else if (isDeptSupervisor) {
+      // Department Supervisor / Manager can view their department
       const targetDept = department || supervisorDepartment;
       if (targetDept && targetDept !== 'all') {
         where.department = { [Op.iLike]: targetDept.trim() };
       }
     } else {
-      // Admin: optional department filter
-      if (department && department !== 'all') {
-        where.department = { [Op.iLike]: department.trim() };
-      }
+      // Regular employee can only view their own attendance records
       if (employeeId) {
         where.employeeId = employeeId;
       }
@@ -199,7 +201,7 @@ exports.getAllAttendances = async (req, res) => {
 };
 
 exports.getAttendanceStats = async (req, res) => {
-  const { companyName, department, role, supervisorDepartment } = req.query;
+  const { companyName, department, role, supervisorDepartment, departmentRole } = req.query;
 
   const rawCompany = String(companyName || '').trim();
   const effectiveCompany =
@@ -213,7 +215,8 @@ exports.getAttendanceStats = async (req, res) => {
       [Op.and]: literal(`"clock_in_date" >= CURRENT_DATE - INTERVAL '6 days'`),
     };
 
-    const targetDept = department || (role === 'Manager' ? supervisorDepartment : null);
+    const isDeptSupervisor = departmentRole === 'Supervisor' || role === 'Manager';
+    const targetDept = department || (isDeptSupervisor ? supervisorDepartment : null);
     if (targetDept && targetDept !== 'all') {
       where.department = { [Op.iLike]: targetDept.trim() };
     }

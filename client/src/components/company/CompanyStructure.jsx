@@ -210,7 +210,17 @@ const CompanyStructure = () => {
     const depts = {};
 
     savedDepartments.forEach((department) => {
-      depts[department.name] = { ...depts[department.name], record: department, head: null, managers: [], members: [] };
+      let supervisor = null;
+      if (department.supervisorId) {
+        supervisor = users.find((u) => u.id === department.supervisorId) || null;
+      }
+      depts[department.name] = {
+        ...depts[department.name],
+        record: department,
+        head: supervisor,
+        managers: [],
+        members: [],
+      };
     });
 
     users.forEach((user) => {
@@ -219,16 +229,23 @@ const CompanyStructure = () => {
         depts[dept] = { ...depts[dept], head: depts[dept]?.head || null, managers: depts[dept]?.managers || [], members: depts[dept]?.members || [] };
       }
 
-      const isMgr = user.role && (user.role.toLowerCase() === 'manager' || user.role.toLowerCase() === 'admin');
+      const isSupervisor =
+        (depts[dept].record?.supervisorId && depts[dept].record.supervisorId === user.id) ||
+        user.departmentRole === 'Supervisor' ||
+        (user.role && user.role.toLowerCase() === 'manager');
 
-      if (isMgr) {
+      if (isSupervisor) {
         if (!depts[dept].head) {
           depts[dept].head = user;
-        } else {
+        } else if (depts[dept].head.id !== user.id) {
           depts[dept].managers.push(user);
         }
       } else {
-        depts[dept].members.push(user);
+        if (depts[dept].head && depts[dept].head.id === user.id) {
+          // Already registered as head
+        } else {
+          depts[dept].members.push(user);
+        }
       }
     });
 
@@ -242,15 +259,15 @@ const CompanyStructure = () => {
       .concat(depts[compName]?.managers || [])
       .concat(depts['Management']?.head ? [depts['Management'].head] : [])
       .concat(depts['Management']?.managers || [])
-      .concat(users.filter(u => u.role === 'Admin' || (u.role === 'Manager' && isRootDept(u.department))));
+      .concat(users.filter(u => u.role === 'Admin' || (u.departmentRole === 'Supervisor' && isRootDept(u.department))));
 
     const rootSupervisors = Array.from(new Map(rootSupervisorsRaw.map(u => [u.id, u])).values());
-    const rootHead = rootSupervisors[0] || users.find(u => u.role === 'Admin') || null;
+    const rootHead = users.find(u => u.role === 'Admin') || rootSupervisors[0] || null;
 
     const rootEmployeesRaw = (depts[compName]?.members || [])
       .concat(depts['Management']?.members || [])
-      .concat(users.filter(u => u.role !== 'Admin' && u.role !== 'Manager' && isRootDept(u.department)))
-      .concat(rootSupervisors.slice(1));
+      .concat(users.filter(u => u.role !== 'Admin' && (!rootHead || u.id !== rootHead.id) && isRootDept(u.department)))
+      .concat(rootSupervisors.filter(s => !rootHead || s.id !== rootHead.id));
 
     const rootEmployees = Array.from(new Map(rootEmployeesRaw.filter(u => !rootHead || u.id !== rootHead.id).map(u => [u.id, u])).values());
 
@@ -615,7 +632,7 @@ const CompanyStructure = () => {
                 </Avatar>
               </Tooltip>
               <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
                   <Typography
                     sx={{
                       fontSize: 12,
@@ -629,6 +646,21 @@ const CompanyStructure = () => {
                     {head.firstName} {head.lastName}
                   </Typography>
                   <FiAward size="12" color="#FE8600" />
+                  <Chip
+                    size="small"
+                    label="Supervisor"
+                    sx={{
+                      height: 16,
+                      fontSize: '9px',
+                      fontWeight: 700,
+                      bgcolor: '#ECFDF5',
+                      color: '#047857',
+                      border: '1px solid #A7F3D0',
+                      borderRadius: '4px',
+                      px: 0.25,
+                      '& .MuiChip-label': { px: 0.4 },
+                    }}
+                  />
                 </Box>
                 <Typography
                   sx={{
@@ -992,9 +1024,26 @@ const CompanyStructure = () => {
                     {getInitials(`${selectedDeptInfo.head.firstName} ${selectedDeptInfo.head.lastName}`)}
                   </Avatar>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 700, fontSize: 14 }} noWrap>
-                      {selectedDeptInfo.head.firstName} {selectedDeptInfo.head.lastName}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: 14 }} noWrap>
+                        {selectedDeptInfo.head.firstName} {selectedDeptInfo.head.lastName}
+                      </Typography>
+                      <Chip
+                        size="small"
+                        label="Supervisor"
+                        sx={{
+                          height: 18,
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          bgcolor: '#ECFDF5',
+                          color: '#047857',
+                          border: '1px solid #A7F3D0',
+                          borderRadius: '4px',
+                          px: 0.5,
+                          '& .MuiChip-label': { px: 0.5 },
+                        }}
+                      />
+                    </Box>
                     <Typography sx={{ fontSize: 12, color: 'text.secondary' }} noWrap>
                       {selectedDeptInfo.head.designation || 'Manager'}
                     </Typography>
@@ -1014,6 +1063,7 @@ const CompanyStructure = () => {
             <List sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
               {drawerMembers.map((user) => {
                 const isHead = user.id === selectedDeptInfo.head?.id;
+                const isSupervisorRole = isHead || user.departmentRole === 'Supervisor';
                 return (
                   <ListItem
                     key={user.id}
@@ -1045,11 +1095,26 @@ const CompanyStructure = () => {
                     <ListItemText
                       sx={{ minWidth: 0, flex: 1, mr: 1 }}
                       primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, flexWrap: 'wrap' }}>
                           <Typography sx={{ fontWeight: 700, fontSize: 13.5 }}>
                             {user.firstName} {user.lastName}
                           </Typography>
                           {isHead && <FiAward size="12" color="#FE8600" />}
+                          <Chip
+                            size="small"
+                            label={isSupervisorRole ? 'Supervisor' : 'Member'}
+                            sx={{
+                              height: 18,
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              bgcolor: isSupervisorRole ? '#ECFDF5' : '#F8FAFC',
+                              color: isSupervisorRole ? '#047857' : '#64748B',
+                              border: isSupervisorRole ? '1px solid #A7F3D0' : '1px solid #E2E8F0',
+                              borderRadius: '4px',
+                              px: 0.5,
+                              '& .MuiChip-label': { px: 0.5 },
+                            }}
+                          />
                         </Box>
                       }
                       secondary={

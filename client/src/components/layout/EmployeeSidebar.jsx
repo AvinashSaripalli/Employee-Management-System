@@ -42,6 +42,9 @@ const Sidebar = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [canReviewLeaves, setCanReviewLeaves] = useState(false);
   const [openReportDialog, setOpenReportDialog] = useState(false);
+  const [currentDeptRole, setCurrentDeptRole] = useState(
+    localStorage.getItem('departmentRole') || 'Member'
+  );
 
   const navigate = useNavigate();
 
@@ -50,11 +53,26 @@ const Sidebar = () => {
     setUserName(
       `${localStorage.getItem('userFirstName') || ''} ${localStorage.getItem('userLastName') || ''}`.trim() || 'User'
     );
+    const email = localStorage.getItem('userEmail');
+    if (email) {
+      axios.get('/users/by-email', { params: { email } })
+        .then((res) => {
+          if (res.data?.departmentRole) {
+            localStorage.setItem('departmentRole', res.data.departmentRole);
+            setCurrentDeptRole(res.data.departmentRole);
+          }
+          if (res.data?.department) {
+            localStorage.setItem('userDepartment', res.data.department);
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
     const role = localStorage.getItem('userRole');
-    if (!['Admin', 'Manager'].includes(role)) {
+    const deptRole = localStorage.getItem('departmentRole');
+    if (!['Admin', 'Manager'].includes(role) && deptRole !== 'Supervisor') {
       setCanReviewLeaves(false);
       return undefined;
     }
@@ -62,6 +80,8 @@ const Sidebar = () => {
     axios.get('/leaves/leave', { params: {
       companyName: localStorage.getItem('companyName'),
       employeeId: localStorage.getItem('userEmployeeId'),
+      departmentRole: deptRole,
+      department: localStorage.getItem('userDepartment'),
       status: 'Pending',
     } }).then(() => setCanReviewLeaves(true)).catch(() => setCanReviewLeaves(false));
   }, []);
@@ -235,7 +255,8 @@ const Sidebar = () => {
   };
 
   const userRole = localStorage.getItem('userRole') || 'Employee';
-  const isSupervisor = userRole === 'Manager';
+  const departmentRole = currentDeptRole || localStorage.getItem('departmentRole') || 'Member';
+  const isSupervisor = departmentRole === 'Supervisor' || userRole === 'Manager';
 
   const renderComponent = () => {
     switch (selectedComponent) {
@@ -246,10 +267,10 @@ const Sidebar = () => {
       case 'Attendance':
       case 'My Attendance':
       case 'My Work Time': return <Attendance />;
-      case 'Work Reports':
-      case 'My Work Reports': return <WorkReports />;
+      case 'Work Reports': return isSupervisor ? <Reports /> : <WorkReports />;
       case 'Department Reports':
       case 'Reports': return <Reports />;
+      case 'My Work Reports': return <WorkReports />;
       case 'Messenger': return <Messenger />;
       case 'CRM': return <Crm />;
       case 'Apply Leave': return <ApplyLeave />;
@@ -279,7 +300,7 @@ const Sidebar = () => {
       {todayRecord?.clockInTime && (
         <Tooltip title="Click to view all your clock-in & clock-out times">
           <Box
-            onClick={() => handleListItemOnClick(isSupervisor ? 'Time & Attendance' : 'My Work Time')}
+            onClick={() => handleListItemOnClick('Time & Attendance')}
             sx={{
               display: { xs: 'none', sm: 'flex' },
               alignItems: 'center',
@@ -358,12 +379,8 @@ const Sidebar = () => {
           icon: <HiOutlineClock {...iconStyle(selectedComponent === 'Time & Attendance' || selectedComponent === 'Attendance' || selectedComponent === 'My Work Time')} />,
         },
         {
-          text: 'Department Reports',
-          icon: <HiOutlineChartBar {...iconStyle(selectedComponent === 'Department Reports' || selectedComponent === 'Reports')} />,
-        },
-        {
-          text: 'My Work Reports',
-          icon: <HiOutlineDocumentText {...iconStyle(selectedComponent === 'My Work Reports' || selectedComponent === 'Work Reports')} />,
+          text: 'Work Reports',
+          icon: <HiOutlineChartBar {...iconStyle(selectedComponent === 'Work Reports' || selectedComponent === 'Department Reports' || selectedComponent === 'Reports')} />,
         },
         {
           text: 'Messenger',
@@ -400,8 +417,8 @@ const Sidebar = () => {
           icon: <HiOutlineUserGroup {...iconStyle(selectedComponent === 'Work Groups')} />,
         },
         {
-          text: 'My Work Time',
-          icon: <HiOutlineClock {...iconStyle(selectedComponent === 'My Work Time' || selectedComponent === 'My Attendance' || selectedComponent === 'Attendance')} />,
+          text: 'Time & Attendance',
+          icon: <HiOutlineClock {...iconStyle(selectedComponent === 'Time & Attendance' || selectedComponent === 'My Work Time' || selectedComponent === 'My Attendance' || selectedComponent === 'Attendance')} />,
         },
         {
           text: 'Work Reports',
@@ -441,7 +458,7 @@ const Sidebar = () => {
         onNavigate={handleListItemOnClick}
         userPhoto={userPhoto}
         userName={userName}
-        userRole={localStorage.getItem('userRole') || 'Employee'}
+        userRole={departmentRole === 'Supervisor' ? `Supervisor (${localStorage.getItem('userDepartment') || 'Dept'})` : (localStorage.getItem('userRole') || 'Employee')}
         userCompany={localStorage.getItem('companyName') || 'Not assigned'}
         onLogout={handleLogout}
         onProfile={() => handleListItemOnClick('Profile')}

@@ -51,13 +51,26 @@ export default function LeadsBoard({ leads, onCreate, onEdit, onDelete, onConver
       {view==='table' ? (
         <Paper sx={{ borderRadius:3, overflow:'hidden', border:'1px solid #E8EEF9' }}>
           <TableContainer sx={{ maxHeight:500 }}>
-            <Table size="small" stickyHeader>
-              <TableHead><TableRow><TableCell padding="checkbox"><Checkbox size="small" checked={filtered.length>0 && selected.length===filtered.length} indeterminate={selected.length>0 && selected.length<filtered.length} onChange={e=> setSelected(e.target.checked? filtered.map(x=>x.id): [])} /></TableCell><TableCell>Lead</TableCell><TableCell>Account</TableCell><TableCell>Source</TableCell><TableCell>Status</TableCell><TableCell>Health</TableCell><TableCell>Score</TableCell><TableCell>Value</TableCell><TableCell>Next Action</TableCell><TableCell align="center">Actions</TableCell></TableRow></TableHead>
+            <Table size="small" stickyHeader sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell padding="checkbox" align="center" sx={{ width: 44, py: 1.25 }}><Checkbox size="small" checked={filtered.length>0 && selected.length===filtered.length} indeterminate={selected.length>0 && selected.length<filtered.length} onChange={e=> setSelected(e.target.checked? filtered.map(x=>x.id): [])} /></TableCell>
+                  <TableCell align="left" sx={{ py: 1.25 }}>Lead</TableCell>
+                  <TableCell align="left" sx={{ py: 1.25 }}>Account</TableCell>
+                  <TableCell align="center" sx={{ width: 100, py: 1.25 }}>Source</TableCell>
+                  <TableCell align="center" sx={{ width: 120, py: 1.25 }}>Status</TableCell>
+                  <TableCell align="center" sx={{ width: 100, py: 1.25 }}>Health</TableCell>
+                  <TableCell align="center" sx={{ width: 100, py: 1.25 }}>Score</TableCell>
+                  <TableCell align="right" sx={{ width: 100, py: 1.25 }}>Value</TableCell>
+                  <TableCell align="left" sx={{ py: 1.25 }}>Next Action</TableCell>
+                  <TableCell align="center" sx={{ width: 120, py: 1.25 }}>Actions</TableCell>
+                </TableRow>
+              </TableHead>
               <TableBody>
                 {filtered.map(l=>(
                   <TableRow key={l.id} hover selected={selected.includes(l.id)} sx={{ bgcolor: l.isDuplicate? '#FFFBEB': undefined }}>
-                    <TableCell padding="checkbox"><Checkbox size="small" checked={selected.includes(l.id)} onChange={()=>toggleSelect(l.id)} /></TableCell>
-                    <TableCell>
+                    <TableCell padding="checkbox" align="center"><Checkbox size="small" checked={selected.includes(l.id)} onChange={()=>toggleSelect(l.id)} /></TableCell>
+                    <TableCell align="left">
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Avatar sx={{ width:30, height:30, fontSize:12, bgcolor: l.health==='Hot'?'#FEE2E2': l.health==='Warm'?'#FEF3C2':'#E0E7FF', color: healthColor(l.health) }}>{`${l.firstName[0]}${l.lastName[0]}`}</Avatar>
                         <Box>
@@ -70,18 +83,18 @@ export default function LeadsBoard({ leads, onCreate, onEdit, onDelete, onConver
                         </Box>
                       </Stack>
                     </TableCell>
-                    <TableCell><Typography fontSize={12}>{l.accountName||'—'}</Typography><Typography variant="caption" color="text.secondary">{l.nextFollowUp? `Follow: ${l.nextFollowUp}`:''}</Typography></TableCell>
-                    <TableCell><Chip size="small" label={l.source} sx={{ height:18, fontSize:11, bgcolor:'#F1F5F9' }}/></TableCell>
-                    <TableCell><Chip size="small" label={l.status} sx={{ bgcolor: LEAD_STATUS_COLOR[l.status]||'#EEF2FF', height:20, fontWeight:600, fontSize:11, border: l.status==='Converted'? '1px solid #16A34A':undefined }}/></TableCell>
-                    <TableCell><Chip icon={<FiZap size={10}/>} label={l.health||'Warm'} size="small" sx={{ bgcolor: healthBg(l.health), color: healthColor(l.health), height:20, fontWeight:700, fontSize:11 }}/></TableCell>
-                    <TableCell>
-                      <Box sx={{ display:'flex', alignItems:'center', gap:0.7 }}>
+                    <TableCell align="left"><Typography fontSize={12}>{l.accountName||'—'}</Typography><Typography variant="caption" color="text.secondary">{l.nextFollowUp? `Follow: ${l.nextFollowUp}`:''}</Typography></TableCell>
+                    <TableCell align="center"><Chip size="small" label={l.source} sx={{ height:18, fontSize:11, bgcolor:'#F1F5F9' }}/></TableCell>
+                    <TableCell align="center"><Chip size="small" label={l.status} sx={{ bgcolor: LEAD_STATUS_COLOR[l.status]||'#EEF2FF', height:20, fontWeight:600, fontSize:11, border: l.status==='Converted'? '1px solid #16A34A':undefined }}/></TableCell>
+                    <TableCell align="center"><Chip icon={<FiZap size={10}/>} label={l.health||'Warm'} size="small" sx={{ bgcolor: healthBg(l.health), color: healthColor(l.health), height:20, fontWeight:700, fontSize:11 }}/></TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display:'flex', alignItems:'center', justifyContent:'center', gap:0.7 }}>
                         <Box sx={{ width:50, height:6, bgcolor:'#E2E8F0', borderRadius:1, overflow:'hidden' }}><Box sx={{ width:`${l.healthScore||l.score}%`, height:'100%', bgcolor: (l.healthScore||l.score)>70?'#16A34A': (l.healthScore||l.score)>45?'#F59E0B':'#EF4444' }}/></Box>
                         <Typography variant="caption" fontWeight={700}>{l.healthScore||l.score}</Typography>
                       </Box>
                     </TableCell>
-                    <TableCell><Typography fontWeight={700} fontSize={12}>${Number(l.value).toLocaleString()}</Typography></TableCell>
-                    <TableCell sx={{ maxWidth:140 }}><Tooltip title={l.nextAction||''}><Typography variant="caption" sx={{ display:'-webkit-box', WebkitLineClamp:1, WebkitBoxOrient:'vertical', overflow:'hidden', fontSize:11, color:'#475569' }}>{l.nextAction||'—'}</Typography></Tooltip></TableCell>
+                    <TableCell align="right"><Typography fontWeight={700} fontSize={12}>${Number(l.value).toLocaleString()}</Typography></TableCell>
+                    <TableCell align="left" sx={{ maxWidth:140 }}><Tooltip title={l.nextAction||''}><Typography variant="caption" sx={{ display:'-webkit-box', WebkitLineClamp:1, WebkitBoxOrient:'vertical', overflow:'hidden', fontSize:11, color:'#475569' }}>{l.nextAction||'—'}</Typography></Tooltip></TableCell>
                     <TableCell align="center">
                       <Tooltip title={l.nextAction}><IconButton size="small" onClick={()=>onConvert(l)} sx={{ color:'#16A34A', bgcolor: l.health==='Hot'?'#DCFCE7':undefined }}><FiArrowRight size={14}/></IconButton></Tooltip>
                       <IconButton size="small" onClick={()=>onEdit(l)}><FiEdit2 size={14}/></IconButton>

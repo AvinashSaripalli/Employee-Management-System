@@ -27,17 +27,17 @@ const HOLIDAYS = [
 
 const HOLIDAY_SET = new Set(HOLIDAYS.map((h) => h.date));
 
+const TOTAL_ANNUAL_LEAVE_QUOTA = 12;
+
 const LEAVE_TYPES = {
   "Casual Leave": {
     code: "CL",
-    allocated: 12,
     allowPast: false,
     minNoticeDays: 0,
     paid: true,
   },
   "Sick Leave": {
     code: "SL",
-    allocated: 12,
     allowPast: true,
     maxPastDays: 7,
     minNoticeDays: 0,
@@ -45,35 +45,30 @@ const LEAVE_TYPES = {
   },
   "Earned Leave": {
     code: "EL",
-    allocated: 15,
     allowPast: false,
     minNoticeDays: 1,
     paid: true,
   },
   "Compensatory Off": {
     code: "CO",
-    allocated: 6,
     allowPast: false,
     minNoticeDays: 0,
     paid: true,
   },
   "Work From Home": {
     code: "WFH",
-    allocated: 24,
     allowPast: false,
     minNoticeDays: 0,
     paid: true,
   },
   "Unpaid Leave": {
     code: "UL",
-    allocated: null,
     allowPast: false,
     minNoticeDays: 0,
     paid: false,
   },
   "Maternity Leave": {
     code: "ML",
-    allocated: 182,
     allowPast: false,
     minNoticeDays: 15,
     paid: true,
@@ -81,7 +76,6 @@ const LEAVE_TYPES = {
   },
   "Paternity Leave": {
     code: "PL",
-    allocated: 15,
     allowPast: false,
     minNoticeDays: 3,
     paid: true,
@@ -170,10 +164,42 @@ function canApproveRole(role) {
   return role === "Admin" || role === "Manager";
 }
 
+function getLeaveYearRange(input = new Date()) {
+  let d;
+  if (!input) {
+    d = new Date();
+  } else if (typeof input === 'number') {
+    d = new Date(input, 4, 1);
+  } else if (typeof input === 'string') {
+    if (/^\d{4}$/.test(input)) {
+      d = new Date(Number(input), 4, 1);
+    } else {
+      d = parseDate(input) || new Date(input);
+    }
+  } else if (input instanceof Date) {
+    d = input;
+  } else {
+    d = new Date();
+  }
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1; // 1 to 12
+  const startYear = month >= 4 ? year : year - 1;
+  const endYear = startYear + 1;
+  return {
+    startYear,
+    endYear,
+    label: `Apr ${startYear} – Mar ${endYear}`,
+    startDate: `${startYear}-04-01`,
+    endDate: `${endYear}-03-31`,
+  };
+}
+
 module.exports = {
+  TOTAL_ANNUAL_LEAVE_QUOTA,
   HOLIDAYS,
   LEAVE_TYPES,
   ACTIVE_STATUSES,
+  getLeaveYearRange,
   parseDate,
   formatDate,
   todayDate,

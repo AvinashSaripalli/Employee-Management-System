@@ -17,7 +17,7 @@ exports.registerUsers = async (req, res) => {
 
   // Basic-fields mode: password/photo are optional for admin-created employees
   // Default password if not supplied, and photo is nullable
-  const effectivePassword = password || "Welcome@123";
+  const effectivePassword = password || "Password@123";
   const effectiveConfirm = confirmPassword || effectivePassword;
   if (effectivePassword !== effectiveConfirm) {
     return res.status(400).json({ error: "Passwords do not match" });
@@ -123,6 +123,10 @@ exports.getUserByEmail = async (req, res) => {
       email: user.email,
       companyName: user.companyName || null,
       role: user.role,
+      departmentRole: user.departmentRole || 'Member',
+      department: user.department,
+      employeeId: user.employeeId,
+      designation: user.designation,
     });
   } catch (error) {
     console.error("Error finding user by email:", error);
@@ -173,6 +177,7 @@ exports.loginUser = async (req, res) => {
       {
         id: user.id,
         role: user.role,
+        departmentRole: user.departmentRole || 'Member',
         companyName: user.companyName,
         department: user.department,
         employeeId: user.employeeId,
@@ -185,6 +190,7 @@ exports.loginUser = async (req, res) => {
       success: true,
       token,
       role: user.role,
+      departmentRole: user.departmentRole || 'Member',
       photo: photoUrl,
       companyName: user.companyName,
       designation: user.designation,

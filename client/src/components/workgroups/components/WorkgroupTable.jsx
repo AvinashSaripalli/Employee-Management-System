@@ -71,13 +71,13 @@ const WorkgroupTable = ({
         overflowX: 'auto',
       }}
     >
-      <Table stickyHeader aria-label="workgroups table">
+      <Table stickyHeader aria-label="workgroups table" sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
         <TableHead>
           <TableRow sx={{ '& th': { bgcolor: '#F8FAFC', fontWeight: 700, color: '#334155', fontSize: '0.85rem' } }}>
-            <TableCell>Workgroup</TableCell>
-            <TableCell>Category</TableCell>
+            <TableCell align="left">Workgroup</TableCell>
+            <TableCell align="center">Category</TableCell>
             <TableCell align="center">Privacy</TableCell>
-            <TableCell>Leader</TableCell>
+            <TableCell align="left">Leader</TableCell>
             <TableCell align="center">Members</TableCell>
             <TableCell align="center">Created</TableCell>
             <TableCell align="center">Status</TableCell>
@@ -118,7 +118,7 @@ const WorkgroupTable = ({
                 </TableCell>
 
                 {/* Category */}
-                <TableCell>
+                <TableCell align="center">
                   <Chip
                     label={group.category || 'Project Pod'}
                     size="small"

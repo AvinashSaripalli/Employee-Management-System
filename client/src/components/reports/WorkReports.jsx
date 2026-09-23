@@ -494,23 +494,23 @@ const WorkReports = () => {
         {/* Table View */}
         {viewMode === 'table' && (
           <TableContainer sx={{ maxHeight: 'calc(100vh - 360px)' }}>
-            <Table stickyHeader size="small">
+            <Table stickyHeader size="small" sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ width: 44, bgcolor: '#f8fafc', py: 1 }} />
-                  <TableCell sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px' }}>
+                  <TableCell align="center" sx={{ width: 48, bgcolor: '#f8fafc', py: 1.25 }} />
+                  <TableCell align="left" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', width: 170, py: 1.25 }}>
                     Date
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px' }}>
+                  <TableCell align="left" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1.25 }}>
                     Task Name
                   </TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px' }}>
+                  <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', width: 140, py: 1.25 }}>
                     Hours
                   </TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px' }}>
+                  <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', width: 170, py: 1.25 }}>
                     Feedback Status
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px' }}>
+                  <TableCell align="right" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', width: 120, py: 1.25 }}>
                     Actions
                   </TableCell>
                 </TableRow>
@@ -561,13 +561,13 @@ const WorkReports = () => {
                             transition: 'background-color 0.15s',
                           }}
                         >
-                          <TableCell sx={{ py: 1 }}>
+                          <TableCell align="center" sx={{ py: 1.25 }}>
                             <IconButton size="small" onClick={() => setExpandedId(expanded ? null : report.id)}>
                               {expanded ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
                             </IconButton>
                           </TableCell>
 
-                          <TableCell sx={{ py: 1 }}>
+                          <TableCell align="left" sx={{ py: 1.25 }}>
                             <Typography sx={{ fontWeight: 700, fontSize: '13.5px', color: '#0f172a' }}>
                               {formatDate(report.date)}
                             </Typography>
@@ -576,7 +576,7 @@ const WorkReports = () => {
                             </Typography>
                           </TableCell>
 
-                          <TableCell sx={{ py: 1 }}>
+                          <TableCell align="left" sx={{ py: 1.25 }}>
                             <Typography sx={{ fontWeight: 600, fontSize: '13.5px', color: '#0f172a' }}>
                               {report.taskName}
                             </Typography>
@@ -585,7 +585,7 @@ const WorkReports = () => {
                             </Typography>
                           </TableCell>
 
-                          <TableCell align="center" sx={{ py: 1 }}>
+                          <TableCell align="center" sx={{ py: 1.25 }}>
                             <Chip
                               icon={<AccessTimeIcon sx={{ fontSize: '14px !important', color: '#0369a1 !important' }} />}
                               label={formatHours(report.hoursWorked)}
@@ -600,7 +600,7 @@ const WorkReports = () => {
                             />
                           </TableCell>
 
-                          <TableCell align="center" sx={{ py: 1 }}>
+                          <TableCell align="center" sx={{ py: 1.25 }}>
                             <Chip
                               label={isReviewed ? 'Reviewed' : 'Pending Feedback'}
                               size="small"
@@ -616,7 +616,7 @@ const WorkReports = () => {
                             />
                           </TableCell>
 
-                          <TableCell align="right" sx={{ py: 1 }}>
+                          <TableCell align="right" sx={{ py: 1.25 }}>
                             <Tooltip title="Edit Report">
                               <IconButton
                                 size="small"

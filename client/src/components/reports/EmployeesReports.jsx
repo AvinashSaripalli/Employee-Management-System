@@ -65,28 +65,40 @@ const EmployeesReports = () => {
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
       <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 2 }}>Work Reports</Typography>
-      <TableContainer component={Paper} sx={{ maxHeight: '462px', overflowY: 'auto', boxShadow: "rgba(0, 0, 0, 0.1) 0px 2px 12px" }}>
-        <Table>
-          <TableHead sx={{ height: "80px" }}>
+      <TableContainer component={Paper} sx={{ maxHeight: '462px', overflowY: 'auto', borderRadius: 3, border: '1px solid #E8ECF5' }}>
+        <Table stickyHeader sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
+          <TableHead>
             <TableRow>
-              <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Report ID</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Date</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Department</TableCell>
-              <TableCell sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Task Name</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Hours Worked</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 'bold', fontSize: '16px', color: 'black' }}>Actions</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, fontSize: '13px', color: '#14286D', bgcolor: '#F6F8FE', py: 1.5, width: 120 }}>Report ID</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, fontSize: '13px', color: '#14286D', bgcolor: '#F6F8FE', py: 1.5, width: 140 }}>Date</TableCell>
+              <TableCell align="left" sx={{ fontWeight: 700, fontSize: '13px', color: '#14286D', bgcolor: '#F6F8FE', py: 1.5 }}>Department</TableCell>
+              <TableCell align="left" sx={{ fontWeight: 700, fontSize: '13px', color: '#14286D', bgcolor: '#F6F8FE', py: 1.5 }}>Task Name</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, fontSize: '13px', color: '#14286D', bgcolor: '#F6F8FE', py: 1.5, width: 140 }}>Hours Worked</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, fontSize: '13px', color: '#14286D', bgcolor: '#F6F8FE', py: 1.5, width: 110 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {reports.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((report, index) => (
-              <TableRow key={index} sx={{ '&:nth-of-type(odd)': { backgroundColor: '#f9f9f9' }, height: "70px" }}>
-                <TableCell align="center">{report.id}</TableCell>
-                <TableCell align="center">{new Date(report.date).toLocaleDateString('en-GB')}</TableCell>
-                <TableCell>{report.department}</TableCell>
-                <TableCell>{report.taskName}</TableCell>
-                <TableCell align="center">{report.hoursWorked}</TableCell>
-                <TableCell align="center">
-                  <Button variant='contained' size='small' onClick={() => handleViewClick(report)}>View</Button>
+              <TableRow key={index} hover sx={{ '&:hover': { backgroundColor: '#F8FAFD' } }}>
+                <TableCell align="center" sx={{ py: 1.25 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#14286D' }}>#{report.id}</Typography>
+                </TableCell>
+                <TableCell align="center" sx={{ py: 1.25, fontSize: '13px', color: '#1B2A5B' }}>
+                  {new Date(report.date).toLocaleDateString('en-GB')}
+                </TableCell>
+                <TableCell align="left" sx={{ py: 1.25 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#1B2A5B' }}>{report.department}</Typography>
+                </TableCell>
+                <TableCell align="left" sx={{ py: 1.25, fontSize: '13px', color: 'text.secondary' }}>
+                  {report.taskName}
+                </TableCell>
+                <TableCell align="center" sx={{ py: 1.25 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: '#0369a1' }}>{report.hoursWorked}h</Typography>
+                </TableCell>
+                <TableCell align="center" sx={{ py: 1.25 }}>
+                  <Button variant="contained" size="small" onClick={() => handleViewClick(report)} sx={{ bgcolor: '#14286D', textTransform: 'none', fontWeight: 600 }}>
+                    View
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

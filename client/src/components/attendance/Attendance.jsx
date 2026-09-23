@@ -51,9 +51,10 @@ const Attendance = () => {
 
   // User Role & Context
   const userRole = localStorage.getItem('userRole') || 'Employee';
+  const departmentRole = localStorage.getItem('departmentRole') || 'Member';
   const userDepartment = localStorage.getItem('userDepartment') || '';
   const userEmployeeId = localStorage.getItem('userEmployeeId') || '';
-  const isSupervisor = userRole === 'Manager';
+  const isSupervisor = departmentRole === 'Supervisor' || userRole === 'Manager';
   const isAdmin = userRole === 'Admin';
   const isEmployee = !isAdmin && !isSupervisor;
 
@@ -70,6 +71,7 @@ const Attendance = () => {
       const params = { companyName };
       if (isSupervisor && userDepartment) {
         params.role = 'Manager';
+        params.departmentRole = departmentRole;
         params.supervisorDepartment = userDepartment;
       } else if (isEmployee && userEmployeeId) {
         params.role = 'Employee';
@@ -108,7 +110,7 @@ const Attendance = () => {
     } finally {
       setLoading(false);
     }
-  }, [companyName, isSupervisor, userDepartment, isEmployee, userEmployeeId, selectedMonth]);
+  }, [companyName, isSupervisor, departmentRole, userDepartment, isEmployee, userEmployeeId, selectedMonth]);
 
   useEffect(() => {
     fetchData();
@@ -239,6 +241,7 @@ const Attendance = () => {
         department: dept,
         photo: user.photo,
         role: user.role,
+        departmentRole: user.departmentRole || 'Member',
       });
     });
 
@@ -459,35 +462,35 @@ const Attendance = () => {
   };
 
   return (
-    <Box sx={{ p: { xs: 1.5, md: 3 }, bgcolor: '#f4f7f9', minHeight: '100vh' }}>
+    <Box sx={{ p: { xs: 1.5, md: 3 }, bgcolor: '#F3F6FB', minHeight: '100vh' }}>
       {/* Top Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a', letterSpacing: '-0.4px', display: 'flex', alignItems: 'center', gap: 1 }}>
-            {isEmployee ? 'My Work Time' : 'Time & Attendance'}
+          <Typography variant="h5" sx={{ fontWeight: 800, color: '#1B2A5B', letterSpacing: '-0.4px', display: 'flex', alignItems: 'center', gap: 1 }}>
+            Time & Attendance
             {isEmployee && (
               <Chip
                 label={`My Records · ${userEmployeeId || 'Employee'}`}
                 size="small"
-                sx={{ bgcolor: '#ecfdf5', color: '#047857', fontWeight: 700, fontSize: '11px' }}
+                sx={{ bgcolor: '#EEF2FF', color: '#14286D', border: '1px solid #DDE4FF', fontWeight: 700, fontSize: '11px' }}
               />
             )}
             {isSupervisor && (
               <Chip
                 label={`${userDepartment} Supervisor View`}
                 size="small"
-                sx={{ bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 700, fontSize: '11px' }}
+                sx={{ bgcolor: '#EEF2FF', color: '#14286D', border: '1px solid #DDE4FF', fontWeight: 700, fontSize: '11px' }}
               />
             )}
             {isAdmin && (
               <Chip
                 label="Admin View · All Departments"
                 size="small"
-                sx={{ bgcolor: '#f1f5f9', color: '#475569', fontWeight: 700, fontSize: '11px' }}
+                sx={{ bgcolor: '#F6F8FE', color: '#14286D', border: '1px solid #DDE4FF', fontWeight: 700, fontSize: '11px' }}
               />
             )}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '13px', mt: 0.25 }}>
+          <Typography variant="body2" sx={{ color: '#66708C', fontSize: '13px', mt: 0.25 }}>
             {isEmployee
               ? 'View your daily clock-in, clock-out times, worked hours, and shift history.'
               : isSupervisor
@@ -503,7 +506,12 @@ const Attendance = () => {
             exclusive
             onChange={(_, next) => next && setViewMode(next)}
             size="small"
-            sx={{ bgcolor: '#ffffff', height: 33 }}
+            sx={{
+              bgcolor: '#ffffff',
+              height: 33,
+              border: '1px solid #DDE4FF',
+              '& .Mui-selected': { bgcolor: '#14286D !important', color: '#ffffff !important' },
+            }}
           >
             <ToggleButton value="matrix" sx={{ textTransform: 'none', fontWeight: 600, fontSize: '12px', px: 1.2 }}>
               <CalendarViewMonthIcon sx={{ fontSize: 16, mr: 0.5 }} />
@@ -525,11 +533,11 @@ const Attendance = () => {
               fontWeight: 600,
               fontSize: '13px',
               borderRadius: '7px',
-              borderColor: '#cbd5e1',
-              color: '#475569',
+              borderColor: '#DDE4FF',
+              color: '#14286D',
               bgcolor: '#ffffff',
               height: 33,
-              '&:hover': { bgcolor: '#f8fafc', borderColor: '#94a3b8' },
+              '&:hover': { bgcolor: '#EEF2FF', borderColor: '#14286D' },
             }}
           >
             Refresh
@@ -546,10 +554,10 @@ const Attendance = () => {
               fontWeight: 700,
               fontSize: '13px',
               borderRadius: '7px',
-              bgcolor: '#0284c7',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
+              bgcolor: '#14286D',
+              boxShadow: '0 2px 6px rgba(20, 40, 109, 0.25)',
               height: 33,
-              '&:hover': { bgcolor: '#0369a1' },
+              '&:hover': { bgcolor: '#0F1F58' },
             }}
           >
             Export CSV
@@ -561,11 +569,11 @@ const Attendance = () => {
       <Paper
         elevation={0}
         sx={{
-          borderRadius: '10px',
-          border: '1px solid #dcdfe4',
+          borderRadius: '12px',
+          border: '1px solid #EDF0F7',
           bgcolor: '#ffffff',
           overflow: 'hidden',
-          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.04)',
+          boxShadow: '0 2px 10px rgba(20, 40, 109, 0.04)',
         }}
       >
         {/* Toolbar: Month Navigation, Search, Department Filter */}
@@ -577,7 +585,7 @@ const Attendance = () => {
             flexWrap: 'wrap',
             px: 2,
             py: 1.25,
-            borderBottom: '1px solid #edf1f5',
+            borderBottom: '1px solid #EDF0F7',
             gap: 1.5,
           }}
         >
@@ -586,19 +594,19 @@ const Attendance = () => {
             <IconButton
               size="small"
               onClick={() => setSelectedMonth((prev) => prev.subtract(1, 'month'))}
-              sx={{ p: 0.6, color: '#475569', borderRadius: '6px', border: '1px solid #e2e8f0', '&:hover': { bgcolor: '#f1f5f9' } }}
+              sx={{ p: 0.6, color: '#14286D', borderRadius: '6px', border: '1px solid #DDE4FF', '&:hover': { bgcolor: '#EEF2FF' } }}
             >
               <ChevronLeftIcon fontSize="small" />
             </IconButton>
 
-            <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: '#1e293b', px: 1, minWidth: 140, textAlign: 'center', userSelect: 'none' }}>
+            <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: '#1B2A5B', px: 1, minWidth: 140, textAlign: 'center', userSelect: 'none' }}>
               {selectedMonth.format('MMMM YYYY')}
             </Typography>
 
             <IconButton
               size="small"
               onClick={() => setSelectedMonth((prev) => prev.add(1, 'month'))}
-              sx={{ p: 0.6, color: '#475569', borderRadius: '6px', border: '1px solid #e2e8f0', '&:hover': { bgcolor: '#f1f5f9' } }}
+              sx={{ p: 0.6, color: '#14286D', borderRadius: '6px', border: '1px solid #DDE4FF', '&:hover': { bgcolor: '#EEF2FF' } }}
             >
               <ChevronRightIcon fontSize="small" />
             </IconButton>
@@ -617,11 +625,11 @@ const Attendance = () => {
                 fontWeight: 700,
                 textTransform: 'none',
                 borderRadius: '6px',
-                borderColor: '#cbd5e1',
-                color: '#0284c7',
-                bgcolor: '#f0f9ff',
+                borderColor: '#DDE4FF',
+                color: '#14286D',
+                bgcolor: '#EEF2FF',
                 py: 0.4,
-                '&:hover': { bgcolor: '#e0f2fe', borderColor: '#0284c7' },
+                '&:hover': { bgcolor: '#DDE4FF', borderColor: '#14286D' },
               }}
             >
               Today ({dayjs().format('DD MMM')})
@@ -730,8 +738,8 @@ const Attendance = () => {
                   <TableCell
                     sx={{
                       fontWeight: 700,
-                      color: '#1e3a5f',
-                      bgcolor: '#dff0f8',
+                      color: '#14286D',
+                      bgcolor: '#F6F8FE',
                       fontSize: '13px',
                       py: 1,
                       px: 2,
@@ -741,8 +749,8 @@ const Attendance = () => {
                       position: 'sticky',
                       left: 0,
                       zIndex: 4,
-                      borderRight: '2px solid #b8d5e5',
-                      borderBottom: '1px solid #cbdde9',
+                      borderRight: '1.5px solid #E8ECF5',
+                      borderBottom: '1.5px solid #E8ECF5',
                     }}
                   >
                     Employee
@@ -753,15 +761,15 @@ const Attendance = () => {
                     align="center"
                     sx={{
                       fontWeight: 700,
-                      color: '#1e3a5f',
-                      bgcolor: '#dff0f8',
+                      color: '#14286D',
+                      bgcolor: '#F6F8FE',
                       fontSize: '12px',
                       py: 1,
                       px: 1,
                       width: 100,
                       minWidth: 100,
-                      borderRight: '2px solid #b8d5e5',
-                      borderBottom: '1px solid #cbdde9',
+                      borderRight: '1.5px solid #E8ECF5',
+                      borderBottom: '1.5px solid #E8ECF5',
                     }}
                   >
                     Month Total
@@ -774,20 +782,20 @@ const Attendance = () => {
                       align="center"
                       onClick={() => scrollToDay(day.dayNumber)}
                       sx={{
-                        bgcolor: day.isToday ? '#e0f2fe' : '#dff0f8',
-                        color: '#1e3a5f',
+                        bgcolor: day.isToday ? '#EEF2FF' : '#F6F8FE',
+                        color: '#14286D',
                         fontWeight: 600,
                         width: 58,
                         minWidth: 58,
                         maxWidth: 58,
-                        borderRight: '1px solid #cbdde9',
-                        borderBottom: '1px solid #cbdde9',
+                        borderRight: '1px solid #E8ECF5',
+                        borderBottom: '1.5px solid #E8ECF5',
                         px: 0.2,
                         py: 0.6,
                         cursor: 'pointer',
                         userSelect: 'none',
                         transition: 'background-color 0.15s',
-                        '&:hover': { bgcolor: '#bae6fd' },
+                        '&:hover': { bgcolor: '#E0E7FF' },
                       }}
                     >
                       <Box
@@ -795,15 +803,15 @@ const Attendance = () => {
                           fontSize: '13px',
                           fontWeight: 700,
                           lineHeight: 1.2,
-                          color: day.isToday ? '#0284c7' : '#1e3a5f',
+                          color: day.isToday ? '#ffffff' : '#14286D',
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           minWidth: 22,
                           height: 22,
                           borderRadius: day.isToday ? '12px' : 0,
-                          bgcolor: day.isToday ? '#ffffff' : 'transparent',
-                          boxShadow: day.isToday ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                          bgcolor: day.isToday ? '#14286D' : 'transparent',
+                          boxShadow: day.isToday ? '0 1px 3px rgba(20,40,109,0.3)' : 'none',
                         }}
                       >
                         {day.dayNumber}
@@ -839,10 +847,10 @@ const Attendance = () => {
                         <TableRow
                           onClick={() => toggleDeptCollapse(departmentName)}
                           sx={{
-                            bgcolor: '#f4f6f8',
+                            bgcolor: '#F6F8FE',
                             cursor: 'pointer',
                             userSelect: 'none',
-                            '&:hover': { bgcolor: '#edf0f3' },
+                            '&:hover': { bgcolor: '#EEF2FF' },
                           }}
                         >
                           <TableCell
@@ -852,11 +860,11 @@ const Attendance = () => {
                               px: 1.5,
                               fontWeight: 700,
                               fontSize: '12px',
-                              color: '#334155',
+                              color: '#14286D',
                               textTransform: 'uppercase',
                               letterSpacing: '0.4px',
-                              borderTop: '1px solid #e2e8f0',
-                              borderBottom: '1px solid #e2e8f0',
+                              borderTop: '1px solid #E8ECF5',
+                              borderBottom: '1px solid #E8ECF5',
                               position: 'sticky',
                               left: 0,
                               zIndex: 2,
@@ -865,17 +873,17 @@ const Attendance = () => {
                           >
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, position: 'sticky', left: 16 }}>
                               {isCollapsed ? (
-                                <KeyboardArrowRightIcon sx={{ fontSize: 18, color: '#0284c7' }} />
+                                <KeyboardArrowRightIcon sx={{ fontSize: 18, color: '#14286D' }} />
                               ) : (
-                                <KeyboardArrowDownIcon sx={{ fontSize: 18, color: '#0284c7' }} />
+                                <KeyboardArrowDownIcon sx={{ fontSize: 18, color: '#14286D' }} />
                               )}
-                              <Typography sx={{ fontWeight: 800, fontSize: '12px', color: '#0f172a', letterSpacing: '0.4px' }}>
+                              <Typography sx={{ fontWeight: 800, fontSize: '12px', color: '#14286D', letterSpacing: '0.4px' }}>
                                 DEPARTMENT: {departmentName.toUpperCase()}
                               </Typography>
                               <Chip
                                 label={`${departmentEmployees.length} employees`}
                                 size="small"
-                                sx={{ height: 18, fontSize: '10px', fontWeight: 700, bgcolor: '#0284c7', color: '#ffffff' }}
+                                sx={{ height: 18, fontSize: '10px', fontWeight: 700, bgcolor: '#14286D', color: '#ffffff' }}
                               />
                             </Box>
                           </TableCell>
@@ -886,19 +894,19 @@ const Attendance = () => {
                           departmentEmployees.map((emp) => {
                             const stats = getEmployeeMonthStats(emp);
                             const initials = emp.name
-                              .split(' ')
-                              .map((p) => p[0])
-                              .join('')
-                              .slice(0, 2)
-                              .toUpperCase();
+                               .split(' ')
+                               .map((p) => p[0])
+                               .join('')
+                               .slice(0, 2)
+                               .toUpperCase();
 
                             return (
                               <TableRow
                                 key={emp.employeeId || emp.id}
                                 sx={{
                                   '&:hover': {
-                                    bgcolor: '#f8fafc',
-                                    '& .sticky-emp-col': { bgcolor: '#f8fafc' },
+                                    bgcolor: '#F8FAFD',
+                                    '& .sticky-emp-col': { bgcolor: '#F8FAFD' },
                                   },
                                 }}
                               >
@@ -915,9 +923,9 @@ const Attendance = () => {
                                     left: 0,
                                     zIndex: 2,
                                     bgcolor: '#ffffff',
-                                    borderRight: '2px solid #e2e8f0',
-                                    borderBottom: '1px solid #edf2f7',
-                                    boxShadow: '2px 0 4px rgba(0,0,0,0.02)',
+                                    borderRight: '1.5px solid #EDF0F7',
+                                    borderBottom: '1px solid #EDF0F7',
+                                    boxShadow: '2px 0 4px rgba(20,40,109,0.02)',
                                   }}
                                 >
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -927,7 +935,8 @@ const Attendance = () => {
                                         height: 28,
                                         fontSize: '11px',
                                         fontWeight: 700,
-                                        bgcolor: '#0284c7',
+                                        bgcolor: '#14286D',
+                                        color: '#ffffff',
                                         flexShrink: 0,
                                       }}
                                     >
@@ -938,7 +947,7 @@ const Attendance = () => {
                                         sx={{
                                           fontSize: '13px',
                                           fontWeight: 600,
-                                          color: '#0f172a',
+                                          color: '#1B2A5B',
                                           lineHeight: 1.2,
                                           whiteSpace: 'nowrap',
                                           overflow: 'hidden',
@@ -955,20 +964,38 @@ const Attendance = () => {
                                             height: 18,
                                             fontSize: '9.5px',
                                             fontWeight: 700,
-                                            bgcolor: '#e0f2fe',
-                                            color: '#0284c7',
-                                            border: '1px solid #bae6fd',
+                                            bgcolor: '#EEF2FF',
+                                            color: '#14286D',
+                                            border: '1px solid #DDE4FF',
                                             borderRadius: '4px',
                                             flexShrink: 0,
                                             px: 0.5,
                                             '& .MuiChip-label': { px: 0.5 },
                                           }}
                                         />
+                                        {emp.departmentRole === 'Supervisor' && (
+                                          <Chip
+                                            label="Supervisor"
+                                            size="small"
+                                            sx={{
+                                              height: 18,
+                                              fontSize: '9.5px',
+                                              fontWeight: 700,
+                                              bgcolor: '#ECFDF5',
+                                              color: '#047857',
+                                              border: '1px solid #A7F3D0',
+                                              borderRadius: '4px',
+                                              flexShrink: 0,
+                                              px: 0.5,
+                                              '& .MuiChip-label': { px: 0.5 },
+                                            }}
+                                          />
+                                        )}
                                         <Typography
                                           variant="caption"
                                           sx={{
                                             fontSize: '11px',
-                                            color: '#64748b',
+                                            color: '#66708C',
                                             lineHeight: 1.1,
                                             overflow: 'hidden',
                                             textOverflow: 'ellipsis',
@@ -991,8 +1018,8 @@ const Attendance = () => {
                                   sx={{
                                     py: 1,
                                     px: 0.75,
-                                    borderRight: '2px solid #e2e8f0',
-                                    borderBottom: '1px solid #edf2f7',
+                                    borderRight: '1.5px solid #EDF0F7',
+                                    borderBottom: '1px solid #EDF0F7',
                                   }}
                                 >
                                   <Chip
@@ -1045,12 +1072,12 @@ const Attendance = () => {
                                         minWidth: 58,
                                         maxWidth: 58,
                                         verticalAlign: 'middle',
-                                        borderRight: '1px solid #edf2f7',
-                                        borderBottom: '1px solid #edf2f7',
+                                        borderRight: '1px solid #EDF0F7',
+                                        borderBottom: '1px solid #EDF0F7',
                                         bgcolor: day.isToday
-                                          ? '#f0f9ff'
+                                          ? '#EEF2FF'
                                           : day.isWeekend
-                                          ? '#fafbfc'
+                                          ? '#F9FAFB'
                                           : 'transparent',
                                       }}
                                     >
@@ -1096,18 +1123,18 @@ const Attendance = () => {
                                               px: 0.5,
                                               py: 0.3,
                                               borderRadius: '4px',
-                                              bgcolor: !report ? '#fffbeb' : '#e0f2fe',
-                                              border: !report ? '1px solid #fde68a' : '1px solid #bae6fd',
+                                              bgcolor: !report ? '#fffbeb' : '#EEF2FF',
+                                              border: !report ? '1px solid #fde68a' : '1px solid #DDE4FF',
                                               cursor: 'pointer',
                                               transition: 'all 0.15s ease',
                                               '&:hover': {
-                                                bgcolor: !report ? '#fef3c7' : '#bae6fd',
+                                                bgcolor: !report ? '#fef3c7' : '#E0E7FF',
                                                 transform: 'scale(1.04)',
-                                                boxShadow: '0 2px 5px rgba(2, 132, 199, 0.2)',
+                                                boxShadow: '0 2px 5px rgba(20, 40, 109, 0.15)',
                                               },
                                             }}
                                           >
-                                            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: !report ? '#b45309' : '#0369a1', lineHeight: 1.1 }}>
+                                            <Typography sx={{ fontSize: '10px', fontWeight: 800, color: !report ? '#b45309' : '#14286D', lineHeight: 1.1 }}>
                                               {att.workedTime ? att.workedTime.slice(0, 5) : 'Done'}
                                             </Typography>
                                             {!report ? (
@@ -1129,7 +1156,7 @@ const Attendance = () => {
                                                 No Report
                                               </Typography>
                                             ) : (
-                                              <Typography sx={{ fontSize: '8.5px', color: '#0284c7', lineHeight: 1.1, mt: 0.2 }}>
+                                              <Typography sx={{ fontSize: '8.5px', color: '#14286D', lineHeight: 1.1, mt: 0.2 }}>
                                                 {att.clockInTime ? att.clockInTime.slice(0, 5) : ''}
                                               </Typography>
                                             )}
@@ -1260,35 +1287,35 @@ const Attendance = () => {
           /* ======================================================= */
           <>
             <TableContainer sx={{ maxHeight: 'calc(100vh - 350px)' }}>
-              <Table stickyHeader size="small">
+              <Table stickyHeader size="small" sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
                 <TableHead>
                   <TableRow>
                     {!isEmployee && (
                       <>
-                        <TableCell sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                        <TableCell align="left" sx={{ fontWeight: 700, color: '#14286D', bgcolor: '#F6F8FE', fontSize: '13px', py: 1.25, borderBottom: '1.5px solid #E8ECF5' }}>
                           Employee
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                        <TableCell align="center" sx={{ fontWeight: 700, color: '#14286D', bgcolor: '#F6F8FE', fontSize: '13px', py: 1.25, width: 140, borderBottom: '1.5px solid #E8ECF5' }}>
                           Department
                         </TableCell>
                       </>
                     )}
-                    <TableCell align={isEmployee ? 'left' : 'center'} sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1, pl: isEmployee ? 2.5 : 1 }}>
+                    <TableCell align={isEmployee ? 'left' : 'center'} sx={{ fontWeight: 700, color: '#14286D', bgcolor: '#F6F8FE', fontSize: '13px', py: 1.25, width: 140, borderBottom: '1.5px solid #E8ECF5' }}>
                       Date
                     </TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                    <TableCell align="center" sx={{ fontWeight: 700, color: '#14286D', bgcolor: '#F6F8FE', fontSize: '13px', py: 1.25, width: 130, borderBottom: '1.5px solid #E8ECF5' }}>
                       Clock In Time
                     </TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                    <TableCell align="center" sx={{ fontWeight: 700, color: '#14286D', bgcolor: '#F6F8FE', fontSize: '13px', py: 1.25, width: 130, borderBottom: '1.5px solid #E8ECF5' }}>
                       Clock Out Time
                     </TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                    <TableCell align="center" sx={{ fontWeight: 700, color: '#14286D', bgcolor: '#F6F8FE', fontSize: '13px', py: 1.25, width: 140, borderBottom: '1.5px solid #E8ECF5' }}>
                       Worked Duration
                     </TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                    <TableCell align="center" sx={{ fontWeight: 700, color: '#14286D', bgcolor: '#F6F8FE', fontSize: '13px', py: 1.25, width: 140, borderBottom: '1.5px solid #E8ECF5' }}>
                       Shift Status
                     </TableCell>
-                    <TableCell align="center" sx={{ fontWeight: 700, color: '#1e293b', bgcolor: '#f8fafc', fontSize: '13px', py: 1 }}>
+                    <TableCell align="center" sx={{ fontWeight: 700, color: '#14286D', bgcolor: '#F6F8FE', fontSize: '13px', py: 1.25, width: 130, borderBottom: '1.5px solid #E8ECF5' }}>
                       Work Report
                     </TableCell>
                   </TableRow>
@@ -1303,15 +1330,20 @@ const Attendance = () => {
                     </TableRow>
                   ) : paginatedList.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={isEmployee ? 6 : 8} align="center" sx={{ py: 8, color: 'text.secondary', fontSize: '14px' }}>
-                        No attendance records found.
+                      <TableCell colSpan={isEmployee ? 6 : 8} align="center" sx={{ py: 8, color: '#64748b', fontSize: '14px' }}>
+                        No attendance records found for this period.
                       </TableCell>
                     </TableRow>
                   ) : (
                     paginatedList.map((item) => {
-                      const fullName = `${item.firstName || ''} ${item.lastName || ''}`.trim() || item.employeeId || 'Employee';
-                      const initials = fullName.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
                       const isActive = !item.clockOutTime;
+                      const fullName = `${item.firstName || ''} ${item.lastName || ''}`.trim() || item.employeeId || 'Employee';
+                      const initials = fullName
+                        .split(' ')
+                        .map((p) => p[0])
+                        .join('')
+                        .slice(0, 2)
+                        .toUpperCase();
                       const itemDate = String(item.clockInDate || '').slice(0, 10);
                       const eId = item.employeeId ? String(item.employeeId).trim().toLowerCase() : '';
                       const eName = fullName.trim().toLowerCase();
@@ -1322,21 +1354,21 @@ const Attendance = () => {
                           key={item.id}
                           hover
                           onClick={() => setDetailModal({ attendance: item, employee: { name: fullName, employeeId: item.employeeId, department: item.department, designation: item.designation }, date: item.clockInDate, report: rep })}
-                          sx={{ cursor: 'pointer' }}
+                          sx={{ cursor: 'pointer', '&:hover': { bgcolor: '#F8FAFD' } }}
                         >
                           {!isEmployee && (
                             <>
-                              <TableCell sx={{ py: 1 }}>
+                              <TableCell align="left" sx={{ py: 1.25 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                                  <Avatar sx={{ width: 28, height: 28, fontSize: '11px', fontWeight: 700, bgcolor: '#0284c7' }}>
+                                  <Avatar sx={{ width: 30, height: 30, fontSize: '11px', fontWeight: 700, bgcolor: '#14286D', color: '#ffffff' }}>
                                     {initials}
                                   </Avatar>
-                                  <Box>
-                                    <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>
+                                  <Box sx={{ minWidth: 0 }}>
+                                    <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#1B2A5B' }}>
                                       {fullName}
                                     </Typography>
                                     {item.designation && (
-                                      <Typography variant="caption" sx={{ fontSize: '11px', color: '#64748b' }}>
+                                      <Typography variant="caption" sx={{ fontSize: '11px', color: '#66708C', display: 'block' }}>
                                         {item.designation}
                                       </Typography>
                                     )}
@@ -1344,16 +1376,16 @@ const Attendance = () => {
                                 </Box>
                               </TableCell>
 
-                              <TableCell sx={{ py: 1 }}>
+                              <TableCell align="center" sx={{ py: 1.25 }}>
                                 <Chip
                                   label={item.department || 'General'}
                                   size="small"
                                   sx={{
                                     fontSize: '11px',
                                     fontWeight: 700,
-                                    bgcolor: '#e0f2fe',
-                                    color: '#0284c7',
-                                    border: '1px solid #bae6fd',
+                                    bgcolor: '#EEF2FF',
+                                    color: '#14286D',
+                                    border: '1px solid #DDE4FF',
                                     borderRadius: '4px',
                                   }}
                                 />
@@ -1361,7 +1393,7 @@ const Attendance = () => {
                             </>
                           )}
 
-                          <TableCell align={isEmployee ? 'left' : 'center'} sx={{ py: 1, fontSize: '13px', fontWeight: 600, color: '#0f172a', pl: isEmployee ? 2.5 : 1 }}>
+                          <TableCell align={isEmployee ? 'left' : 'center'} sx={{ py: 1.25, fontSize: '13px', fontWeight: 600, color: '#1B2A5B' }}>
                             {item.clockInDate ? formatDate(item.clockInDate) : '—'}
                           </TableCell>
 
@@ -1389,7 +1421,7 @@ const Attendance = () => {
                             )}
                           </TableCell>
 
-                          <TableCell align="center" sx={{ py: 1, fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                          <TableCell align="center" sx={{ py: 1, fontSize: '13px', fontWeight: 700, color: '#1B2A5B' }}>
                             {item.workedTime || (isActive ? 'In session' : '—')}
                           </TableCell>
 
@@ -1454,7 +1486,7 @@ const Attendance = () => {
               page={page}
               onPageChange={(_, p) => setPage(p)}
               onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
-              sx={{ borderTop: '1px solid #edf1f5' }}
+              sx={{ borderTop: '1px solid #EDF0F7' }}
             />
           </>
         )}
@@ -1481,8 +1513,8 @@ const Attendance = () => {
               </>
             ) : (
               <>
-                <AccessTimeIcon sx={{ color: '#0284c7', fontSize: 24 }} />
-                <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a' }}>
+                <AccessTimeIcon sx={{ color: '#14286D', fontSize: 24 }} />
+                <Typography variant="h6" sx={{ fontWeight: 800, color: '#1B2A5B' }}>
                   Attendance & Shift Details
                 </Typography>
               </>
@@ -1508,14 +1540,14 @@ const Attendance = () => {
                       .toUpperCase()}
                   </Avatar>
                   <Box>
-                    <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#1B2A5B' }}>
                       {detailModal.employee?.name}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b', fontSize: '12px' }}>
+                    <Typography variant="body2" sx={{ color: '#66708C', fontSize: '12px' }}>
                       ID: {detailModal.employee?.employeeId} · Department: {detailModal.employee?.department}
                     </Typography>
                     {detailModal.employee?.designation && (
-                      <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '11px' }}>
+                      <Typography variant="caption" sx={{ color: '#66708C', fontSize: '11px' }}>
                         Designation: {detailModal.employee.designation}
                       </Typography>
                     )}
@@ -1525,7 +1557,7 @@ const Attendance = () => {
                 <Paper variant="outlined" sx={{ p: 2, borderRadius: '8px', bgcolor: '#ffffff' }}>
                   <Stack spacing={1.5}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
+                      <Typography variant="body2" sx={{ color: '#66708C', fontWeight: 600 }}>
                         Leave Type:
                       </Typography>
                       <Chip
@@ -1538,20 +1570,20 @@ const Attendance = () => {
                     </Box>
 
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
+                      <Typography variant="body2" sx={{ color: '#66708C', fontWeight: 600 }}>
                         Period:
                       </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#1B2A5B' }}>
                         {formatDate(detailModal.leave?.start_date)} to {formatDate(detailModal.leave?.end_date)}
                       </Typography>
                     </Box>
 
                     {detailModal.leave?.days && (
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 600 }}>
+                        <Typography variant="body2" sx={{ color: '#66708C', fontWeight: 600 }}>
                           Total Duration:
                         </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#1B2A5B' }}>
                           {detailModal.leave.days} day(s)
                         </Typography>
                       </Box>
@@ -1559,7 +1591,7 @@ const Attendance = () => {
 
                     {detailModal.leave?.reason && (
                       <Box sx={{ pt: 0.5 }}>
-                        <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: '#66708C', fontWeight: 600, display: 'block', mb: 0.5 }}>
                           Reason:
                         </Typography>
                         <Typography variant="body2" sx={{ fontSize: '12.5px', color: '#334155', fontStyle: 'italic', bgcolor: '#f8fafc', p: 1.25, borderRadius: '6px', border: '1px solid #e2e8f0' }}>
@@ -1577,8 +1609,8 @@ const Attendance = () => {
             ) : (
               <Stack spacing={2.5}>
                 {/* Employee Summary Card */}
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: '8px', bgcolor: '#f8fafc', display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Avatar sx={{ width: 44, height: 44, bgcolor: '#0284c7', fontWeight: 700, fontSize: '15px' }}>
+                <Paper variant="outlined" sx={{ p: 2, borderRadius: '8px', bgcolor: '#F8FAFD', borderColor: '#EDF0F7', display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Avatar sx={{ width: 44, height: 44, bgcolor: '#14286D', color: '#ffffff', fontWeight: 700, fontSize: '15px' }}>
                     {(detailModal.employee?.name || detailModal.attendance?.firstName || 'E')
                       .split(' ')
                       .map((p) => p[0])
@@ -1587,14 +1619,14 @@ const Attendance = () => {
                       .toUpperCase()}
                   </Avatar>
                   <Box>
-                    <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '15px', color: '#1B2A5B' }}>
                       {detailModal.employee?.name || `${detailModal.attendance?.firstName || ''} ${detailModal.attendance?.lastName || ''}`.trim()}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b', fontSize: '12px' }}>
+                    <Typography variant="body2" sx={{ color: '#66708C', fontSize: '12px' }}>
                       ID: {detailModal.attendance?.employeeId || detailModal.employee?.employeeId} · Department: {detailModal.attendance?.department || detailModal.employee?.department}
                     </Typography>
                     {detailModal.employee?.designation && (
-                      <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '11px' }}>
+                      <Typography variant="caption" sx={{ color: '#66708C', fontSize: '11px' }}>
                         Designation: {detailModal.employee.designation}
                       </Typography>
                     )}
@@ -1619,23 +1651,23 @@ const Attendance = () => {
                     <Typography variant="caption" sx={{ color: detailModal.attendance?.clockOutTime ? '#475569' : '#92400e', fontWeight: 700, textTransform: 'uppercase', fontSize: '10.5px' }}>
                       Clock-Out Time
                     </Typography>
-                    <Typography variant="h6" sx={{ color: detailModal.attendance?.clockOutTime ? '#0f172a' : '#d97706', fontWeight: 800, mt: 0.2 }}>
+                    <Typography variant="h6" sx={{ color: detailModal.attendance?.clockOutTime ? '#1B2A5B' : '#d97706', fontWeight: 800, mt: 0.2 }}>
                       {detailModal.attendance?.clockOutTime || 'Active (Working)'}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748b', fontSize: '11px' }}>
+                    <Typography variant="caption" sx={{ color: '#66708C', fontSize: '11px' }}>
                       {detailModal.attendance?.clockOutTime ? 'Shift Completed' : 'Shift currently in progress'}
                     </Typography>
                   </Paper>
                 </Box>
 
                 {/* Work Duration & Status */}
-                <Paper variant="outlined" sx={{ p: 1.75, borderRadius: '8px', bgcolor: '#ffffff' }}>
+                <Paper variant="outlined" sx={{ p: 1.75, borderRadius: '8px', bgcolor: '#ffffff', borderColor: '#EDF0F7' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Box>
-                      <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px' }}>
+                      <Typography variant="caption" sx={{ color: '#66708C', fontWeight: 600, textTransform: 'uppercase', fontSize: '11px' }}>
                         Total Worked Duration
                       </Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a', mt: 0.2 }}>
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: '#1B2A5B', mt: 0.2 }}>
                         {detailModal.attendance?.workedTime || (detailModal.attendance?.clockOutTime ? '—' : 'In Session')}
                       </Typography>
                     </Box>
@@ -1643,10 +1675,10 @@ const Attendance = () => {
                       label={detailModal.attendance?.clockOutTime ? 'Completed Shift' : 'Working Now'}
                       sx={{
                         fontWeight: 700,
-                        bgcolor: detailModal.attendance?.clockOutTime ? '#f1f5f9' : '#ecfdf5',
-                        color: detailModal.attendance?.clockOutTime ? '#475569' : '#059669',
+                        bgcolor: detailModal.attendance?.clockOutTime ? '#F6F8FE' : '#ecfdf5',
+                        color: detailModal.attendance?.clockOutTime ? '#14286D' : '#059669',
                         border: '1px solid',
-                        borderColor: detailModal.attendance?.clockOutTime ? '#e2e8f0' : '#a7f3d0',
+                        borderColor: detailModal.attendance?.clockOutTime ? '#DDE4FF' : '#a7f3d0',
                       }}
                     />
                   </Box>
@@ -1654,21 +1686,21 @@ const Attendance = () => {
 
                 {/* Associated Work Report If Submitted */}
                 {detailModal.report ? (
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: '8px', bgcolor: '#f0f9ff', borderColor: '#bae6fd' }}>
+                  <Paper variant="outlined" sx={{ p: 2, borderRadius: '8px', bgcolor: '#EEF2FF', borderColor: '#DDE4FF' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      <AssignmentTurnedInIcon sx={{ color: '#0284c7', fontSize: 20 }} />
-                      <Typography sx={{ fontWeight: 700, fontSize: '13px', color: '#0369a1' }}>
+                      <AssignmentTurnedInIcon sx={{ color: '#14286D', fontSize: 20 }} />
+                      <Typography sx={{ fontWeight: 700, fontSize: '13px', color: '#14286D' }}>
                         Associated Work Report
                       </Typography>
                     </Box>
-                    <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#1B2A5B' }}>
                       {detailModal.report.taskName}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.2 }}>
+                    <Typography variant="caption" sx={{ color: '#66708C', display: 'block', mt: 0.2 }}>
                       Reported Hours: {formatHours(detailModal.report.hoursWorked)} · Feedback: {detailModal.report.feedback || 'Pending'}
                     </Typography>
                     {detailModal.report.workDescription && (
-                      <Typography variant="body2" sx={{ fontSize: '12px', color: '#334155', mt: 1, whiteSpace: 'pre-wrap', bgcolor: '#ffffff', p: 1.25, borderRadius: '6px', border: '1px solid #e0f2fe' }}>
+                      <Typography variant="body2" sx={{ fontSize: '12px', color: '#334155', mt: 1, whiteSpace: 'pre-wrap', bgcolor: '#ffffff', p: 1.25, borderRadius: '6px', border: '1px solid #DDE4FF' }}>
                         {detailModal.report.workDescription}
                       </Typography>
                     )}

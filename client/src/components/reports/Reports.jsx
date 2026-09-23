@@ -66,10 +66,11 @@ const Reports = () => {
 
   const tableContainerRef = useRef(null);
 
-  // Role detection: Admin sees all, Department Supervisor (Manager) sees only their department
+  // Role detection: Admin sees all, Department Supervisor sees only their department
   const userRole = localStorage.getItem('userRole') || 'Employee';
+  const departmentRole = localStorage.getItem('departmentRole') || 'Member';
   const userDepartment = localStorage.getItem('userDepartment') || '';
-  const isSupervisor = userRole === 'Manager';
+  const isSupervisor = departmentRole === 'Supervisor' || userRole === 'Manager';
   const isAdmin = userRole === 'Admin';
 
   // Read companyName safely, defaulting to KN Advisors if null or undefined string
@@ -87,6 +88,7 @@ const Reports = () => {
       const params = { companyName };
       if (isSupervisor && userDepartment) {
         params.role = 'Manager';
+        params.departmentRole = departmentRole;
         params.supervisorDepartment = userDepartment;
       }
 
@@ -123,7 +125,7 @@ const Reports = () => {
     } finally {
       setLoading(false);
     }
-  }, [companyName, isSupervisor, userDepartment, selectedMonth]);
+  }, [companyName, isSupervisor, departmentRole, userDepartment, selectedMonth]);
 
   useEffect(() => {
     fetchData();
@@ -262,6 +264,7 @@ const Reports = () => {
         department: dept,
         photo: user.photo,
         role: user.role,
+        departmentRole: user.departmentRole || 'Member',
       });
     });
 
@@ -469,14 +472,14 @@ const Reports = () => {
   if (loading && !reports.length && !users.length) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 14 }}>
-        <CircularProgress size={44} thickness={4} sx={{ color: '#0284c7', mb: 2 }} />
+        <CircularProgress size={44} thickness={4} sx={{ color: '#14286D', mb: 2 }} />
         <Typography variant="body2" color="text.secondary">Loading work reports & attendance...</Typography>
       </Box>
     );
   }
 
   return (
-    <Box sx={{ p: { xs: 1.5, md: 3 }, bgcolor: '#f4f7f9', minHeight: '100vh' }}>
+    <Box sx={{ p: { xs: 1.5, md: 3 }, bgcolor: '#F3F6FB', minHeight: '100vh' }}>
       {/* Top Header Section */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, flexWrap: 'wrap', gap: 1.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -484,7 +487,7 @@ const Reports = () => {
             variant="h5"
             sx={{
               fontWeight: 800,
-              color: '#0f172a',
+              color: '#1B2A5B',
               letterSpacing: '-0.4px',
               display: 'flex',
               alignItems: 'center',
@@ -498,7 +501,7 @@ const Reports = () => {
             <Chip
               label={`${userDepartment} Supervisor View`}
               size="small"
-              sx={{ bgcolor: '#e0f2fe', color: '#0369a1', fontWeight: 700, fontSize: '11px' }}
+              sx={{ bgcolor: '#EEF2FF', color: '#14286D', fontWeight: 700, fontSize: '11px', border: '1px solid #DDE4FF' }}
             />
           )}
 
@@ -506,7 +509,7 @@ const Reports = () => {
             <Chip
               label="Admin · All Departments"
               size="small"
-              sx={{ bgcolor: '#f1f5f9', color: '#475569', fontWeight: 700, fontSize: '11px' }}
+              sx={{ bgcolor: '#F6F8FE', color: '#14286D', fontWeight: 700, fontSize: '11px', border: '1px solid #EDF0F7' }}
             />
           )}
         </Box>
@@ -522,12 +525,12 @@ const Reports = () => {
               textTransform: 'none',
               fontWeight: 600,
               fontSize: '13px',
-              borderRadius: '7px',
-              borderColor: '#cbd5e1',
-              color: '#475569',
+              borderRadius: '8px',
+              borderColor: '#E8ECF5',
+              color: '#1B2A5B',
               bgcolor: '#ffffff',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-              '&:hover': { bgcolor: '#f8fafc', borderColor: '#94a3b8' },
+              boxShadow: '0 1px 2px rgba(17,32,77,0.04)',
+              '&:hover': { bgcolor: '#F6F8FE', borderColor: '#DDE4FF' },
             }}
           >
             Refresh
@@ -542,10 +545,10 @@ const Reports = () => {
               textTransform: 'none',
               fontWeight: 600,
               fontSize: '13px',
-              borderRadius: '7px',
-              bgcolor: '#0284c7',
-              boxShadow: '0 2px 6px rgba(2, 132, 199, 0.25)',
-              '&:hover': { bgcolor: '#0369a1' },
+              borderRadius: '8px',
+              bgcolor: '#14286D',
+              boxShadow: '0 4px 12px rgba(20, 40, 109, 0.25)',
+              '&:hover': { bgcolor: '#0F1F58' },
             }}
           >
             Export CSV
@@ -561,9 +564,9 @@ const Reports = () => {
             mb: 2,
             px: 2,
             py: 1,
-            borderRadius: '8px',
-            bgcolor: '#eff6ff',
-            border: '1px solid #bfdbfe',
+            borderRadius: '10px',
+            bgcolor: '#EEF2FF',
+            border: '1px solid #DDE4FF',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -575,10 +578,9 @@ const Reports = () => {
             <Chip
               label="Latest Submission"
               size="small"
-              color="primary"
-              sx={{ height: 20, fontSize: '10.5px', fontWeight: 700 }}
+              sx={{ height: 20, fontSize: '10.5px', fontWeight: 700, bgcolor: '#14286D', color: '#ffffff' }}
             />
-            <Typography variant="body2" sx={{ color: '#1e3a8a', fontSize: '13px' }}>
+            <Typography variant="body2" sx={{ color: '#1B2A5B', fontSize: '13px' }}>
               <strong>{getEmployeeName(latestReport)}</strong> submitted{' '}
               <strong>&ldquo;{latestReport.taskName}&rdquo;</strong> on {formatDate(latestReport.date)} ({formatHours(latestReport.hoursWorked)})
             </Typography>
@@ -597,9 +599,9 @@ const Reports = () => {
                 py: 0.25,
                 px: 1.25,
                 bgcolor: '#ffffff',
-                borderColor: '#93c5fd',
-                color: '#1d4ed8',
-                '&:hover': { bgcolor: '#f0f9ff', borderColor: '#3b82f6' },
+                borderColor: '#DDE4FF',
+                color: '#14286D',
+                '&:hover': { bgcolor: '#F6F8FE', borderColor: '#14286D' },
               }}
             >
               View Report
@@ -614,8 +616,8 @@ const Reports = () => {
                 fontSize: '12px',
                 py: 0.25,
                 px: 1.25,
-                bgcolor: '#2563eb',
-                '&:hover': { bgcolor: '#1d4ed8' },
+                bgcolor: '#14286D',
+                '&:hover': { bgcolor: '#0F1F58' },
               }}
             >
               Scroll to Date ({String(latestReport.date).slice(8, 10)})
@@ -718,12 +720,12 @@ const Reports = () => {
                 fontSize: '12px',
                 fontWeight: 700,
                 textTransform: 'none',
-                borderRadius: '6px',
-                borderColor: '#cbd5e1',
-                color: '#0284c7',
-                bgcolor: '#f0f9ff',
+                borderRadius: '8px',
+                borderColor: '#DDE4FF',
+                color: '#14286D',
+                bgcolor: '#EEF2FF',
                 py: 0.4,
-                '&:hover': { bgcolor: '#e0f2fe', borderColor: '#0284c7' },
+                '&:hover': { bgcolor: '#DDE4FF', borderColor: '#14286D' },
               }}
             >
               Today ({dayjs().format('DD MMM')})
@@ -765,8 +767,8 @@ const Reports = () => {
                   onChange={(e) => setShowStatistics(e.target.checked)}
                   size="small"
                   sx={{
-                    color: '#0284c7',
-                    '&.Mui-checked': { color: '#0284c7' },
+                    color: '#14286D',
+                    '&.Mui-checked': { color: '#14286D' },
                     p: 0.5,
                   }}
                 />
@@ -785,14 +787,14 @@ const Reports = () => {
                 label={`Department: ${userDepartment}`}
                 size="small"
                 sx={{
-                  bgcolor: '#f1f5f9',
-                  color: '#0f172a',
+                  bgcolor: '#EEF2FF',
+                  color: '#14286D',
                   fontWeight: 700,
                   fontSize: '12px',
                   height: 33,
                   px: 1,
                   borderRadius: '6px',
-                  border: '1px solid #cbd5e1',
+                  border: '1px solid #DDE4FF',
                 }}
               />
             ) : (
@@ -851,7 +853,7 @@ const Reports = () => {
               PaperProps={{ sx: { minWidth: 190, mt: 0.5, borderRadius: '8px', boxShadow: '0 4px 14px rgba(0,0,0,0.08)' } }}
             >
               <MenuItem onClick={handleExportCSV} sx={{ fontSize: '13px', gap: 1.5, py: 1 }}>
-                <DownloadIcon fontSize="small" sx={{ color: '#0284c7' }} /> Export CSV
+                <DownloadIcon fontSize="small" sx={{ color: '#14286D' }} /> Export CSV
               </MenuItem>
               <Divider sx={{ my: 0.5 }} />
               <MenuItem onClick={() => { fetchData(); setSettingsAnchor(null); }} sx={{ fontSize: '13px', gap: 1.5, py: 1 }}>
@@ -915,8 +917,8 @@ const Reports = () => {
                 {/* Employee Column Header */}
                 <TableCell
                   sx={{
-                    bgcolor: '#dff0f8',
-                    color: '#1e3a5f',
+                    bgcolor: '#F6F8FE',
+                    color: '#14286D',
                     fontWeight: 700,
                     fontSize: '13px',
                     width: 250,
@@ -925,8 +927,8 @@ const Reports = () => {
                     position: 'sticky',
                     left: 0,
                     zIndex: 4,
-                    borderRight: '1.5px solid #cbdde9',
-                    borderBottom: '1.5px solid #cbdde9',
+                    borderRight: '1.5px solid #E8ECF5',
+                    borderBottom: '1.5px solid #E8ECF5',
                     py: 1,
                     px: 1.5,
                   }}
@@ -940,16 +942,16 @@ const Reports = () => {
                     <TableCell
                       align="center"
                       sx={{
-                        bgcolor: '#dff0f8',
-                        color: '#1e3a5f',
+                        bgcolor: '#F6F8FE',
+                        color: '#14286D',
                         fontWeight: 700,
                         fontSize: '11px',
                         lineHeight: 1.2,
                         width: 90,
                         minWidth: 90,
                         maxWidth: 90,
-                        borderRight: '1px solid #cbdde9',
-                        borderBottom: '1px solid #cbdde9',
+                        borderRight: '1px solid #E8ECF5',
+                        borderBottom: '1px solid #E8ECF5',
                         px: 0.5,
                         py: 0.75,
                       }}
@@ -959,16 +961,16 @@ const Reports = () => {
                     <TableCell
                       align="center"
                       sx={{
-                        bgcolor: '#dff0f8',
-                        color: '#1e3a5f',
+                        bgcolor: '#F6F8FE',
+                        color: '#14286D',
                         fontWeight: 700,
                         fontSize: '11px',
                         lineHeight: 1.2,
                         width: 90,
                         minWidth: 90,
                         maxWidth: 90,
-                        borderRight: '1px solid #cbdde9',
-                        borderBottom: '1px solid #cbdde9',
+                        borderRight: '1px solid #E8ECF5',
+                        borderBottom: '1px solid #E8ECF5',
                         px: 0.5,
                         py: 0.75,
                         position: 'relative',
@@ -1001,20 +1003,20 @@ const Reports = () => {
                     align="center"
                     onClick={() => scrollToDay(day.dayNumber)}
                     sx={{
-                      bgcolor: day.isToday ? '#e0f2fe' : '#dff0f8',
-                      color: '#1e3a5f',
+                      bgcolor: day.isToday ? '#EEF2FF' : '#F6F8FE',
+                      color: '#14286D',
                       fontWeight: 600,
                       width: 58,
                       minWidth: 58,
                       maxWidth: 58,
-                      borderRight: '1px solid #cbdde9',
-                      borderBottom: '1px solid #cbdde9',
+                      borderRight: '1px solid #E8ECF5',
+                      borderBottom: '1px solid #E8ECF5',
                       px: 0.2,
                       py: 0.6,
                       cursor: 'pointer',
                       userSelect: 'none',
                       transition: 'background-color 0.15s',
-                      '&:hover': { bgcolor: '#bae6fd' },
+                      '&:hover': { bgcolor: '#E0E7FF' },
                     }}
                   >
                     <Box
@@ -1022,15 +1024,15 @@ const Reports = () => {
                         fontSize: '13px',
                         fontWeight: 700,
                         lineHeight: 1.2,
-                        color: day.isToday ? '#0284c7' : '#1e3a5f',
+                        color: day.isToday ? '#ffffff' : '#14286D',
                         display: 'inline-flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         minWidth: 22,
                         height: 22,
                         borderRadius: day.isToday ? '12px' : 0,
-                        bgcolor: day.isToday ? '#ffffff' : 'transparent',
-                        boxShadow: day.isToday ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        bgcolor: day.isToday ? '#14286D' : 'transparent',
+                        boxShadow: day.isToday ? '0 1px 3px rgba(20,40,109,0.3)' : 'none',
                       }}
                     >
                       {day.dayNumber}
@@ -1039,7 +1041,7 @@ const Reports = () => {
                       sx={{
                         fontSize: '10px',
                         fontWeight: 600,
-                        color: day.isWeekend ? '#94a3b8' : '#475569',
+                        color: day.isWeekend ? '#94a3b8' : '#66708C',
                         mt: 0.2,
                       }}
                     >
@@ -1071,10 +1073,10 @@ const Reports = () => {
                       <TableRow
                         onClick={() => toggleDeptCollapse(departmentName)}
                         sx={{
-                          bgcolor: '#f4f6f8',
+                          bgcolor: '#F6F8FE',
                           cursor: 'pointer',
                           userSelect: 'none',
-                          '&:hover': { bgcolor: '#edf0f3' },
+                          '&:hover': { bgcolor: '#EEF2FF' },
                         }}
                       >
                         <TableCell
@@ -1084,11 +1086,11 @@ const Reports = () => {
                             px: 1.5,
                             fontWeight: 700,
                             fontSize: '11.5px',
-                            color: '#334155',
+                            color: '#1B2A5B',
                             textTransform: 'uppercase',
                             letterSpacing: '0.4px',
-                            borderTop: '1px solid #e2e8f0',
-                            borderBottom: '1px solid #e2e8f0',
+                            borderTop: '1px solid #EDF0F7',
+                            borderBottom: '1px solid #EDF0F7',
                             position: 'sticky',
                             left: 0,
                             zIndex: 2,
@@ -1097,11 +1099,11 @@ const Reports = () => {
                         >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, position: 'sticky', left: 16 }}>
                             {isCollapsed ? (
-                              <KeyboardArrowRightIcon sx={{ fontSize: 18, color: '#0284c7' }} />
+                              <KeyboardArrowRightIcon sx={{ fontSize: 18, color: '#14286D' }} />
                             ) : (
-                              <KeyboardArrowDownIcon sx={{ fontSize: 18, color: '#0284c7' }} />
+                              <KeyboardArrowDownIcon sx={{ fontSize: 18, color: '#14286D' }} />
                             )}
-                            <Typography sx={{ fontWeight: 800, fontSize: '12px', color: '#0f172a', letterSpacing: '0.4px' }}>
+                            <Typography sx={{ fontWeight: 800, fontSize: '12px', color: '#14286D', letterSpacing: '0.4px' }}>
                               DEPARTMENT: {departmentName.toUpperCase()}
                             </Typography>
                             <Chip
@@ -1111,7 +1113,7 @@ const Reports = () => {
                                 height: 18,
                                 fontSize: '10px',
                                 fontWeight: 700,
-                                bgcolor: '#0284c7',
+                                bgcolor: '#14286D',
                                 color: '#ffffff',
                               }}
                             />
@@ -1135,8 +1137,8 @@ const Reports = () => {
                               key={emp.employeeId || emp.id}
                               sx={{
                                 '&:hover': {
-                                  bgcolor: '#f8fafc',
-                                  '& .sticky-emp-col': { bgcolor: '#f8fafc' },
+                                  bgcolor: '#F6F8FE',
+                                  '& .sticky-emp-col': { bgcolor: '#F6F8FE' },
                                 },
                               }}
                             >
@@ -1153,9 +1155,9 @@ const Reports = () => {
                                   left: 0,
                                   zIndex: 2,
                                   bgcolor: '#ffffff',
-                                  borderRight: '2px solid #e2e8f0',
-                                  borderBottom: '1px solid #edf2f7',
-                                  boxShadow: '2px 0 4px rgba(0,0,0,0.02)',
+                                  borderRight: '2px solid #EDF0F7',
+                                  borderBottom: '1px solid #EDF0F7',
+                                  boxShadow: '2px 0 4px rgba(17,32,77,0.02)',
                                 }}
                               >
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -1166,7 +1168,7 @@ const Reports = () => {
                                       height: 30,
                                       fontSize: '11px',
                                       fontWeight: 700,
-                                      bgcolor: '#0284c7',
+                                      bgcolor: '#14286D',
                                       color: '#ffffff',
                                       flexShrink: 0,
                                     }}
@@ -1178,8 +1180,8 @@ const Reports = () => {
                                       <Typography
                                         sx={{
                                           fontSize: '13px',
-                                          color: '#0b66c3',
-                                          fontWeight: 600,
+                                          color: '#14286D',
+                                          fontWeight: 700,
                                           overflow: 'hidden',
                                           textOverflow: 'ellipsis',
                                           whiteSpace: 'nowrap',
@@ -1212,11 +1214,12 @@ const Reports = () => {
                                             height: 16,
                                             fontSize: '9px',
                                             fontWeight: 700,
-                                            bgcolor: '#e0f2fe',
-                                            color: '#0369a1',
+                                            bgcolor: '#EEF2FF',
+                                            color: '#14286D',
+                                            border: '1px solid #DDE4FF',
                                             cursor: 'pointer',
                                             flexShrink: 0,
-                                            '&:hover': { bgcolor: '#bae6fd' },
+                                            '&:hover': { bgcolor: '#DDE4FF' },
                                           }}
                                         />
                                       )}
@@ -1231,15 +1234,33 @@ const Reports = () => {
                                           height: 18,
                                           fontSize: '9.5px',
                                           fontWeight: 700,
-                                          bgcolor: '#e0f2fe',
-                                          color: '#0284c7',
-                                          border: '1px solid #bae6fd',
+                                          bgcolor: '#EEF2FF',
+                                          color: '#14286D',
+                                          border: '1px solid #DDE4FF',
                                           borderRadius: '4px',
                                           px: 0.5,
                                           flexShrink: 0,
                                           '& .MuiChip-label': { px: 0.5 },
                                         }}
                                       />
+                                      {emp.departmentRole === 'Supervisor' && (
+                                        <Chip
+                                          label="Supervisor"
+                                          size="small"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: '9.5px',
+                                            fontWeight: 700,
+                                            bgcolor: '#ECFDF5',
+                                            color: '#047857',
+                                            border: '1px solid #A7F3D0',
+                                            borderRadius: '4px',
+                                            px: 0.5,
+                                            flexShrink: 0,
+                                            '& .MuiChip-label': { px: 0.5 },
+                                          }}
+                                        />
+                                      )}
                                       <Typography
                                         variant="caption"
                                         sx={{
@@ -1363,7 +1384,7 @@ const Reports = () => {
                                             <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
                                               {report.taskName || 'Work Report'}
                                             </Typography>
-                                            <Typography variant="caption" sx={{ color: '#bae6fd', display: 'block' }}>
+                                            <Typography variant="caption" sx={{ color: '#c7d2fe', display: 'block' }}>
                                               {formatHours(report.hoursWorked)} worked
                                             </Typography>
                                             {(report.clockInTime || attendance?.clockInTime) && (
@@ -1389,7 +1410,7 @@ const Reports = () => {
                                             height: 24,
                                             mx: 'auto',
                                             borderRadius: '4px',
-                                            bgcolor: report.feedback && report.feedback !== 'Pending' ? '#94a3b8' : '#0284c7',
+                                            bgcolor: report.feedback && report.feedback !== 'Pending' ? '#64748b' : '#14286D',
                                             color: '#ffffff',
                                             fontSize: '10px',
                                             fontWeight: 700,
@@ -1397,9 +1418,9 @@ const Reports = () => {
                                             userSelect: 'none',
                                             transition: 'all 0.15s ease',
                                             '&:hover': {
-                                              bgcolor: report.feedback && report.feedback !== 'Pending' ? '#64748b' : '#0369a1',
+                                              bgcolor: report.feedback && report.feedback !== 'Pending' ? '#475569' : '#0F1F58',
                                               transform: 'scale(1.04)',
-                                              boxShadow: '0 2px 4px rgba(2, 132, 199, 0.2)',
+                                              boxShadow: '0 2px 6px rgba(20, 40, 109, 0.3)',
                                             },
                                           }}
                                         >
@@ -1557,8 +1578,8 @@ const Reports = () => {
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AssignmentTurnedInIcon sx={{ color: '#0284c7', fontSize: 22 }} />
-            <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a', fontSize: '17px' }}>
+            <AssignmentTurnedInIcon sx={{ color: '#14286D', fontSize: 22 }} />
+            <Typography variant="h6" sx={{ fontWeight: 800, color: '#1B2A5B', fontSize: '17px' }}>
               Work Report Details
             </Typography>
           </Box>
@@ -1577,19 +1598,19 @@ const Reports = () => {
                   alignItems: 'center',
                   gap: 2,
                   p: 1.75,
-                  bgcolor: '#f8fafc',
+                  bgcolor: '#F6F8FE',
                   borderRadius: '10px',
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid #EDF0F7',
                 }}
               >
                 <Avatar
                   src={viewReport.employee?.photo || ''}
-                  sx={{ width: 48, height: 48, bgcolor: '#0284c7', fontWeight: 800, fontSize: 17 }}
+                  sx={{ width: 48, height: 48, bgcolor: '#14286D', fontWeight: 800, fontSize: 17 }}
                 >
                   {getEmployeeName(viewReport).split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>
-                  <Typography sx={{ fontWeight: 800, fontSize: '16px', color: '#0f172a' }}>
+                  <Typography sx={{ fontWeight: 800, fontSize: '16px', color: '#1B2A5B' }}>
                     {getEmployeeName(viewReport)}
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ fontSize: '12.5px' }}>
@@ -1603,7 +1624,7 @@ const Reports = () => {
                 <Chip
                   label={formatDate(viewReport.date)}
                   size="small"
-                  sx={{ fontWeight: 600, bgcolor: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd' }}
+                  sx={{ fontWeight: 600, bgcolor: '#EEF2FF', color: '#14286D', border: '1px solid #DDE4FF' }}
                 />
                 <Chip
                   icon={<AccessTimeIcon sx={{ fontSize: '15px !important', color: '#047857 !important' }} />}
@@ -1657,7 +1678,7 @@ const Reports = () => {
                     <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase', fontSize: '10.5px' }}>
                       Recorded Duration
                     </Typography>
-                    <Typography sx={{ fontWeight: 700, fontSize: '13.5px', color: '#0284c7' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '13.5px', color: '#14286D' }}>
                       {formatHours(viewReport.hoursWorked)}
                     </Typography>
                   </Box>
@@ -1696,7 +1717,7 @@ const Reports = () => {
                   ) : (
                     parseWorkDescription(viewReport.workDescription).map((line, i) => (
                       <Typography key={i} variant="body2" sx={{ py: 0.35, display: 'flex', gap: 1.25, color: '#334155', fontSize: '13px' }}>
-                        <Box component="span" sx={{ color: '#0284c7', fontWeight: 700, minWidth: 16 }}>{i + 1}.</Box>
+                        <Box component="span" sx={{ color: '#14286D', fontWeight: 700, minWidth: 16 }}>{i + 1}.</Box>
                         <Box sx={{ flex: 1 }}>{line}</Box>
                       </Typography>
                     ))
@@ -1714,7 +1735,7 @@ const Reports = () => {
                     size="small"
                     startIcon={<SendIcon sx={{ fontSize: 13 }} />}
                     onClick={() => openFeedbackDialog(viewReport)}
-                    sx={{ textTransform: 'none', fontSize: '12px', fontWeight: 600, color: '#0284c7' }}
+                    sx={{ textTransform: 'none', fontSize: '12px', fontWeight: 600, color: '#14286D' }}
                   >
                     {viewReport.feedback && viewReport.feedback !== 'Pending' ? 'Edit Feedback' : 'Give Feedback'}
                   </Button>
@@ -1965,9 +1986,9 @@ const Reports = () => {
             sx={{
               textTransform: 'none',
               fontWeight: 700,
-              bgcolor: '#0284c7',
+              bgcolor: '#14286D',
               borderRadius: '7px',
-              '&:hover': { bgcolor: '#0369a1' },
+              '&:hover': { bgcolor: '#0F1F58' },
             }}
           >
             Submit Feedback

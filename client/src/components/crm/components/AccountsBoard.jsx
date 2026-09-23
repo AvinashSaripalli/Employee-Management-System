@@ -13,21 +13,30 @@ export default function AccountsBoard({ accounts, onCreate, onEdit, onDelete }){
         <Button variant="contained" startIcon={<FiPlus size={14}/>} onClick={onCreate} sx={{ bgcolor:'#14286D', textTransform:'none', borderRadius:2 }}>Add Account</Button>
       </Box>
       <TableContainer sx={{ maxHeight:420 }}>
-        <Table size="small" stickyHeader>
-          <TableHead><TableRow><TableCell>Account</TableCell><TableCell>Industry</TableCell><TableCell>Size</TableCell><TableCell>City</TableCell><TableCell>Owner</TableCell><TableCell align="center">Actions</TableCell></TableRow></TableHead>
+        <Table size="small" stickyHeader sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
+          <TableHead>
+            <TableRow>
+              <TableCell align="left" sx={{ py: 1.25 }}>Account</TableCell>
+              <TableCell align="center" sx={{ width: 140, py: 1.25 }}>Industry</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Size</TableCell>
+              <TableCell align="left" sx={{ width: 140, py: 1.25 }}>City</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Owner</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
           <TableBody>
             {filtered.map(a=>(
               <TableRow key={a.id} hover>
-                <TableCell>
+                <TableCell align="left">
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Avatar sx={{ width:30, height:30, bgcolor:'#EEF2FF', color:'#3730A3', fontSize:12 }}><FiGlobe size={14}/></Avatar>
                     <Box><Typography fontWeight={700} fontSize={13}>{a.name}</Typography><Typography variant="caption" color="text.secondary">{a.website||'—'}</Typography></Box>
                   </Stack>
                 </TableCell>
-                <TableCell><Chip size="small" label={a.industry||'General'} sx={{ height:18, fontSize:11 }}/></TableCell>
-                <TableCell>{a.size||'—'}</TableCell>
-                <TableCell>{a.city||'—'}</TableCell>
-                <TableCell>{a.ownerId||'—'}</TableCell>
+                <TableCell align="center"><Chip size="small" label={a.industry||'General'} sx={{ height:18, fontSize:11 }}/></TableCell>
+                <TableCell align="center">{a.size||'—'}</TableCell>
+                <TableCell align="left">{a.city||'—'}</TableCell>
+                <TableCell align="center">{a.ownerId||'—'}</TableCell>
                 <TableCell align="center">
                   <IconButton size="small" onClick={()=>onEdit(a)}><FiEdit2 size={14}/></IconButton>
                   <IconButton size="small" color="error" onClick={()=>onDelete(a)}><FiTrash2 size={14}/></IconButton>

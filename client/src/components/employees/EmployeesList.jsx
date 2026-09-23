@@ -311,46 +311,72 @@ const EmployeesList = ({ onClose }) => {
 
       {/* Table card */}
       <TableContainer component={Paper} sx={{ borderRadius: 3, overflow: 'hidden' }}>
-        <Table stickyHeader aria-label="users table">
+        <Table stickyHeader aria-label="users table" sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
           <TableHead>
             <TableRow>
-              <TableCell align="center" sx={{ width: 56 }}>
+              <TableCell align="center" sx={{ width: 56, py: 1.5 }}>
                 <Checkbox
                   indeterminate={selectedUsers.length > 0 && selectedUsers.length < users.length}
                   checked={selectedUsers.length === users.length && users.length > 0}
                   onChange={handleSelectAll}
                 />
               </TableCell>
-              <TableCell align="center">Photo</TableCell>
-              <TableCell align="center" sx={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={handleSortByEmployeeId}>
-                Employee ID {sortOrder === 'asc' ? <FiChevronDown size="16" /> : <FiChevronUp size="16" />}
+              <TableCell align="center" sx={{ width: 68, py: 1.5 }}>Photo</TableCell>
+              <TableCell align="center" sx={{ width: 140, cursor: 'pointer', whiteSpace: 'nowrap', py: 1.5 }} onClick={handleSortByEmployeeId}>
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                  <span>Employee ID</span>
+                  {sortOrder === 'asc' ? <FiChevronDown size="16" /> : <FiChevronUp size="16" />}
+                </Box>
               </TableCell>
-              <TableCell align="left">Name</TableCell>
-              <TableCell align="left">Designation</TableCell>
-              <TableCell align="left">Email</TableCell>
-              <TableCell align="center">Actions</TableCell>
+              <TableCell align="left" sx={{ py: 1.5 }}>Name</TableCell>
+              <TableCell align="left" sx={{ py: 1.5 }}>Designation</TableCell>
+              <TableCell align="left" sx={{ py: 1.5 }}>Email</TableCell>
+              <TableCell align="center" sx={{ width: 100, py: 1.5 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {filteredUsers.length > 0 ? filteredUsers.map((user) => (
               <TableRow key={user.id} selected={selectedUsers.includes(user.id)} hover>
-                <TableCell align="center">
+                <TableCell align="center" sx={{ py: 1.25 }}>
                   <Checkbox
                     checked={selectedUsers.includes(user.id)}
                     onChange={() => handleSelectUser(user.id)}
                   />
                 </TableCell>
-                <TableCell align="center">
-                  <Avatar src={user.photo || undefined} sx={{ width: 40, height: 40 }}>{getInitials(user)}</Avatar>
+                <TableCell align="center" sx={{ py: 1.25 }}>
+                  <Avatar src={user.photo || undefined} sx={{ width: 38, height: 38, mx: 'auto', bgcolor: '#14286D', fontWeight: 700, fontSize: 13 }}>
+                    {getInitials(user)}
+                  </Avatar>
                 </TableCell>
-                <TableCell align="center">
+                <TableCell align="center" sx={{ py: 1.25 }}>
                   <Chip label={user.employeeId} size="small" sx={{ bgcolor: '#EEF2FF', color: 'primary.main', fontWeight: 700 }} />
                 </TableCell>
-                <TableCell align="left" sx={{ fontWeight: 600 }}>{user.lastName} {user.firstName}</TableCell>
-                <TableCell align="left" sx={{ color: 'text.secondary' }}>{user.designation}</TableCell>
-                <TableCell align="left" sx={{ color: 'text.secondary' }}>{user.email}</TableCell>
-                <TableCell align="center">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <TableCell align="left" sx={{ py: 1.25, fontWeight: 600 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '13.5px', color: '#1B2A5B' }}>
+                      {user.lastName} {user.firstName}
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label={user.departmentRole === 'Supervisor' ? 'Supervisor' : 'Member'}
+                      sx={{
+                        height: 18,
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        bgcolor: user.departmentRole === 'Supervisor' ? '#ECFDF5' : '#F8FAFC',
+                        color: user.departmentRole === 'Supervisor' ? '#047857' : '#64748B',
+                        border: user.departmentRole === 'Supervisor' ? '1px solid #A7F3D0' : '1px solid #E2E8F0',
+                        borderRadius: '4px',
+                        px: 0.5,
+                        '& .MuiChip-label': { px: 0.5 },
+                      }}
+                    />
+                  </Box>
+                </TableCell>
+                <TableCell align="left" sx={{ py: 1.25, color: 'text.secondary', fontSize: '13px' }}>{user.designation || '—'}</TableCell>
+                <TableCell align="left" sx={{ py: 1.25, color: 'text.secondary', fontSize: '13px' }}>{user.email || '—'}</TableCell>
+                <TableCell align="center" sx={{ py: 1.25 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0.5 }}>
                     <Tooltip title="View profile">
                       <IconButton size="small" onClick={() => handleViewUser(user)} sx={{ color: 'primary.main' }}>
                         <FiEye size="19" />

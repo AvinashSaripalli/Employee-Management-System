@@ -9,7 +9,7 @@ const employeeInclude = {
 };
 
 exports.getReports = async (req, res) => {
-  const { companyName, date, from, to, department, search, role, supervisorDepartment } = req.query;
+  const { companyName, date, from, to, department, search, role, supervisorDepartment, departmentRole } = req.query;
 
   const rawCompany = String(companyName || "").trim();
   const effectiveCompany =
@@ -30,7 +30,8 @@ exports.getReports = async (req, res) => {
     if (Object.keys(dateFilter).length) where.date = dateFilter;
 
     // Role-based visibility: Department Supervisor / Manager can only see their department!
-    const targetDept = department || (role === "Manager" ? supervisorDepartment : null);
+    const isDeptSupervisor = departmentRole === "Supervisor" || role === "Manager";
+    const targetDept = department || (isDeptSupervisor ? supervisorDepartment : null);
     if (targetDept && targetDept !== "all") {
       where.department = { [Op.iLike]: targetDept.trim() };
     }

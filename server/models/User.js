@@ -42,6 +42,10 @@ const User = sequelize.define(
     department: {
       type: DataTypes.STRING,
     },
+    departmentRole: {
+      type: DataTypes.STRING,
+      defaultValue: "Member",
+    },
     jobLocation: {
       type: DataTypes.STRING,
     },

@@ -110,16 +110,16 @@ const MyLeaves = () => {
           ) : (
             <>
               <TableContainer component={Paper} sx={{ borderRadius: 2, overflow: 'hidden' }}>
-                <Table stickyHeader>
+                <Table stickyHeader sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Type</TableCell>
-                      <TableCell>Dates</TableCell>
-                      <TableCell>Duration</TableCell>
-                      <TableCell>Reason</TableCell>
-                      <TableCell>Review</TableCell>
-                      <TableCell align="center">Status</TableCell>
-                      <TableCell align="right">Action</TableCell>
+                      <TableCell align="center" sx={{ py: 1.5, width: 140 }}>Type</TableCell>
+                      <TableCell align="left" sx={{ py: 1.5, width: 200 }}>Dates</TableCell>
+                      <TableCell align="center" sx={{ py: 1.5, width: 110 }}>Duration</TableCell>
+                      <TableCell align="left" sx={{ py: 1.5 }}>Reason</TableCell>
+                      <TableCell align="left" sx={{ py: 1.5, width: 180 }}>Review</TableCell>
+                      <TableCell align="center" sx={{ py: 1.5, width: 150 }}>Status</TableCell>
+                      <TableCell align="right" sx={{ py: 1.5, width: 100 }}>Action</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -129,48 +129,61 @@ const MyLeaves = () => {
                         .map((leave) => {
                           const meta = LEAVE_TYPE_META[leave.leave_type] || {};
                           return (
-                            <TableRow key={leave.id}>
-                              <TableCell>
+                            <TableRow key={leave.id} hover>
+                              <TableCell align="center" sx={{ py: 1.25 }}>
                                 <Chip
                                   size="small"
                                   label={leave.leave_type}
-                                  sx={{ bgcolor: meta.bg, color: meta.color }}
+                                  sx={{ bgcolor: meta.bg, color: meta.color, fontWeight: 700, fontSize: '11px' }}
                                 />
                               </TableCell>
-                              <TableCell>
+                              <TableCell align="left" sx={{ py: 1.25, fontSize: '13px', fontWeight: 500, color: '#1B2A5B' }}>
                                 {formatLeaveDate(leave.start_date)} – {formatLeaveDate(leave.end_date)}
                               </TableCell>
-                              <TableCell>{durationLabel(leave)}</TableCell>
-                              <TableCell sx={{ maxWidth: 240 }}>{leave.reason}</TableCell>
-                              <TableCell sx={{ maxWidth: 200 }}>
+                              <TableCell align="center" sx={{ py: 1.25 }}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '13px', color: '#1B2A5B' }}>
+                                  {durationLabel(leave)}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="left" sx={{ py: 1.25, maxWidth: 240, fontSize: '13px', color: 'text.secondary' }}>
+                                {leave.reason || '—'}
+                              </TableCell>
+                              <TableCell align="left" sx={{ py: 1.25, maxWidth: 200 }}>
                                 {leave.reviewer_name || leave.review_comment ? (
                                   <Stack spacing={0.25}>
                                     {leave.reviewer_name && (
-                                      <Typography variant="caption">{leave.reviewer_name}</Typography>
+                                      <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '12px', color: '#1B2A5B' }}>
+                                        {leave.reviewer_name}
+                                      </Typography>
                                     )}
                                     {leave.review_comment && (
-                                      <Typography variant="caption" color="text.secondary">
+                                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '11px' }}>
                                         {leave.review_comment}
                                       </Typography>
                                     )}
                                   </Stack>
-                                ) : '—'}
-                              </TableCell>
-                              <TableCell align="center">
-                                <Chip label={leave.status} color={statusColor(leave.status)} size="small" />
-                                {leave.status === 'Pending' && leave.approval_stage && (
-                                  <Typography display="block" variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                                    Waiting for {leave.approval_stage === 'FinalApprover' ? 'final approver' : leave.approval_stage.toLowerCase()}
-                                  </Typography>
+                                ) : (
+                                  <Typography variant="caption" color="text.secondary">—</Typography>
                                 )}
                               </TableCell>
-                              <TableCell align="right">
+                              <TableCell align="center" sx={{ py: 1.25 }}>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                  <Chip label={leave.status} color={statusColor(leave.status)} size="small" sx={{ fontWeight: 700, fontSize: '11px' }} />
+                                  {leave.status === 'Pending' && leave.approval_stage && (
+                                    <Typography display="block" variant="caption" color="text.secondary" sx={{ mt: 0.5, fontSize: '10.5px' }}>
+                                      Waiting for {leave.approval_stage === 'FinalApprover' ? 'final approver' : leave.approval_stage.toLowerCase()}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </TableCell>
+                              <TableCell align="right" sx={{ py: 1.25 }}>
                                 {canCancel(leave) && (
                                   <Button
                                     size="small"
                                     color="error"
                                     variant="outlined"
                                     onClick={() => setCancelTarget(leave)}
+                                    sx={{ fontWeight: 700, px: 1.5, py: 0.3 }}
                                   >
                                     Cancel
                                   </Button>

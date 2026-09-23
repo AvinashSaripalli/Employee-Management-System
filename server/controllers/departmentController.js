@@ -6,22 +6,22 @@ const { Department, User } = require("../models");
 async function reconcileSupervisor(department, supervisorId) {
   const nextId = supervisorId ? Number(supervisorId) : null;
 
-  // Demote the previously recorded supervisor (only if it is a simple Manager role)
+  // Demote the previously recorded supervisor's department role to Member
   const prevId = department.supervisorId ? Number(department.supervisorId) : null;
   if (prevId && prevId !== nextId) {
     const previous = await User.findByPk(prevId);
-    if (previous && String(previous.role || "").toLowerCase() === "manager") {
-      await previous.update({ role: "Employee" });
+    if (previous) {
+      await previous.update({ departmentRole: "Member" });
     }
   }
 
   department.supervisorId = supervisorId || null;
 
-  // Promote the newly selected supervisor
+  // Promote the newly selected supervisor to departmentRole = 'Supervisor'
   if (nextId) {
     const supervisor = await User.findByPk(nextId);
     if (supervisor) {
-      await supervisor.update({ department: department.name, role: "Manager" });
+      await supervisor.update({ department: department.name, departmentRole: "Supervisor" });
     }
   }
 }
@@ -161,8 +161,8 @@ exports.deleteDepartment = async (req, res) => {
     // Demote the head of the removed department
     if (department.supervisorId) {
       const supervisor = await User.findByPk(department.supervisorId);
-      if (supervisor && String(supervisor.role || "").toLowerCase() === "manager") {
-        await supervisor.update({ role: "Employee" });
+      if (supervisor) {
+        await supervisor.update({ departmentRole: "Member" });
       }
     }
 
@@ -195,8 +195,7 @@ exports.removeMember = async (req, res) => {
       return res.status(400).json({ error: "Employee is not assigned to this department" });
     }
 
-    const updates = { department: '' };
-    if (String(user.role || '').toLowerCase() === 'manager') updates.role = 'Employee';
+    const updates = { department: '', departmentRole: 'Member' };
     await user.update(updates);
 
     if (Number(department.supervisorId) === user.id) {

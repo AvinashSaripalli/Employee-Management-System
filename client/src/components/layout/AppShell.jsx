@@ -61,6 +61,7 @@ const AppShell = ({
 
   const userEmail = localStorage.getItem('userEmail') || '';
   const employeeId = localStorage.getItem('userEmployeeId') || '';
+  const departmentRole = localStorage.getItem('departmentRole') || 'Member';
 
   const handleCopyEmail = async () => {
     if (!userEmail || !navigator.clipboard) return;
@@ -438,7 +439,28 @@ const AppShell = ({
 
           <Chip
             avatar={<Avatar alt={userName} src={userPhoto || undefined}>{getInitials(userName)}</Avatar>}
-            label={<Typography sx={{ display: { xs: 'none', md: 'block' } }}>{userName}</Typography>}
+            label={
+              <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.75 }}>
+                <Typography sx={{ fontWeight: 600, fontSize: 13 }}>{userName}</Typography>
+                {departmentRole === 'Supervisor' && (
+                  <Chip
+                    size="small"
+                    label="Supervisor"
+                    sx={{
+                      height: 18,
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      bgcolor: '#ECFDF5',
+                      color: '#047857',
+                      border: '1px solid #A7F3D0',
+                      borderRadius: '4px',
+                      px: 0.5,
+                      '& .MuiChip-label': { px: 0.5 },
+                    }}
+                  />
+                )}
+              </Box>
+            }
             onClick={handleMenu}
             deleteIcon={<HiOutlineChevronDown size={16} />}
             onDelete={handleMenu}
@@ -469,7 +491,24 @@ const AppShell = ({
                   {getInitials(userName)}
                 </Avatar>
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>{userName}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                    <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>{userName}</Typography>
+                    <Chip
+                      size="small"
+                      label={departmentRole === 'Supervisor' ? 'Supervisor' : 'Member'}
+                      sx={{
+                        height: 18,
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        bgcolor: departmentRole === 'Supervisor' ? '#ECFDF5' : 'rgba(255,255,255,0.2)',
+                        color: departmentRole === 'Supervisor' ? '#047857' : '#FFFFFF',
+                        border: departmentRole === 'Supervisor' ? '1px solid #A7F3D0' : '1px solid rgba(255,255,255,0.35)',
+                        borderRadius: '4px',
+                        px: 0.5,
+                        '& .MuiChip-label': { px: 0.5 },
+                      }}
+                    />
+                  </Box>
                   <Typography variant="caption" sx={{ opacity: 0.8 }} noWrap>
                     {userRole || 'Team member'}{userCompany ? ` · ${userCompany}` : ''}
                   </Typography>

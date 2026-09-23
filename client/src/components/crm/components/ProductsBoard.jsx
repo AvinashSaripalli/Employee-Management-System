@@ -15,22 +15,32 @@ export default function ProductsBoard({ products, onCreate, onEdit, onDelete }){
         <Button variant="contained" startIcon={<FiPlus size={14}/>} onClick={onCreate} sx={{ bgcolor:'#14286D', textTransform:'none', borderRadius:2 }}>Add Product</Button>
       </Box>
       <TableContainer sx={{ maxHeight:440 }}>
-        <Table size="small" stickyHeader>
-          <TableHead><TableRow><TableCell>Product</TableCell><TableCell>SKU</TableCell><TableCell>Category</TableCell><TableCell align="right">Price</TableCell><TableCell align="right">Margin</TableCell><TableCell>Status</TableCell><TableCell align="center">Actions</TableCell></TableRow></TableHead>
+        <Table size="small" stickyHeader sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
+          <TableHead>
+            <TableRow>
+              <TableCell align="left" sx={{ py: 1.25 }}>Product</TableCell>
+              <TableCell align="center" sx={{ width: 120, py: 1.25 }}>SKU</TableCell>
+              <TableCell align="center" sx={{ width: 130, py: 1.25 }}>Category</TableCell>
+              <TableCell align="right" sx={{ width: 120, py: 1.25 }}>Price</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Margin</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Status</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
           <TableBody>
             {filtered.map(p=>(
               <TableRow key={p.id} hover>
-                <TableCell>
+                <TableCell align="left">
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Avatar sx={{ width:30, height:30, bgcolor:'#E0F2FE', color:'#0284C7' }}><FiPackage size={14}/></Avatar>
                     <Typography fontWeight={700} fontSize={13}>{p.name}</Typography>
                   </Stack>
                 </TableCell>
-                <TableCell><Typography variant="caption" sx={{ fontFamily:'monospace' }}>{p.sku||'—'}</Typography></TableCell>
-                <TableCell><Chip size="small" label={p.category||'General'} sx={{ height:18, fontSize:11 }}/></TableCell>
+                <TableCell align="center"><Typography variant="caption" sx={{ fontFamily:'monospace' }}>{p.sku||'—'}</Typography></TableCell>
+                <TableCell align="center"><Chip size="small" label={p.category||'General'} sx={{ height:18, fontSize:11 }}/></TableCell>
                 <TableCell align="right"><Typography fontWeight={700} fontSize={13} sx={{ display:'inline-flex', alignItems:'center', gap:0.3 }}><FiDollarSign size={11}/>{Number(p.price).toLocaleString()}</Typography></TableCell>
-                <TableCell align="right"><Chip size="small" label={`${margin(p)}%`} color={margin(p)>40?'success': margin(p)>20?'warning':'default'} sx={{ height:18, fontSize:11 }}/></TableCell>
-                <TableCell><Chip size="small" label={p.active?'Active':'Inactive'} color={p.active?'success':'default'} sx={{ height:18, fontSize:11 }}/></TableCell>
+                <TableCell align="center"><Chip size="small" label={`${margin(p)}%`} color={margin(p)>40?'success': margin(p)>20?'warning':'default'} sx={{ height:18, fontSize:11 }}/></TableCell>
+                <TableCell align="center"><Chip size="small" label={p.active?'Active':'Inactive'} color={p.active?'success':'default'} sx={{ height:18, fontSize:11 }}/></TableCell>
                 <TableCell align="center">
                   <IconButton size="small" onClick={()=>onEdit(p)}><FiEdit2 size={14}/></IconButton>
                   <IconButton size="small" color="error" onClick={()=>onDelete(p)}><FiTrash2 size={14}/></IconButton>

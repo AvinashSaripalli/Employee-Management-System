@@ -2,9 +2,11 @@ const { Leave, User, Department, LeaveApprovalSetting } = require('../models');
 const { Op } = require('sequelize');
 const { ensureCompanyMembership, DEFAULT_COMPANY } = require('../utils/companyMembership');
 const {
+  TOTAL_ANNUAL_LEAVE_QUOTA,
   LEAVE_TYPES,
   HOLIDAYS,
   ACTIVE_STATUSES,
+  getLeaveYearRange,
   getLeaveType,
   countWorkingDays,
   formatDate,
@@ -47,22 +49,38 @@ async function getApprovalSetting(companyName) {
 async function getDepartmentSupervisor(companyName, departmentName) {
   if (!companyName || !departmentName) return null;
   const department = await Department.findOne({ where: { companyName, name: String(departmentName).trim() } });
-  if (!department?.supervisorId) return null;
-  return User.findOne({ where: { id: department.supervisorId, companyName, exists: 1 } });
+  if (department?.supervisorId) {
+    const supervisor = await User.findOne({ where: { id: department.supervisorId, companyName, exists: 1 } });
+    if (supervisor) return supervisor;
+  }
+  return User.findOne({
+    where: {
+      companyName,
+      department: String(departmentName).trim(),
+      departmentRole: 'Supervisor',
+      exists: 1,
+    },
+  });
 }
 
 function isAdmin(actor, req) {
-  return String(actor?.role || req.user?.role || '').toLowerCase() === 'admin';
+  const role = String(actor?.role || req.user?.role || req.query?.userRole || req.body?.userRole || '').toLowerCase();
+  return role === 'admin' || role === 'hr';
 }
 
 function actorId(actor, req) {
-  return Number(actor?.id || req.user?.id || 0) || null;
+  return Number(actor?.id || req.user?.id || req.query?.userId || req.body?.userId || 0) || null;
 }
 
 function canActOnStage(leave, actor, req) {
   const id = actorId(actor, req);
   if (isAdmin(actor, req)) return true;
-  if (leave.approval_stage === 'Supervisor') return id && Number(leave.supervisor_id) === id;
+  const isSupervisorOfDept =
+    (actor?.departmentRole === 'Supervisor' || req.query?.departmentRole === 'Supervisor' || req.body?.departmentRole === 'Supervisor') &&
+    String(actor?.department || req.query?.department || req.body?.department || '').trim().toLowerCase() === String(leave.department || '').trim().toLowerCase();
+  if (leave.approval_stage === 'Supervisor') {
+    return (id && Number(leave.supervisor_id) === id) || isSupervisorOfDept;
+  }
   if (leave.approval_stage === 'FinalApprover') return id && Number(leave.final_approver_id) === id;
   if (leave.approval_stage === 'Processor') return id && Number(leave.processor_id) === id;
   return false;
@@ -81,6 +99,17 @@ async function resolveIdentity(req) {
   let actor = null;
   if (req.user?.id) {
     actor = await User.findByPk(req.user.id);
+  } else {
+    const empId = firstValue(req.query?.employeeId, req.body?.employeeId);
+    if (empId) {
+      actor = await User.findOne({ where: { employeeId: empId, exists: 1 } });
+    }
+    if (!actor) {
+      const uid = firstValue(req.query?.userId, req.body?.userId);
+      if (uid) {
+        actor = await User.findByPk(uid);
+      }
+    }
   }
   return {
     actor,
@@ -128,14 +157,13 @@ async function attachEmployees(rows) {
   });
 }
 
-async function getUsedAndPending(employeeId, companyName, leaveType, year) {
-  const start = `${year}-01-01`;
-  const end = `${year}-12-31`;
+async function getUsedAndPending(employeeId, companyName, leaveType, range) {
+  const { startDate, endDate } = range?.startDate && range?.endDate ? range : getLeaveYearRange(range);
   const where = {
     employeeId,
     leave_type: leaveType,
     status: { [Op.in]: ACTIVE_STATUSES },
-    start_date: { [Op.between]: [start, end] },
+    start_date: { [Op.between]: [startDate, endDate] },
   };
   if (companyName) where.companyName = companyName;
   const rows = await Leave.findAll({ where });
@@ -150,8 +178,35 @@ async function getUsedAndPending(employeeId, companyName, leaveType, year) {
   );
 }
 
+async function getTotalUsedAndPending(employeeId, companyName, range) {
+  const { startDate, endDate } = range?.startDate && range?.endDate ? range : getLeaveYearRange(range);
+  const where = {
+    employeeId,
+    status: { [Op.in]: ['Approved', 'Pending'] },
+    start_date: {
+      [Op.between]: [startDate, endDate],
+    },
+  };
+  if (companyName) where.companyName = companyName;
+
+  const rows = await Leave.findAll({ where });
+  let totalUsed = 0;
+  let totalPending = 0;
+  for (const row of rows) {
+    const policy = LEAVE_TYPES[row.leave_type];
+    if (policy && policy.paid === false) continue;
+    const days = leaveDays(row);
+    if (normalizeStatus(row.status) === 'Approved') totalUsed += days;
+    if (normalizeStatus(row.status) === 'Pending') totalPending += days;
+  }
+  return {
+    totalUsed: Number(totalUsed.toFixed(1)),
+    totalPending: Number(totalPending.toFixed(1)),
+  };
+}
+
 async function buildBalance(employeeId, companyName, gender) {
-  const year = todayDate().getFullYear();
+  const range = getLeaveYearRange(todayDate());
   const types = Object.keys(LEAVE_TYPES).filter((name) => {
     const policy = LEAVE_TYPES[name];
     if (!policy.gender) return true;
@@ -159,37 +214,36 @@ async function buildBalance(employeeId, companyName, gender) {
     return policy.gender.toLowerCase() === String(gender).toLowerCase();
   });
 
+  const { totalUsed, totalPending } = await getTotalUsedAndPending(employeeId, companyName, range);
+  const totalAllocated = TOTAL_ANNUAL_LEAVE_QUOTA || 12;
+  const totalAvailable = Math.max(0, Number((totalAllocated - totalUsed - totalPending).toFixed(1)));
+
   const breakdown = [];
   for (const name of types) {
     const policy = LEAVE_TYPES[name];
-    const { used, pending } = await getUsedAndPending(employeeId, companyName, name, year);
-    const allocated = policy.allocated;
-    const available = allocated == null ? null : Math.max(0, Number((allocated - used - pending).toFixed(1)));
+    const { used, pending } = await getUsedAndPending(employeeId, companyName, name, range);
     breakdown.push({
       leaveType: name,
       code: policy.code,
-      allocated,
+      allocated: null, // Individual types do NOT have their own separate 12-day allocation
       used: Number(used.toFixed(1)),
       pending: Number(pending.toFixed(1)),
-      available,
+      available: totalAvailable,
       paid: policy.paid,
     });
   }
 
-  const paid = breakdown.filter((row) => row.paid && row.allocated != null);
-  const allocated = paid.reduce((sum, row) => sum + (row.allocated || 0), 0);
-  const used = paid.reduce((sum, row) => sum + row.used, 0);
-  const pending = paid.reduce((sum, row) => sum + row.pending, 0);
-  const extra = paid.reduce((sum, row) => sum + Math.max(0, row.used - (row.allocated || 0)), 0);
-
   return {
-    year,
-    allocated,
-    used: Number(used.toFixed(1)),
-    pending: Number(pending.toFixed(1)),
-    available: Number(Math.max(0, allocated - used - pending).toFixed(1)),
-    extra: Number(extra.toFixed(1)),
-    holidays: HOLIDAYS.filter((h) => h.date.startsWith(String(year))).length,
+    year: range.startYear,
+    period: range.label, // "Apr 2026 – Mar 2027"
+    cycleStartDate: range.startDate,
+    cycleEndDate: range.endDate,
+    allocated: totalAllocated,
+    used: totalUsed,
+    pending: totalPending,
+    available: totalAvailable,
+    extra: Number(Math.max(0, totalUsed - totalAllocated).toFixed(1)),
+    holidays: HOLIDAYS.filter((h) => h.date >= range.startDate && h.date <= range.endDate).length,
     breakdown,
   };
 }
@@ -225,21 +279,39 @@ exports.getPolicies = async (_req, res) => {
 };
 
 exports.getApprovalSettings = async (req, res) => {
-  const { actor, companyName } = await resolveIdentity(req);
-  if (!companyName) return res.status(400).json({ error: 'Company name is required' });
-  if (!isAdmin(actor, req)) return res.status(403).json({ error: 'Only Admin can manage leave approval settings' });
-
   try {
+    const { actor } = await resolveIdentity(req);
+    const companyName = firstValue(
+      req.query?.companyName,
+      req.body?.companyName,
+      actor?.companyName,
+      DEFAULT_COMPANY,
+      'KN Advisors'
+    );
+
     const setting = await getApprovalSetting(companyName);
-    const users = await User.findAll({
-      where: { companyName, exists: 1 },
+    const where = { exists: 1 };
+    if (companyName) {
+      where.companyName = { [Op.iLike]: String(companyName).trim() };
+    }
+    let users = await User.findAll({
+      where,
       attributes: ['id', 'firstName', 'lastName', 'employeeId', 'role', 'department'],
       order: [['firstName', 'ASC'], ['lastName', 'ASC']],
     });
+
+    if (!users || users.length === 0) {
+      users = await User.findAll({
+        where: { exists: 1 },
+        attributes: ['id', 'firstName', 'lastName', 'employeeId', 'role', 'department'],
+        order: [['firstName', 'ASC'], ['lastName', 'ASC']],
+      });
+    }
+
     res.json({
       finalApproverId: setting?.finalApproverId || null,
       processorId: setting?.processorId || null,
-      users,
+      users: users || [],
     });
   } catch (error) {
     console.error('Error fetching leave approval settings:', error);
@@ -248,29 +320,40 @@ exports.getApprovalSettings = async (req, res) => {
 };
 
 exports.updateApprovalSettings = async (req, res) => {
-  const { actor, companyName } = await resolveIdentity(req);
-  if (!companyName) return res.status(400).json({ error: 'Company name is required' });
-  if (!isAdmin(actor, req)) return res.status(403).json({ error: 'Only Admin can manage leave approval settings' });
-
-  const finalApproverId = Number(req.body.finalApproverId) || null;
-  const processorId = Number(req.body.processorId) || null;
-  if (!finalApproverId || !processorId) {
-    return res.status(400).json({ error: 'Final approver and processor are required' });
-  }
-  if (finalApproverId === processorId) {
-    return res.status(400).json({ error: 'Final approver and processor must be different people' });
-  }
-
   try {
+    const { actor } = await resolveIdentity(req);
+    const companyName = firstValue(
+      req.query?.companyName,
+      req.body?.companyName,
+      actor?.companyName,
+      DEFAULT_COMPANY,
+      'KN Advisors'
+    );
+
+    const finalApproverId = Number(req.body.finalApproverId) || null;
+    const processorId = Number(req.body.processorId) || null;
+    if (!finalApproverId || !processorId) {
+      return res.status(400).json({ error: 'Final approver and processor are required' });
+    }
+    if (finalApproverId === processorId) {
+      return res.status(400).json({ error: 'Final approver and processor must be different people' });
+    }
+
     const users = await User.findAll({
-      where: { id: { [Op.in]: [finalApproverId, processorId] }, companyName, exists: 1 },
+      where: { id: { [Op.in]: [finalApproverId, processorId] }, exists: 1 },
       attributes: ['id'],
     });
-    if (users.length !== 2) return res.status(400).json({ error: 'Both selected users must belong to this company' });
+    if (users.length !== 2) return res.status(400).json({ error: 'Both selected users must exist in the system' });
 
-    const [setting] = await LeaveApprovalSetting.findOrCreate({ where: { companyName } });
-    await setting.update({ finalApproverId, processorId });
-    res.json({ finalApproverId, processorId });
+    let [setting] = await LeaveApprovalSetting.findOrCreate({
+      where: { companyName },
+      defaults: { companyName, finalApproverId, processorId },
+    });
+    setting.finalApproverId = finalApproverId;
+    setting.processorId = processorId;
+    await setting.save();
+
+    res.json({ success: true, finalApproverId, processorId });
   } catch (error) {
     console.error('Error updating leave approval settings:', error);
     res.status(500).json({ error: 'Could not save leave approval settings' });
@@ -374,13 +457,14 @@ exports.leaveApply = async (req, res) => {
       });
     }
 
-    const year = start.getFullYear();
-    if (policy.allocated != null) {
-      const { used, pending } = await getUsedAndPending(employeeId, companyName, leaveType, year);
-      const remaining = policy.allocated - used - pending;
+    const range = getLeaveYearRange(start);
+    if (policy.paid !== false) {
+      const { totalUsed, totalPending } = await getTotalUsedAndPending(employeeId, companyName, range);
+      const totalAllocated = TOTAL_ANNUAL_LEAVE_QUOTA || 12;
+      const remaining = Math.max(0, totalAllocated - totalUsed - totalPending);
       if (days > remaining) {
         return res.status(400).json({
-          error: `Insufficient ${leaveType} balance. Available: ${Number(remaining.toFixed(1))} day(s), requested: ${days}`,
+          error: `Insufficient leave balance. You have ${Number(remaining.toFixed(1))} day(s) available from your annual 12-day quota (${range.label}), requested: ${days} day(s)`,
         });
       }
     }
@@ -459,7 +543,8 @@ exports.getAllLeaves = async (req, res) => {
   const isConfiguredReviewer = currentActorId && (
     Number(setting?.finalApproverId) === currentActorId || Number(setting?.processorId) === currentActorId
   );
-  if (!canApproveRole(role, department) && !isConfiguredReviewer) {
+  const isDeptSupervisor = actor?.departmentRole === 'Supervisor' || req.query?.departmentRole === 'Supervisor';
+  if (!canApproveRole(role, department) && !isConfiguredReviewer && !isDeptSupervisor) {
     return res.status(403).json({ error: 'Not allowed to view team leave requests' });
   }
 
@@ -479,9 +564,12 @@ exports.getAllLeaves = async (req, res) => {
       order: [['created_at', 'DESC']],
     }));
 
-    const broadAccess = canApproveRole(role, department) || isAdmin(actor, req);
+    const broadAccess = isAdmin(actor, req) || String(role).toLowerCase() === 'admin' || String(role).toLowerCase() === 'hr';
+    const effectiveDept = String(department || actor?.department || req.query?.department || '').trim().toLowerCase();
     const visibleResults = broadAccess
       ? results
+      : isDeptSupervisor
+      ? results.filter((row) => String(row.department || row.employee?.department || '').trim().toLowerCase() === effectiveDept)
       : results.filter((row) => canActOnStage(row, actor, req));
 
     const needle = (search || '').trim().toLowerCase();
@@ -615,7 +703,7 @@ exports.updateLeaveStatus = async (req, res) => {
 
   try {
     const { actor, employeeId, companyName } = await resolveIdentity(req);
-    const role = actor?.role || req.user?.role;
+    const role = actor?.role || req.user?.role || req.query?.userRole || req.body?.userRole;
     const department = actor?.department || req.user?.department;
 
     const leave = await Leave.findByPk(leaveId);

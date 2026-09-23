@@ -15,21 +15,30 @@ export default function ContactsBoard({ contacts, accounts, onCreate, onEdit, on
         <Button variant="contained" startIcon={<FiPlus size={14}/>} onClick={onCreate} sx={{ bgcolor:'#14286D', textTransform:'none', borderRadius:2 }}>Add Contact</Button>
       </Box>
       <TableContainer sx={{ maxHeight:440 }}>
-        <Table size="small" stickyHeader>
-          <TableHead><TableRow><TableCell>Contact</TableCell><TableCell>Account</TableCell><TableCell>Title</TableCell><TableCell>Contact</TableCell><TableCell>Owner</TableCell><TableCell align="center">Actions</TableCell></TableRow></TableHead>
+        <Table size="small" stickyHeader sx={{ '& td, & th': { verticalAlign: 'middle' } }}>
+          <TableHead>
+            <TableRow>
+              <TableCell align="left" sx={{ py: 1.25 }}>Contact</TableCell>
+              <TableCell align="center" sx={{ width: 140, py: 1.25 }}>Account</TableCell>
+              <TableCell align="left" sx={{ py: 1.25 }}>Title</TableCell>
+              <TableCell align="left" sx={{ py: 1.25 }}>Phone & Email</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Owner</TableCell>
+              <TableCell align="center" sx={{ width: 110, py: 1.25 }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
           <TableBody>
             {filtered.map(c=>(
               <TableRow key={c.id} hover>
-                <TableCell>
+                <TableCell align="left">
                   <Stack direction="row" spacing={1} alignItems="center">
                     <Avatar sx={{ width:30, height:30, bgcolor: c.isPrimary? '#FEF3C2':'#E0E7FF', color: c.isPrimary? '#D97706':'#4338CA', fontSize:12 }}>{`${c.firstName[0]}${c.lastName[0]}`}</Avatar>
                     <Box><Typography fontWeight={700} fontSize={13}>{c.firstName} {c.lastName} {c.isPrimary && <FiStar size={10} color="#F59E0B"/>}</Typography><Typography variant="caption" color="text.secondary">{c.email||'—'}</Typography></Box>
                   </Stack>
                 </TableCell>
-                <TableCell><Chip size="small" label={accountName(c.accountId)} sx={{ height:18, fontSize:11 }}/></TableCell>
-                <TableCell>{c.title||'—'}</TableCell>
-                <TableCell><Stack spacing={0.3}><Typography variant="caption" sx={{ display:'flex', alignItems:'center', gap:0.5 }}><FiMail size={10}/> {c.email||'—'}</Typography><Typography variant="caption" sx={{ display:'flex', alignItems:'center', gap:0.5 }}><FiPhone size={10}/> {c.phone||'—'}</Typography></Stack></TableCell>
-                <TableCell>{c.ownerId||'—'}</TableCell>
+                <TableCell align="center"><Chip size="small" label={accountName(c.accountId)} sx={{ height:18, fontSize:11 }}/></TableCell>
+                <TableCell align="left">{c.title||'—'}</TableCell>
+                <TableCell align="left"><Stack spacing={0.3}><Typography variant="caption" sx={{ display:'flex', alignItems:'center', gap:0.5 }}><FiMail size={10}/> {c.email||'—'}</Typography><Typography variant="caption" sx={{ display:'flex', alignItems:'center', gap:0.5 }}><FiPhone size={10}/> {c.phone||'—'}</Typography></Stack></TableCell>
+                <TableCell align="center">{c.ownerId||'—'}</TableCell>
                 <TableCell align="center">
                   <IconButton size="small" onClick={()=>onEdit(c)}><FiEdit2 size={14}/></IconButton>
                   <IconButton size="small" color="error" onClick={()=>onDelete(c)}><FiTrash2 size={14}/></IconButton>

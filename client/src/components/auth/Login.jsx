@@ -29,13 +29,14 @@ function Login() {
       const response = await axios.post("/login", loginValues);
       if (response.data.success) {
         const {
-          token, role, photo, companyName, designation, email, firstName,
+          token, role, departmentRole, photo, companyName, designation, email, firstName,
           jobLocation, lastName, phoneNumber, department, id, employeeId,
           technicalSkills, dateOfBirth, bloodGroup, gender
         } = response.data;
 
         localStorage.setItem("token", token);
         localStorage.setItem("userRole", role);
+        localStorage.setItem("departmentRole", departmentRole || 'Member');
         localStorage.setItem("userPhoto", photo);
         localStorage.setItem("companyName", companyName);
         localStorage.setItem("userDesignation", designation);

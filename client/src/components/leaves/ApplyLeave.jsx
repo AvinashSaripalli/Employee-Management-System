@@ -145,8 +145,8 @@ const ApplyLeave = () => {
     if (requestedDays <= 0 && startDate && endDate) {
       newErrors.endDate = 'Selected range has no working days.';
     }
-    if (selectedBalance?.available != null && requestedDays > selectedBalance.available) {
-      newErrors.leaveType = `Only ${selectedBalance.available} day(s) remaining for this type.`;
+    if (selectedPolicy?.paid !== false && balance?.available != null && requestedDays > balance.available) {
+      newErrors.leaveType = `Insufficient balance. Only ${balance.available} day(s) available in your annual quota (${balance?.period || 'Apr – Mar'}).`;
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -278,10 +278,30 @@ const ApplyLeave = () => {
   };
 
   const summaryCards = [
-    { label: 'Annual quota', value: balance?.allocated ?? '—', icon: <FiCalendar size={18} color="#14286D" /> },
-    { label: 'Available', value: balance?.available ?? '—', icon: <FiCheckCircle size={18} color="#16A34A" /> },
-    { label: 'Pending', value: balance?.pending ?? '—', icon: <FiClock size={18} color="#F59E0B" /> },
-    { label: 'Public holidays', value: balance?.holidays ?? upcomingHolidays.length, icon: <FiInfo size={18} color="#FE8600" /> },
+    {
+      label: 'Annual quota',
+      value: `${balance?.allocated ?? 12} days`,
+      sub: balance?.period || 'April – March',
+      icon: <FiCalendar size={18} color="#14286D" />,
+    },
+    {
+      label: 'Available',
+      value: `${balance?.available ?? '—'} days`,
+      sub: 'Shared across all types',
+      icon: <FiCheckCircle size={18} color="#16A34A" />,
+    },
+    {
+      label: 'Used / Pending',
+      value: `${balance?.used ?? 0} / ${balance?.pending ?? 0}`,
+      sub: 'Days consumed / pending',
+      icon: <FiClock size={18} color="#F59E0B" />,
+    },
+    {
+      label: 'Public holidays',
+      value: `${balance?.holidays ?? upcomingHolidays.length} days`,
+      sub: 'In fiscal year',
+      icon: <FiInfo size={18} color="#FE8600" />,
+    },
   ];
 
   return (
@@ -300,6 +320,11 @@ const ApplyLeave = () => {
                       </Typography>
                     </Stack>
                     <Typography variant="h5">{loading ? '—' : card.value}</Typography>
+                    {card.sub && (
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, fontSize: '0.72rem' }}>
+                        {card.sub}
+                      </Typography>
+                    )}
                   </CardContent>
                 </Card>
               </Grid>
@@ -309,42 +334,46 @@ const ApplyLeave = () => {
           {balance?.breakdown?.length > 0 && (
             <Card sx={{ mb: 2 }}>
               <CardContent>
-                <Typography variant="subtitle1" sx={{ mb: 1.5 }}>
-                  Leave balances
-                </Typography>
+                <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                    Leave categories & usage
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    All paid leave types draw from your single 12-day annual quota ({balance?.period || 'Apr – Mar'})
+                  </Typography>
+                </Stack>
                 <Grid container spacing={1.5}>
                   {balance.breakdown.map((row) => {
                     const meta = LEAVE_TYPE_META[row.leaveType] || {};
-                    const max = row.allocated || 1;
-                    const consumed = row.used + row.pending;
-                    const pct = row.allocated == null ? 0 : Math.min(100, (consumed / max) * 100);
                     return (
                       <Grid item xs={12} sm={6} md={4} key={row.leaveType}>
                         <Paper
                           elevation={0}
                           sx={{
-                            p: 1.25,
+                            p: 1.5,
                             border: '1px solid',
                             borderColor: 'divider',
                             borderRadius: 2,
                             bgcolor: meta.bg || '#F6F8FE',
                           }}
                         >
-                          <Stack direction="row" justifyContent="space-between" alignItems="center">
+                          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                             <Typography variant="body2" sx={{ fontWeight: 700 }}>
                               {row.code} · {row.leaveType}
                             </Typography>
-                            <Typography variant="caption">
-                              {row.allocated == null ? `${row.used} used` : `${row.available} left`}
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                fontWeight: 600,
+                                color: row.used > 0 ? 'primary.main' : 'text.secondary',
+                              }}
+                            >
+                              {row.used} used {row.pending > 0 ? `· ${row.pending} pend.` : ''}
                             </Typography>
                           </Stack>
-                          {row.allocated != null && (
-                            <LinearProgress
-                              variant="determinate"
-                              value={pct}
-                              sx={{ mt: 1, height: 6, borderRadius: 4, bgcolor: '#fff' }}
-                            />
-                          )}
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontSize: '0.72rem' }}>
+                            {row.paid ? 'Drawn from 12-day annual quota' : 'Unpaid · No quota limit'}
+                          </Typography>
                         </Paper>
                       </Grid>
                     );
@@ -473,10 +502,12 @@ const ApplyLeave = () => {
 
                       {requestedDays > 0 && (
                         <Grid item xs={12}>
-                          <Alert severity={selectedBalance?.available != null && requestedDays > selectedBalance.available ? 'warning' : 'info'}>
+                          <Alert severity={selectedPolicy?.paid !== false && balance?.available != null && requestedDays > balance.available ? 'warning' : 'info'}>
                             This request uses <strong>{requestedDays}</strong> working day{requestedDays === 1 ? '' : 's'}
-                            {selectedBalance?.available != null
-                              ? `. Remaining after submit: ${Number((selectedBalance.available - requestedDays).toFixed(1))}`
+                            {selectedPolicy?.paid !== false && balance?.available != null
+                              ? `. Remaining annual balance after submit: ${Number((balance.available - requestedDays).toFixed(1))} day(s)`
+                              : selectedPolicy?.paid === false
+                              ? ' (Unpaid leave · Does not deduct from annual quota).'
                               : '.'}
                           </Alert>
                         </Grid>
