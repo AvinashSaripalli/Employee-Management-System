@@ -11,7 +11,7 @@ import {
   HiOutlineCalendarDays, HiOutlineExclamationTriangle, HiOutlineCheckCircle, HiOutlineBars3,
   HiOutlineChevronDoubleLeft, HiOutlineChevronDoubleRight, HiOutlineEnvelope, HiOutlineIdentification,
   HiOutlineShieldCheck, HiOutlineCheck, HiOutlineClock, HiOutlineArrowRight,
-  HiOutlineChatBubbleLeftRight, HiOutlineDocumentText, HiOutlineSparkles,
+  HiOutlineChatBubbleLeftRight, HiOutlineDocumentText, HiOutlineSparkles, HiOutlineXMark,
 } from 'react-icons/hi2';
 import axios from '../../api/axios';
 
@@ -130,12 +130,16 @@ const AppShell = ({
   }, []);
 
   const unreadNotifications = notifications.filter((notification) => !readNotificationIds.includes(notification.id));
+  const actionNotifications = notifications.filter(
+    (n) => n.severity === 'urgent' || n.severity === 'action' || n.badge === 'Pending Review'
+  );
+  const messageNotifications = notifications.filter((n) => n.category === 'message');
 
   const filteredNotifications = notifications.filter((n) => {
     if (notificationTab === 'unread') return !readNotificationIds.includes(n.id);
-    if (notificationTab === 'tasks') return n.category === 'task';
-    if (notificationTab === 'reports') return n.category === 'report' || n.category === 'shift';
-    if (notificationTab === 'leaves') return n.category === 'leave';
+    if (notificationTab === 'actions') {
+      return n.severity === 'urgent' || n.severity === 'action' || n.badge === 'Pending Review';
+    }
     if (notificationTab === 'messages') return n.category === 'message';
     return true;
   });
@@ -143,57 +147,153 @@ const AppShell = ({
   const tabCounts = {
     all: notifications.length,
     unread: unreadNotifications.length,
-    tasks: notifications.filter((n) => n.category === 'task').length,
-    reports: notifications.filter((n) => n.category === 'report' || n.category === 'shift').length,
-    leaves: notifications.filter((n) => n.category === 'leave').length,
-    messages: notifications.filter((n) => n.category === 'message').length,
+    actions: actionNotifications.length,
+    messages: messageNotifications.length,
   };
 
-  const getNotificationIcon = (category, severity) => {
-    if (severity === 'urgent') return <HiOutlineExclamationTriangle size={18} />;
-    if (category === 'shift') return <HiOutlineClock size={18} />;
-    if (category === 'report') return <HiOutlineDocumentText size={18} />;
-    if (category === 'task') return <HiOutlineClipboardDocumentCheck size={18} />;
-    if (category === 'leave') return <HiOutlineCalendarDays size={18} />;
-    if (category === 'message') return <HiOutlineChatBubbleLeftRight size={18} />;
-    return <HiOutlineInformationCircle size={18} />;
+  const getNotificationVisual = (item) => {
+    if (item.category === 'message') {
+      const initials = getInitials(item.actorName || 'Colleague');
+      return (
+        <Box sx={{ position: 'relative', width: 38, height: 38, flexShrink: 0 }}>
+          <Avatar
+            sx={{
+              width: 38,
+              height: 38,
+              fontSize: '12.5px',
+              fontWeight: 700,
+              bgcolor: '#EEF2FF',
+              color: '#3730A3',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+            }}
+          >
+            {initials}
+          </Avatar>
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: -2,
+              right: -2,
+              width: 16,
+              height: 16,
+              borderRadius: '50%',
+              bgcolor: '#14286D',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '2px solid #FFFFFF',
+            }}
+          >
+            <HiOutlineChatBubbleLeftRight size={9} />
+          </Box>
+        </Box>
+      );
+    }
+
+    if (item.category === 'leave') {
+      const isApproval = item.severity === 'success';
+      const isUrgent = item.severity === 'urgent';
+      const bg = isApproval ? '#ECFDF5' : isUrgent ? '#FEF2F2' : '#FFFBEB';
+      const color = isApproval ? '#059669' : isUrgent ? '#DC2626' : '#D97706';
+      return (
+        <Box
+          sx={{
+            width: 38,
+            height: 38,
+            borderRadius: '10px',
+            bgcolor: bg,
+            color: color,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          {isApproval ? <HiOutlineCheckCircle size={20} /> : <HiOutlineCalendarDays size={20} />}
+        </Box>
+      );
+    }
+
+    if (item.category === 'report') {
+      const isOverdue = item.severity === 'urgent';
+      return (
+        <Box
+          sx={{
+            width: 38,
+            height: 38,
+            borderRadius: '10px',
+            bgcolor: isOverdue ? '#FEF2F2' : '#EFF6FF',
+            color: isOverdue ? '#DC2626' : '#2563EB',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <HiOutlineDocumentText size={20} />
+        </Box>
+      );
+    }
+
+    if (item.category === 'task') {
+      const isOverdue = item.severity === 'urgent';
+      return (
+        <Box
+          sx={{
+            width: 38,
+            height: 38,
+            borderRadius: '10px',
+            bgcolor: isOverdue ? '#FEF2F2' : '#F5F3FF',
+            color: isOverdue ? '#DC2626' : '#7C3AED',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          {isOverdue ? <HiOutlineExclamationTriangle size={20} /> : <HiOutlineClipboardDocumentCheck size={20} />}
+        </Box>
+      );
+    }
+
+    return (
+      <Box
+        sx={{
+          width: 38,
+          height: 38,
+          borderRadius: '10px',
+          bgcolor: '#EEF2FF',
+          color: '#14286D',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <HiOutlineClock size={20} />
+      </Box>
+    );
   };
 
-  const getSeverityStyles = (severity, isUnread) => {
-    switch (severity) {
-      case 'urgent':
-        return {
-          borderLeft: '4px solid #EF4444',
-          bg: isUnread ? '#FEF2F2' : '#FFFFFF',
-          badgeBg: '#FEE2E2',
-          badgeColor: '#B91C1C',
-          iconColor: '#DC2626',
-        };
-      case 'action':
-        return {
-          borderLeft: '4px solid #F59E0B',
-          bg: isUnread ? '#FFFBEB' : '#FFFFFF',
-          badgeBg: '#FEF3C7',
-          badgeColor: '#B45309',
-          iconColor: '#D97706',
-        };
-      case 'success':
-        return {
-          borderLeft: '4px solid #10B981',
-          bg: isUnread ? '#ECFDF5' : '#FFFFFF',
-          badgeBg: '#D1FAE5',
-          badgeColor: '#047857',
-          iconColor: '#059669',
-        };
-      case 'info':
+  const getBadgeChipStyles = (badge) => {
+    switch (badge) {
+      case 'Pending Review':
+        return { bg: '#FEF3C7', color: '#92400E' };
+      case 'Overdue':
+        return { bg: '#FEE2E2', color: '#991B1B' };
+      case 'Due Soon':
+      case 'Due Today':
+        return { bg: '#FFEDD5', color: '#9A3412' };
+      case 'Approved':
+      case 'Submitted':
+        return { bg: '#D1FAE5', color: '#065F46' };
+      case 'In Progress':
+        return { bg: '#E0E7FF', color: '#3730A3' };
+      case 'Message':
+        return { bg: '#E0F2FE', color: '#0369A1' };
       default:
-        return {
-          borderLeft: '4px solid #14286D',
-          bg: isUnread ? '#F6F8FE' : '#FFFFFF',
-          badgeBg: '#EEF2FF',
-          badgeColor: '#14286D',
-          iconColor: '#14286D',
-        };
+        return { bg: '#F1F5F9', color: '#475569' };
     }
   };
 
@@ -438,15 +538,17 @@ const AppShell = ({
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             slotProps={{
               paper: {
+                elevation: 0,
                 sx: {
-                  width: { xs: 'calc(100vw - 32px)', sm: 440 },
-                  maxHeight: 620,
-                  borderRadius: 3,
-                  boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.2), 0 0 1px 1px rgba(15, 23, 42, 0.08)',
+                  width: { xs: 'calc(100vw - 24px)', sm: 460 },
+                  maxHeight: 580,
+                  borderRadius: '16px',
+                  boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(15, 23, 42, 0.08)',
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',
-                  border: '1px solid #E2E8F0',
+                  mt: 1.2,
+                  bgcolor: '#FFFFFF',
                 },
               },
             }}
@@ -455,8 +557,8 @@ const AppShell = ({
             <Box
               sx={{
                 px: 2.5,
-                pt: 2,
-                pb: 1.5,
+                pt: 2.2,
+                pb: 1.6,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -464,46 +566,32 @@ const AppShell = ({
                 bgcolor: '#FFFFFF',
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                <Box
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography
                   sx={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 2,
-                    bgcolor: '#EEF2FF',
-                    color: '#14286D',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    fontWeight: 800,
+                    color: '#0F172A',
+                    fontSize: '16px',
+                    letterSpacing: '-0.02em',
                   }}
                 >
-                  <HiOutlineBell size={19} />
-                </Box>
-                <Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#0F172A', fontSize: '15px' }}>
-                      Notification Center
-                    </Typography>
-                    {unreadNotifications.length > 0 && (
-                      <Chip
-                        size="small"
-                        label={`${unreadNotifications.length} new`}
-                        sx={{
-                          height: 18,
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          bgcolor: '#EFF6FF',
-                          color: '#2563EB',
-                        }}
-                      />
-                    )}
+                  Notifications
+                </Typography>
+                {unreadNotifications.length > 0 && (
+                  <Box
+                    sx={{
+                      px: 0.9,
+                      py: 0.2,
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      bgcolor: '#EEF2FF',
+                      color: '#14286D',
+                    }}
+                  >
+                    {unreadNotifications.length} unread
                   </Box>
-                  <Typography variant="caption" sx={{ color: '#64748B', display: 'block', fontSize: '11.5px' }}>
-                    {unreadNotifications.length > 0
-                      ? `${unreadNotifications.length} item(s) requiring attention`
-                      : 'All alerts & tasks are up to date'}
-                  </Typography>
-                </Box>
+                )}
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -512,7 +600,12 @@ const AppShell = ({
                     <IconButton
                       size="small"
                       onClick={() => persistReadNotificationIds(notifications.map((n) => n.id))}
-                      sx={{ color: '#64748B', '&:hover': { color: '#14286D', bgcolor: '#EEF2FF' } }}
+                      sx={{
+                        color: '#64748B',
+                        p: 0.7,
+                        borderRadius: '8px',
+                        '&:hover': { color: '#14286D', bgcolor: '#EEF2FF' },
+                      }}
                     >
                       <HiOutlineCheckCircle size={18} />
                     </IconButton>
@@ -524,6 +617,8 @@ const AppShell = ({
                     onClick={fetchNotifications}
                     sx={{
                       color: '#64748B',
+                      p: 0.7,
+                      borderRadius: '8px',
                       '&:hover': { color: '#14286D', bgcolor: '#EEF2FF' },
                       animation: notificationsLoading ? 'spin 1s linear infinite' : 'none',
                       '@keyframes spin': { '0%': { transform: 'rotate(0deg)' }, '100%': { transform: 'rotate(360deg)' } },
@@ -532,226 +627,268 @@ const AppShell = ({
                     <HiOutlineArrowPath size={17} />
                   </IconButton>
                 </Tooltip>
+                <Tooltip title="Close">
+                  <IconButton
+                    size="small"
+                    onClick={() => setNotificationAnchor(null)}
+                    sx={{
+                      color: '#94A3B8',
+                      p: 0.7,
+                      borderRadius: '8px',
+                      '&:hover': { color: '#0F172A', bgcolor: '#F1F5F9' },
+                    }}
+                  >
+                    <HiOutlineXMark size={18} />
+                  </IconButton>
+                </Tooltip>
               </Box>
             </Box>
 
-            {/* Filter Tabs */}
-            <Box
-              sx={{
-                px: 2,
-                py: 1,
-                display: 'flex',
-                gap: 0.75,
-                bgcolor: '#F8FAFC',
-                borderBottom: '1px solid #E2E8F0',
-                overflowX: 'auto',
-                scrollbarWidth: 'none',
-                '&::-webkit-scrollbar': { display: 'none' },
-              }}
-            >
-              {[
-                { key: 'all', label: 'All', count: tabCounts.all },
-                { key: 'unread', label: 'Unread', count: tabCounts.unread },
-                { key: 'tasks', label: 'Tasks', count: tabCounts.tasks },
-                { key: 'reports', label: 'Reports & Shifts', count: tabCounts.reports },
-                { key: 'leaves', label: 'Leaves', count: tabCounts.leaves },
-                { key: 'messages', label: 'Messages', count: tabCounts.messages },
-              ].map((tab) => {
-                const isSelected = notificationTab === tab.key;
-                return (
-                  <Chip
-                    key={tab.key}
-                    clickable
-                    onClick={() => setNotificationTab(tab.key)}
-                    label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6 }}>
-                        <span>{tab.label}</span>
-                        {tab.count > 0 && (
-                          <Box
-                            component="span"
-                            sx={{
-                              px: 0.6,
-                              py: 0.1,
-                              borderRadius: 1,
-                              fontSize: '10px',
-                              fontWeight: 700,
-                              bgcolor: isSelected ? 'rgba(255,255,255,0.25)' : '#E2E8F0',
-                              color: isSelected ? '#FFFFFF' : '#475569',
-                            }}
-                          >
-                            {tab.count}
-                          </Box>
-                        )}
-                      </Box>
-                    }
-                    size="small"
-                    sx={{
-                      height: 26,
-                      fontSize: '11.5px',
-                      fontWeight: isSelected ? 700 : 500,
-                      bgcolor: isSelected ? '#14286D' : '#FFFFFF',
-                      color: isSelected ? '#FFFFFF' : '#475569',
-                      border: isSelected ? 'none' : '1px solid #CBD5E1',
-                      transition: 'all 0.15s ease',
-                      '&:hover': {
-                        bgcolor: isSelected ? '#0f1f54' : '#F1F5F9',
-                      },
-                    }}
-                  />
-                );
-              })}
+            {/* Seamless Segmented Control (No horizontal scrolling / No text clipping) */}
+            <Box sx={{ px: 2, py: 1.2, bgcolor: '#FFFFFF', borderBottom: '1px solid #F1F5F9' }}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  bgcolor: '#F1F5F9',
+                  p: '3px',
+                  borderRadius: '9px',
+                  gap: '3px',
+                }}
+              >
+                {[
+                  { key: 'all', label: 'All', count: tabCounts.all },
+                  { key: 'unread', label: 'Unread', count: tabCounts.unread },
+                  { key: 'actions', label: 'Actions', count: tabCounts.actions },
+                  { key: 'messages', label: 'Chat', count: tabCounts.messages },
+                ].map((tab) => {
+                  const isSelected = notificationTab === tab.key;
+                  return (
+                    <Box
+                      key={tab.key}
+                      component="button"
+                      onClick={() => setNotificationTab(tab.key)}
+                      sx={{
+                        border: 'none',
+                        outline: 'none',
+                        cursor: 'pointer',
+                        py: 0.6,
+                        px: 0.5,
+                        borderRadius: '6px',
+                        bgcolor: isSelected ? '#FFFFFF' : 'transparent',
+                        boxShadow: isSelected ? '0 1px 3px rgba(15, 23, 42, 0.08)' : 'none',
+                        color: isSelected ? '#0F172A' : '#64748B',
+                        fontWeight: isSelected ? 700 : 500,
+                        fontSize: '11.5px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 0.5,
+                        transition: 'all 0.15s ease',
+                        '&:hover': {
+                          color: '#0F172A',
+                        },
+                      }}
+                    >
+                      <span>{tab.label}</span>
+                      {tab.count > 0 && (
+                        <Box
+                          component="span"
+                          sx={{
+                            px: 0.55,
+                            py: 0.05,
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            bgcolor: isSelected ? '#14286D' : '#E2E8F0',
+                            color: isSelected ? '#FFFFFF' : '#475569',
+                          }}
+                        >
+                          {tab.count}
+                        </Box>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Box>
             </Box>
 
-            {/* Notification List Body */}
+            {/* Notification Feed Body */}
             <Box
               sx={{
                 flex: 1,
                 overflowY: 'auto',
-                maxHeight: 420,
-                p: 1.5,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1,
-                bgcolor: '#F8FAFC',
+                maxHeight: 400,
+                bgcolor: '#FFFFFF',
               }}
             >
               {notificationsLoading ? (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 6, gap: 1.5 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 1.5 }}>
                   <CircularProgress size={24} sx={{ color: '#14286D' }} />
-                  <Typography variant="caption" sx={{ color: '#64748B' }}>Syncing updates...</Typography>
+                  <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 500 }}>
+                    Syncing live notifications...
+                  </Typography>
                 </Box>
               ) : filteredNotifications.length > 0 ? (
                 filteredNotifications.map((item) => {
-                  const isRead = readNotificationIds.includes(item.id);
-                  const styles = getSeverityStyles(item.severity, !isRead);
+                  const isUnread = !readNotificationIds.includes(item.id);
+                  const badgeStyles = getBadgeChipStyles(item.badge);
 
                   return (
                     <Box
                       key={item.id}
                       onClick={() => handleNotificationClick(item)}
                       sx={{
-                        p: 1.5,
-                        borderRadius: 2,
-                        bgcolor: styles.bg,
-                        borderLeft: styles.borderLeft,
-                        borderTop: '1px solid #E2E8F0',
-                        borderRight: '1px solid #E2E8F0',
-                        borderBottom: '1px solid #E2E8F0',
-                        boxShadow: isRead ? 'none' : '0 2px 6px rgba(0,0,0,0.03)',
+                        p: 2,
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 1.75,
+                        bgcolor: isUnread ? '#F8FAFF' : '#FFFFFF',
+                        borderLeft: isUnread ? '3px solid #14286D' : '3px solid transparent',
+                        borderBottom: '1px solid #F1F5F9',
                         cursor: 'pointer',
-                        transition: 'all 0.18s ease',
                         position: 'relative',
+                        transition: 'all 0.15s ease',
                         '&:hover': {
-                          transform: 'translateY(-1px)',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
-                          bgcolor: isRead ? '#F8FAFC' : styles.bg,
+                          bgcolor: isUnread ? '#F0F4FF' : '#F8FAFC',
                         },
                       }}
                     >
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.8 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                          <Box sx={{ color: styles.iconColor, display: 'flex', alignItems: 'center' }}>
-                            {getNotificationIcon(item.category, item.severity)}
-                          </Box>
-                          {item.badge && (
-                            <Chip
-                              size="small"
-                              label={item.badge}
-                              sx={{
-                                height: 18,
-                                fontSize: '10px',
-                                fontWeight: 700,
-                                bgcolor: styles.badgeBg,
-                                color: styles.badgeColor,
-                                borderRadius: '4px',
-                              }}
-                            />
-                          )}
-                          {!isRead && (
-                            <Box
-                              sx={{
-                                width: 7,
-                                height: 7,
-                                borderRadius: '50%',
-                                bgcolor: item.severity === 'urgent' ? '#EF4444' : '#2563EB',
-                              }}
-                            />
-                          )}
-                        </Box>
+                      {/* Left: Icon or Initials Avatar */}
+                      {getNotificationVisual(item)}
 
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                          <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '11px', fontWeight: 500 }}>
-                            {formatNotificationTime(item.createdAt)}
-                          </Typography>
-                          <Tooltip title={isRead ? 'Mark as unread' : 'Mark as read'}>
-                            <IconButton
-                              size="small"
-                              onClick={(e) => toggleNotificationRead(item.id, e)}
+                      {/* Middle: Content details */}
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        {/* Top Line: Actor Name + Badge + Relative Time + Unread Dot */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.4 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, minWidth: 0 }}>
+                            <Typography
+                              noWrap
                               sx={{
-                                p: 0.3,
-                                color: isRead ? '#CBD5E1' : '#64748B',
-                                '&:hover': { color: '#14286D' },
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                color: '#0F172A',
                               }}
                             >
-                              <HiOutlineCheck size={14} />
-                            </IconButton>
-                          </Tooltip>
-                        </Box>
-                      </Box>
+                              {item.actorName || item.title}
+                            </Typography>
 
-                      <Typography
-                        sx={{
-                          fontSize: '13px',
-                          fontWeight: isRead ? 600 : 750,
-                          color: isRead ? '#334155' : '#0F172A',
-                          mb: 0.4,
-                          lineHeight: 1.35,
-                        }}
-                      >
-                        {item.title}
-                      </Typography>
+                            {item.badge && (
+                              <Box
+                                component="span"
+                                sx={{
+                                  px: 0.8,
+                                  py: 0.15,
+                                  borderRadius: '5px',
+                                  fontSize: '10.5px',
+                                  fontWeight: 700,
+                                  bgcolor: badgeStyles.bg,
+                                  color: badgeStyles.color,
+                                  whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {item.badge}
+                              </Box>
+                            )}
+                          </Box>
 
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          color: isRead ? '#64748B' : '#475569',
-                          lineHeight: 1.45,
-                          fontSize: '11.5px',
-                        }}
-                      >
-                        {item.detail}
-                      </Typography>
-
-                      {item.actionLabel && (
-                        <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
-                          <Box
-                            sx={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 0.5,
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              color: '#14286D',
-                              bgcolor: '#EEF2FF',
-                              px: 1.2,
-                              py: 0.35,
-                              borderRadius: 1.5,
-                              transition: 'all 0.15s',
-                              '&:hover': {
-                                bgcolor: '#14286D',
-                                color: '#FFFFFF',
-                              },
-                            }}
-                          >
-                            <span>{item.actionLabel}</span>
-                            <HiOutlineArrowRight size={12} />
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+                            <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '11px', fontWeight: 500 }}>
+                              {formatNotificationTime(item.createdAt)}
+                            </Typography>
+                            {isUnread && (
+                              <Box
+                                sx={{
+                                  width: 7,
+                                  height: 7,
+                                  borderRadius: '50%',
+                                  bgcolor: item.severity === 'urgent' ? '#EF4444' : '#2563EB',
+                                  boxShadow: '0 0 0 2px rgba(37, 99, 235, 0.2)',
+                                }}
+                              />
+                            )}
                           </Box>
                         </Box>
-                      )}
+
+                        {/* Title Headline */}
+                        <Typography
+                          sx={{
+                            fontSize: '13px',
+                            fontWeight: isUnread ? 700 : 600,
+                            color: isUnread ? '#0F172A' : '#334155',
+                            mb: 0.3,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {item.title}
+                        </Typography>
+
+                        {/* Body Details */}
+                        <Typography
+                          sx={{
+                            fontSize: '12px',
+                            color: '#64748B',
+                            lineHeight: 1.45,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {item.detail}
+                        </Typography>
+
+                        {/* Action Button Row */}
+                        {item.actionLabel && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
+                            <Box
+                              component="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleNotificationClick(item);
+                              }}
+                              sx={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 0.6,
+                                px: 1.4,
+                                py: 0.45,
+                                borderRadius: '6px',
+                                bgcolor: '#14286D',
+                                color: '#FFFFFF',
+                                fontSize: '11.5px',
+                                fontWeight: 650,
+                                border: 'none',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                boxShadow: '0 1px 2px rgba(20, 40, 109, 0.15)',
+                                '&:hover': {
+                                  bgcolor: '#0B1745',
+                                  transform: 'translateY(-0.5px)',
+                                  boxShadow: '0 3px 6px rgba(20, 40, 109, 0.25)',
+                                },
+                              }}
+                            >
+                              <span>{item.actionLabel}</span>
+                              <HiOutlineArrowRight size={12} />
+                            </Box>
+
+                            <Tooltip title={!isUnread ? 'Mark as unread' : 'Mark as read'}>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => toggleNotificationRead(item.id, e)}
+                                sx={{
+                                  p: 0.4,
+                                  color: !isUnread ? '#CBD5E1' : '#94A3B8',
+                                  '&:hover': { color: '#14286D', bgcolor: '#EEF2FF' },
+                                }}
+                              >
+                                <HiOutlineCheck size={14} />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        )}
+                      </Box>
                     </Box>
                   );
                 })
@@ -762,7 +899,7 @@ const AppShell = ({
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    py: 6,
+                    py: 8,
                     px: 3,
                     textAlign: 'center',
                   }}
@@ -782,13 +919,13 @@ const AppShell = ({
                   >
                     <HiOutlineSparkles size={24} />
                   </Box>
-                  <Typography sx={{ fontWeight: 700, fontSize: '13.5px', color: '#1E293B', mb: 0.5 }}>
-                    {notificationTab === 'unread' ? 'No unread notifications' : 'No notifications in this view'}
+                  <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#1E293B', mb: 0.5 }}>
+                    {notificationTab === 'unread' ? 'No unread notifications' : 'All caught up!'}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#64748B', maxWidth: 260 }}>
+                  <Typography variant="caption" sx={{ color: '#64748B', maxWidth: 280 }}>
                     {notificationTab === 'unread'
-                      ? 'You have reviewed all urgent and informational alerts.'
-                      : 'When new shifts, task updates, reports, or messages arrive, they will appear here.'}
+                      ? 'You have reviewed all pending alerts.'
+                      : 'No new updates right now. You are up to date with shifts, reports, tasks, and messages.'}
                   </Typography>
                 </Box>
               )}
@@ -797,19 +934,19 @@ const AppShell = ({
             {/* Footer */}
             <Box
               sx={{
-                px: 2,
-                py: 1,
-                bgcolor: '#FFFFFF',
+                px: 2.2,
+                py: 1.1,
+                bgcolor: '#F8FAFC',
                 borderTop: '1px solid #F1F5F9',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}
             >
-              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '11px' }}>
-                Showing {filteredNotifications.length} of {notifications.length} update(s)
+              <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '11px', fontWeight: 500 }}>
+                {filteredNotifications.length} of {notifications.length} update(s)
               </Typography>
-              {notifications.length > 0 && (
+              {readNotificationIds.length > 0 && (
                 <Button
                   size="small"
                   onClick={clearReadNotifications}
@@ -819,7 +956,8 @@ const AppShell = ({
                     color: '#64748B',
                     py: 0.2,
                     px: 0.8,
-                    '&:hover': { color: '#14286D', bgcolor: '#F8FAFC' },
+                    fontWeight: 600,
+                    '&:hover': { color: '#14286D', bgcolor: '#EEF2FF' },
                   }}
                 >
                   Hide read
