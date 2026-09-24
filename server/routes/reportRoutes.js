@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const reportController = require("../controllers/reportController");
 
+router.get("/pending", reportController.getPendingReports);
 router.get("/getAll", reportController.getTheReports);
 router.get("/", reportController.getReports);
 router.post("/", reportController.createReport);

@@ -54,8 +54,8 @@ const Attendance = () => {
   const departmentRole = localStorage.getItem('departmentRole') || 'Member';
   const userDepartment = localStorage.getItem('userDepartment') || '';
   const userEmployeeId = localStorage.getItem('userEmployeeId') || '';
-  const isSupervisor = departmentRole === 'Supervisor' || userRole === 'Manager';
-  const isAdmin = userRole === 'Admin';
+  const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'hr';
+  const isSupervisor = !isAdmin && (departmentRole === 'Supervisor' || userRole === 'Manager');
   const isEmployee = !isAdmin && !isSupervisor;
 
   const storedCompany = localStorage.getItem('companyName');
@@ -69,7 +69,9 @@ const Attendance = () => {
     setLoading(true);
     try {
       const params = { companyName };
-      if (isSupervisor && userDepartment) {
+      if (isAdmin) {
+        params.role = 'Admin';
+      } else if (isSupervisor && userDepartment) {
         params.role = 'Manager';
         params.departmentRole = departmentRole;
         params.supervisorDepartment = userDepartment;
@@ -110,7 +112,7 @@ const Attendance = () => {
     } finally {
       setLoading(false);
     }
-  }, [companyName, isSupervisor, departmentRole, userDepartment, isEmployee, userEmployeeId, selectedMonth]);
+  }, [companyName, isAdmin, isSupervisor, departmentRole, userDepartment, isEmployee, userEmployeeId, selectedMonth]);
 
   useEffect(() => {
     fetchData();
@@ -207,6 +209,7 @@ const Attendance = () => {
   const groupedDepartments = useMemo(() => {
     const map = {};
     const q = searchQuery.trim().toLowerCase();
+    const seenEmpIds = new Set();
 
     // Group from users
     users.forEach((user) => {
@@ -225,12 +228,14 @@ const Attendance = () => {
       }
 
       const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.employeeId || 'Employee';
-      const empId = (user.employeeId || '').toLowerCase();
+      const empId = (user.employeeId || '').trim().toLowerCase();
       const desig = (user.designation || '').toLowerCase();
 
       if (q && !fullName.toLowerCase().includes(q) && !empId.includes(q) && !desig.includes(q)) {
         return;
       }
+
+      if (empId) seenEmpIds.add(empId);
 
       if (!map[dept]) map[dept] = [];
       map[dept].push({
@@ -247,6 +252,10 @@ const Attendance = () => {
 
     // Also include any employees found in attendance who might not be in the users table
     attendances.forEach((att) => {
+      const empId = (att.employeeId || '').trim().toLowerCase();
+      // If employee is already grouped from users, never duplicate them into another department
+      if (empId && seenEmpIds.has(empId)) return;
+
       const dept = (att.department || '').trim() || 'General';
 
       if (isSupervisor && userDepartment) {
@@ -260,26 +269,24 @@ const Attendance = () => {
       }
 
       const fullName = `${att.firstName || ''} ${att.lastName || ''}`.trim() || att.employeeId || 'Employee';
-      const empId = (att.employeeId || '').toLowerCase();
       const desig = (att.designation || '').toLowerCase();
 
       if (q && !fullName.toLowerCase().includes(q) && !empId.includes(q) && !desig.includes(q)) {
         return;
       }
 
+      if (empId) seenEmpIds.add(empId);
+
       if (!map[dept]) map[dept] = [];
-      const exists = map[dept].some((e) => e.employeeId.toLowerCase() === empId);
-      if (!exists && att.employeeId) {
-        map[dept].push({
-          id: att.id,
-          employeeId: att.employeeId,
-          name: fullName,
-          designation: att.designation,
-          department: dept,
-          photo: null,
-          role: 'Employee',
-        });
-      }
+      map[dept].push({
+        id: att.id,
+        employeeId: att.employeeId,
+        name: fullName,
+        designation: att.designation,
+        department: dept,
+        photo: null,
+        role: 'Employee',
+      });
     });
 
     // Sort employees alphabetically by name
@@ -318,7 +325,7 @@ const Attendance = () => {
       if (aDate !== monthKey) return false;
       const aId = String(a.employeeId || '').trim().toLowerCase();
       const aName = `${a.firstName || ''} ${a.lastName || ''}`.trim().toLowerCase();
-      return (empId && aId === empId) || (empName && aName === empName);
+      return empId ? aId === empId : (empName && aName === empName);
     });
 
     let totalSeconds = 0;
@@ -348,6 +355,8 @@ const Attendance = () => {
     const monthRecords = attendances.filter((a) => {
       if (isSupervisor && userDepartment) {
         if ((a.department || '').trim().toLowerCase() !== userDepartment.toLowerCase()) return false;
+      } else if (deptFilter !== 'all') {
+        if ((a.department || '').trim().toLowerCase() !== deptFilter.toLowerCase()) return false;
       }
       if (isEmployee && userEmployeeId) {
         if ((a.employeeId || '').trim().toLowerCase() !== userEmployeeId.toLowerCase()) return false;
@@ -384,7 +393,7 @@ const Attendance = () => {
       formattedTotalHours,
       avgHoursPerDay,
     };
-  }, [attendances, selectedMonth, isSupervisor, userDepartment, isEmployee, userEmployeeId]);
+  }, [attendances, selectedMonth, isSupervisor, userDepartment, deptFilter, isEmployee, userEmployeeId]);
 
   // Filtered records for List View
   const filteredList = useMemo(() => {
@@ -460,6 +469,21 @@ const Attendance = () => {
       : `attendance-${selectedMonth.format('YYYY-MM')}.csv`;
     downloadCSV(filename, rows);
   };
+
+  const todayDateStr = dayjs().format('YYYY-MM-DD');
+  const myTodayRecord = useMemo(() => {
+    const normId = userEmployeeId ? String(userEmployeeId).trim().toLowerCase() : '';
+    const myEmail = (localStorage.getItem('userEmail') || '').toLowerCase();
+    return attendances.find((a) => {
+      const aDate = a.clockInDate || (a.date ? dayjs(a.date).format('YYYY-MM-DD') : '');
+      if (aDate !== todayDateStr) return false;
+      const aId = a.employeeId ? String(a.employeeId).trim().toLowerCase() : '';
+      if (normId && aId && aId === normId) return true;
+      const aEmail = a.employeeEmail ? a.employeeEmail.toLowerCase() : '';
+      if (myEmail && aEmail && aEmail === myEmail) return true;
+      return false;
+    }) || null;
+  }, [attendances, userEmployeeId, todayDateStr]);
 
   return (
     <Box sx={{ p: { xs: 1.5, md: 3 }, bgcolor: '#F3F6FB', minHeight: '100vh' }}>
@@ -564,6 +588,147 @@ const Attendance = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* Today's Shift Card */}
+      <Paper
+        elevation={0}
+        sx={{
+          mb: 2.5,
+          p: 2,
+          borderRadius: '12px',
+          border: '1px solid #E2E8F0',
+          bgcolor: '#ffffff',
+          boxShadow: '0 2px 8px rgba(20, 40, 109, 0.04)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 2,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: '10px',
+              bgcolor: myTodayRecord
+                ? myTodayRecord.clockOutTime
+                  ? '#ecfdf5'
+                  : '#f0fdf4'
+                : '#f8fafc',
+              border: `1px solid ${
+                myTodayRecord
+                  ? myTodayRecord.clockOutTime
+                    ? '#a7f3d0'
+                    : '#86efac'
+                  : '#e2e8f0'
+              }`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: myTodayRecord
+                ? myTodayRecord.clockOutTime
+                  ? '#059669'
+                  : '#16a34a'
+                : '#64748b',
+            }}
+          >
+            {myTodayRecord && myTodayRecord.clockOutTime ? (
+              <CheckCircleOutlineIcon sx={{ fontSize: 24 }} />
+            ) : (
+              <AccessTimeIcon sx={{ fontSize: 24 }} />
+            )}
+          </Box>
+
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <Typography sx={{ fontWeight: 800, fontSize: '15px', color: '#0f172a' }}>
+                Today's Shift: {dayjs().format('dddd, MMMM D, YYYY')}
+              </Typography>
+              <Chip
+                label="Single Shift Mode"
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: '10.5px',
+                  fontWeight: 700,
+                  bgcolor: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                }}
+              />
+              {myTodayRecord ? (
+                myTodayRecord.clockOutTime ? (
+                  <Chip
+                    label="Shift Completed"
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      bgcolor: '#ecfdf5',
+                      color: '#047857',
+                      border: '1px solid #a7f3d0',
+                    }}
+                  />
+                ) : (
+                  <Chip
+                    label="Shift In Progress"
+                    size="small"
+                    sx={{
+                      height: 20,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      bgcolor: '#dcfce7',
+                      color: '#15803d',
+                      border: '1px solid #86efac',
+                    }}
+                  />
+                )
+              ) : (
+                <Chip
+                  label="Not Clocked In"
+                  size="small"
+                  sx={{
+                    height: 20,
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    bgcolor: '#f8fafc',
+                    color: '#64748b',
+                    border: '1px solid #e2e8f0',
+                  }}
+                />
+              )}
+            </Box>
+
+            <Typography sx={{ fontSize: '12.5px', color: '#64748b', mt: 0.3 }}>
+              {myTodayRecord ? (
+                myTodayRecord.clockOutTime
+                  ? `Shift recorded: Clocked in at ${myTodayRecord.clockInTime?.slice(0, 5)} · Clocked out at ${myTodayRecord.clockOutTime?.slice(0, 5)} · Total worked: ${myTodayRecord.workedTime || '—'}`
+                  : `Currently working: Clocked in at ${myTodayRecord.clockInTime?.slice(0, 5)}. Use the top navigation bar to manage your active shift or clock out.`
+              ) : (
+                'You have not clocked in for today yet. Use the top navigation bar "Clock In" button to begin your single daily shift.'
+              )}
+            </Typography>
+          </Box>
+        </Box>
+
+        {myTodayRecord && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
+              <Typography sx={{ fontSize: '11px', color: '#64748b', fontWeight: 600, textTransform: 'uppercase' }}>
+                {myTodayRecord.clockOutTime ? 'Shift Duration' : 'Clock-In'}
+              </Typography>
+              <Typography sx={{ fontSize: '15px', fontWeight: 800, color: '#14286D' }}>
+                {myTodayRecord.clockOutTime
+                  ? myTodayRecord.workedTime || 'Completed'
+                  : myTodayRecord.clockInTime?.slice(0, 5) || 'Active'}
+              </Typography>
+            </Box>
+          </Box>
+        )}
+      </Paper>
 
       {/* Main Container Card */}
       <Paper
@@ -1045,17 +1210,17 @@ const Attendance = () => {
 
                                   const att =
                                     (idKey && attendancesByEmpAndDate[idKey]) ||
-                                    (nameKey && attendancesByEmpAndDate[nameKey]) ||
+                                    (!eId && nameKey && attendancesByEmpAndDate[nameKey]) ||
                                     null;
 
                                   const report =
                                     (idKey && reportsByEmpAndDate[idKey]) ||
-                                    (nameKey && reportsByEmpAndDate[nameKey]) ||
+                                    (!eId && nameKey && reportsByEmpAndDate[nameKey]) ||
                                     null;
 
                                   const leave =
                                     (idKey && leavesByEmpAndDate[idKey]) ||
-                                    (nameKey && leavesByEmpAndDate[nameKey]) ||
+                                    (!eId && nameKey && leavesByEmpAndDate[nameKey]) ||
                                     null;
 
                                   const isCompleted = att && att.clockOutTime;

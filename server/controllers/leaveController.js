@@ -651,15 +651,29 @@ exports.getRecentLeaves = async (req, res) => {
 };
 
 exports.getLeaveCounts = async (req, res) => {
-  const { companyName } = await resolveIdentity(req);
+  const { actor, companyName } = await resolveIdentity(req);
+  const role = actor?.role || req.user?.role;
+  const department = actor?.department || req.user?.department;
 
   if (!companyName) {
     return res.status(400).json({ error: 'Company name is required' });
   }
 
   try {
-    const rows = await Leave.findAll({ where: { companyName } });
-    const counts = rows.reduce(
+    const rawRows = await Leave.findAll({ where: { companyName } });
+    const rows = await attachEmployees(rawRows);
+
+    const broadAccess = isAdmin(actor, req) || String(role).toLowerCase() === 'admin' || String(role).toLowerCase() === 'hr';
+    const isDeptSupervisor = actor?.departmentRole === 'Supervisor' || req.query?.departmentRole === 'Supervisor';
+    const effectiveDept = String(department || actor?.department || req.query?.department || '').trim().toLowerCase();
+
+    const visibleRows = broadAccess
+      ? rows
+      : isDeptSupervisor
+      ? rows.filter((row) => String(row.department || row.employee?.department || '').trim().toLowerCase() === effectiveDept)
+      : rows.filter((row) => canActOnStage(row, actor, req));
+
+    const counts = visibleRows.reduce(
       (acc, row) => {
         acc.total += 1;
         const status = normalizeStatus(row.status);
@@ -673,7 +687,7 @@ exports.getLeaveCounts = async (req, res) => {
     );
 
     const today = formatDate(todayDate());
-    counts.onLeaveToday = rows.filter(
+    counts.onLeaveToday = visibleRows.filter(
       (row) =>
         normalizeStatus(row.status) === 'Approved' &&
         String(row.start_date).slice(0, 10) <= today &&
@@ -843,7 +857,9 @@ exports.getLeavesByEmployee = async (req, res) => {
 };
 
 exports.getApprovedLeavesToday = async (req, res) => {
-  const { companyName } = await resolveIdentity(req);
+  const { actor, companyName } = await resolveIdentity(req);
+  const role = actor?.role || req.user?.role;
+  const department = actor?.department || req.user?.department;
 
   if (!companyName) {
     return res.status(400).json({ error: 'Missing required parameters' });
@@ -852,7 +868,7 @@ exports.getApprovedLeavesToday = async (req, res) => {
   const today = formatDate(todayDate());
 
   try {
-    const rows = await attachEmployees(await Leave.findAll({
+    const rawRows = await attachEmployees(await Leave.findAll({
       where: {
         companyName,
         status: { [Op.iLike]: 'Approved' },
@@ -860,6 +876,17 @@ exports.getApprovedLeavesToday = async (req, res) => {
         end_date: { [Op.gte]: today },
       },
     }));
+
+    const broadAccess = isAdmin(actor, req) || String(role).toLowerCase() === 'admin' || String(role).toLowerCase() === 'hr';
+    const isDeptSupervisor = actor?.departmentRole === 'Supervisor' || req.query?.departmentRole === 'Supervisor';
+    const effectiveDept = String(department || actor?.department || req.query?.department || '').trim().toLowerCase();
+
+    const rows = broadAccess
+      ? rawRows
+      : isDeptSupervisor
+      ? rawRows.filter((row) => String(row.department || row.employee?.department || '').trim().toLowerCase() === effectiveDept)
+      : rawRows.filter((row) => canActOnStage(row, actor, req));
+
     res.json({
       leaveCount: rows.length,
       employees: rows.map((row) => ({

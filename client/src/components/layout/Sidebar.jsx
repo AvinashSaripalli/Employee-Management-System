@@ -80,8 +80,20 @@ const Sidebar = () => {
       icon: <HiOutlineSquares2X2 {...iconStyle(selectedComponent === 'Dashboard')} />,
     },
     {
+      text: 'Messenger',
+      icon: <HiOutlineChatBubbleLeftRight {...iconStyle(selectedComponent === 'Messenger')} />,
+    },
+    {
       text: 'Tasks and Projects',
       icon: <HiOutlineClipboardDocumentCheck {...iconStyle(selectedComponent === 'Tasks and Projects')} />,
+    },
+    {
+      text: 'Work Groups',
+      icon: <HiOutlineUserGroup {...iconStyle(selectedComponent === 'Work Groups')} />,
+    },
+    {
+      text: 'CRM',
+      icon: <HiOutlineBriefcase {...iconStyle(selectedComponent === 'CRM')} />,
     },
     {
       text: 'Employees List',
@@ -92,28 +104,16 @@ const Sidebar = () => {
       icon: <HiOutlineBuildingOffice2 {...iconStyle(selectedComponent === 'Company Structure')} />,
     },
     {
-      text: 'Work Groups',
-      icon: <HiOutlineUserGroup {...iconStyle(selectedComponent === 'Work Groups')} />,
-    },
-    {
-      text: 'Messenger',
-      icon: <HiOutlineChatBubbleLeftRight {...iconStyle(selectedComponent === 'Messenger')} />,
-    },
-    {
-      text: 'CRM',
-      icon: <HiOutlineBriefcase {...iconStyle(selectedComponent === 'CRM')} />,
-    },
-    {
-      text: 'Manage Leaves',
-      icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves')} />,
-    },
-    {
       text: 'Time & Attendance',
       icon: <HiOutlineClock {...iconStyle(selectedComponent === 'Time & Attendance' || selectedComponent === 'Attendance')} />,
     },
     {
       text: 'Work Reports',
       icon: <HiOutlineChartBar {...iconStyle(selectedComponent === 'Work Reports' || selectedComponent === 'Reports')} />,
+    },
+    {
+      text: 'Manage Leaves',
+      icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves')} />,
     },
   ];
 

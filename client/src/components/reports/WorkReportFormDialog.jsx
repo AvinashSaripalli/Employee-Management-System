@@ -6,6 +6,8 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import PriorityHighIcon from '@mui/icons-material/PriorityHigh';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import axios from '../../api/axios';
 import { timeToHours, formatDate } from '../../utils/reportUtils';
 
@@ -40,58 +42,98 @@ const WorkReportFormDialog = ({
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [successNotice, setSuccessNotice] = useState('');
   const [checkingAttendance, setCheckingAttendance] = useState(false);
   const [hasClockedIn, setHasClockedIn] = useState(null); // null = unknown, true = clocked in, false = not clocked in
   const [attendanceRecord, setAttendanceRecord] = useState(null);
+  const [pendingReports, setPendingReports] = useState([]);
+  const [loadingPending, setLoadingPending] = useState(false);
 
   const employeeId = localStorage.getItem('userEmployeeId');
   const department = localStorage.getItem('userDepartment');
 
+  const storedCompany = localStorage.getItem('companyName');
+  const effectiveCompany =
+    !storedCompany || storedCompany === 'null' || storedCompany === 'undefined'
+      ? 'KN Advisors'
+      : storedCompany;
+
+  // Helper to fetch the queue of unsubmitted attendance reports for this employee
+  const loadPendingReports = async () => {
+    if (!employeeId) return [];
+    setLoadingPending(true);
+    try {
+      const res = await axios.get('/reports/pending', {
+        params: { employeeId, companyName: effectiveCompany },
+      });
+      const allPending = res.data?.allPending || [];
+      setPendingReports(allPending);
+      return allPending;
+    } catch (err) {
+      console.error('Error fetching pending reports queue:', err);
+      return [];
+    } finally {
+      setLoadingPending(false);
+    }
+  };
+
   useEffect(() => {
     if (!open) return;
 
-    const worked = localStorage.getItem('workedTime');
-    const hoursValue = timeToHours(worked);
-
-    if (initialData) {
-      const parsed = (() => {
-        try {
-          const v = JSON.parse(initialData.workDescription);
-          return Array.isArray(v) ? v.map((line) => `${line}`).join('\n') : String(v);
-        } catch {
-          return String(initialData.workDescription || '');
-        }
-      })();
-
-      setForm({
-        date: initialData.date ? String(initialData.date).slice(0, 10) : today,
-        taskName: initialData.taskName || '',
-        workDescription: buildDescription(parsed || '1. '),
-        hoursWorked: initialData.hoursWorked != null && initialData.hoursWorked !== 0
-          ? String(initialData.hoursWorked)
-          : '',
-      });
-    } else {
-      setForm({
-        date: today,
-        taskName: '',
-        workDescription: '1. ',
-        hoursWorked: hoursValue > 0 ? String(hoursValue) : '',
-      });
-    }
-    setErrors({});
+    setSuccessNotice('');
     setFormError('');
-  }, [open, initialData, today]);
+    setErrors({});
+
+    const init = async () => {
+      if (initialData) {
+        const parsed = (() => {
+          try {
+            const v = JSON.parse(initialData.workDescription);
+            return Array.isArray(v) ? v.map((line) => `${line}`).join('\n') : String(v);
+          } catch {
+            return String(initialData.workDescription || '');
+          }
+        })();
+
+        setForm({
+          date: initialData.date ? String(initialData.date).slice(0, 10) : today,
+          taskName: initialData.taskName || '',
+          workDescription: buildDescription(parsed || '1. '),
+          hoursWorked: initialData.hoursWorked != null && initialData.hoursWorked !== 0
+            ? String(initialData.hoursWorked)
+            : '',
+        });
+        return;
+      }
+
+      // Check pending queue for sequential submission
+      const pendingList = await loadPendingReports();
+      if (pendingList && pendingList.length > 0) {
+        const next = pendingList[0];
+        setForm({
+          date: next.date,
+          taskName: '',
+          workDescription: '1. ',
+          hoursWorked: next.hoursWorked > 0 ? String(next.hoursWorked) : '',
+        });
+      } else {
+        const worked = localStorage.getItem('workedTime');
+        const hoursValue = timeToHours(worked);
+        setForm({
+          date: today,
+          taskName: '',
+          workDescription: '1. ',
+          hoursWorked: hoursValue > 0 ? String(hoursValue) : '',
+        });
+      }
+    };
+
+    init();
+  }, [open, initialData, today, employeeId]);
 
   // Verify clock-in requirement for chosen date
   useEffect(() => {
     if (!open || !form.date || !employeeId) return;
-
-    const storedCompany = localStorage.getItem('companyName');
-    const effectiveCompany =
-      !storedCompany || storedCompany === 'null' || storedCompany === 'undefined'
-        ? 'KN Advisors'
-        : storedCompany;
 
     setCheckingAttendance(true);
     axios
@@ -119,7 +161,7 @@ const WorkReportFormDialog = ({
       .finally(() => {
         setCheckingAttendance(false);
       });
-  }, [open, form.date, employeeId]);
+  }, [open, form.date, employeeId, effectiveCompany]);
 
   const validate = () => {
     const next = {};
@@ -156,12 +198,7 @@ const WorkReportFormDialog = ({
 
     setSubmitting(true);
     setFormError('');
-
-    const storedCompany = localStorage.getItem('companyName');
-    const effectiveCompany =
-      !storedCompany || storedCompany === 'null' || storedCompany === 'undefined'
-        ? 'KN Advisors'
-        : storedCompany;
+    setSuccessNotice('');
 
     try {
       const payload = {
@@ -179,12 +216,35 @@ const WorkReportFormDialog = ({
 
       if (initialData?.id) {
         await axios.put(`/reports/${initialData.id}`, payload);
+        if (onSubmitted) onSubmitted();
+        handleClose();
       } else {
         await axios.post('/reports', payload);
-      }
 
-      if (onSubmitted) onSubmitted();
-      handleClose();
+        // Re-check pending reports queue for any subsequent days
+        const remainingPending = await loadPendingReports();
+
+        if (remainingPending && remainingPending.length > 0) {
+          const next = remainingPending[0];
+          setSuccessNotice(
+            `Report for ${formatDate(payload.date)} submitted successfully! Now please submit your report for ${formatDate(next.date)}.`
+          );
+          setForm({
+            date: next.date,
+            taskName: '',
+            workDescription: '1. ',
+            hoursWorked: next.hoursWorked > 0 ? String(next.hoursWorked) : '',
+          });
+          setFormError('');
+          if (onSubmitted) onSubmitted();
+        } else {
+          setSuccessNotice('All pending work reports submitted successfully!');
+          if (onSubmitted) onSubmitted();
+          setTimeout(() => {
+            handleClose();
+          }, 700);
+        }
+      }
     } catch (error) {
       setFormError(error.response?.data?.error || 'Failed to save the report. Please try again.');
     } finally {
@@ -196,6 +256,7 @@ const WorkReportFormDialog = ({
     if (submitting) return;
     setErrors({});
     setFormError('');
+    setSuccessNotice('');
     if (onClose) onClose();
   };
 
@@ -221,22 +282,76 @@ const WorkReportFormDialog = ({
     }
   };
 
+  const isQueueMode = !initialData && pendingReports.length > 0;
+  const isDateLockedByQueue = isQueueMode && pendingReports.length > 0;
+
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1.5 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a' }}>
-          {dialogTitle}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <PlaylistAddCheckIcon sx={{ color: '#14286D', fontSize: 24 }} />
+          <Typography variant="h6" sx={{ fontWeight: 800, color: '#0f172a' }}>
+            {dialogTitle}
+          </Typography>
+        </Box>
         <IconButton onClick={handleClose} aria-label="close" size="small">
           <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
 
       <DialogContent dividers sx={{ py: 2.5 }}>
+        {/* Success Notice when progressing through the sequential queue */}
+        {successNotice && (
+          <Alert severity="success" sx={{ mb: 2, borderRadius: '8px', fontSize: '13px' }}>
+            {successNotice}
+          </Alert>
+        )}
+
+        {/* Error Notice */}
         {formError && (
           <Alert severity="error" sx={{ mb: 2, borderRadius: '8px' }}>
             {formError}
           </Alert>
+        )}
+
+        {/* Sequential Queue Banner */}
+        {isQueueMode && (
+          <Box
+            sx={{
+              mb: 2.25,
+              p: 1.75,
+              borderRadius: '10px',
+              bgcolor: pendingReports.length > 1 ? '#fffbeb' : '#f0fdf4',
+              border: `1px solid ${pendingReports.length > 1 ? '#fde68a' : '#bbf7d0'}`,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <PriorityHighIcon sx={{ fontSize: 18, color: pendingReports.length > 1 ? '#b45309' : '#15803d' }} />
+                <Typography sx={{ fontWeight: 800, fontSize: '13px', color: pendingReports.length > 1 ? '#92400e' : '#166534' }}>
+                  {pendingReports.length > 1
+                    ? `Sequential Queue: Pending Report 1 of ${pendingReports.length}`
+                    : 'Pending Work Report Submission'}
+                </Typography>
+              </Box>
+              <Chip
+                label={`${pendingReports.length} pending`}
+                size="small"
+                sx={{
+                  height: 20,
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  bgcolor: pendingReports.length > 1 ? '#fef3c7' : '#dcfce7',
+                  color: pendingReports.length > 1 ? '#b45309' : '#15803d',
+                }}
+              />
+            </Box>
+            <Typography sx={{ fontSize: '12px', color: pendingReports.length > 1 ? '#78350f' : '#14532d', lineHeight: 1.45 }}>
+              {pendingReports.length > 1
+                ? `You have unsubmitted reports from previous days. You must submit your report for ${formatDate(pendingReports[0].date)} first. Once submitted, your next report (${formatDate(pendingReports[1].date)}) will automatically open.`
+                : `Submitting your work report for ${formatDate(pendingReports[0].date)}. Once submitted, your attendance for this shift is fully completed.`}
+            </Typography>
+          </Box>
         )}
 
         {/* Clock-In Status Alert */}
@@ -250,13 +365,14 @@ const WorkReportFormDialog = ({
           </Alert>
         ) : hasClockedIn === true ? (
           <Alert severity="success" sx={{ mb: 2, borderRadius: '8px', fontSize: '13px', display: 'flex', alignItems: 'center' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
               <CheckCircleIcon sx={{ fontSize: 16 }} />
-              <span>Clock-in verified for {formatDate(form.date)}</span>
+              <span>Shift verified for {formatDate(form.date)}</span>
               {attendanceRecord?.clockInTime && (
                 <span style={{ fontWeight: 600, marginLeft: 4 }}>
-                  (Clock In: {attendanceRecord.clockInTime}
-                  {attendanceRecord?.clockOutTime ? ` · Clock Out: ${attendanceRecord.clockOutTime}` : ''})
+                  (Clock In: {attendanceRecord.clockInTime?.slice(0, 5)}
+                  {attendanceRecord?.clockOutTime ? ` · Clock Out: ${attendanceRecord.clockOutTime?.slice(0, 5)}` : ''}
+                  {attendanceRecord?.workedTime ? ` · Worked: ${attendanceRecord.workedTime}` : ''})
                 </span>
               )}
             </Box>
@@ -271,8 +387,13 @@ const WorkReportFormDialog = ({
             value={form.date}
             onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
             InputLabelProps={{ shrink: true }}
+            disabled={isDateLockedByQueue}
             error={!!errors.date}
-            helperText={errors.date}
+            helperText={
+              isDateLockedByQueue
+                ? 'Date locked: older pending reports must be submitted in sequential chronological order.'
+                : errors.date
+            }
           />
 
           <TextField
@@ -319,7 +440,11 @@ const WorkReportFormDialog = ({
 
       <DialogActions sx={{ px: 3, py: 2 }}>
         <Typography variant="caption" sx={{ mr: 'auto', color: 'text.secondary' }}>
-          {hasClockedIn === false ? 'Clock-in required to submit' : 'Saved against attendance record'}
+          {isQueueMode && pendingReports.length > 1
+            ? `Step 1 of ${pendingReports.length}: Next report opens immediately upon submit`
+            : hasClockedIn === false
+            ? 'Clock-in required to submit'
+            : 'Saved against attendance record'}
         </Typography>
         <Button onClick={handleClose} color="inherit" sx={{ textTransform: 'none' }}>
           Cancel
@@ -332,12 +457,16 @@ const WorkReportFormDialog = ({
           sx={{
             textTransform: 'none',
             fontWeight: 700,
-            bgcolor: '#0284c7',
+            bgcolor: '#14286D',
             borderRadius: '7px',
-            '&:hover': { bgcolor: '#0369a1' },
+            '&:hover': { bgcolor: '#0f1e54' },
           }}
         >
-          {initialData?.id ? 'Save Changes' : 'Submit Report'}
+          {initialData?.id
+            ? 'Save Changes'
+            : isQueueMode && pendingReports.length > 1
+            ? 'Submit & Next Report'
+            : 'Submit Report'}
         </Button>
       </DialogActions>
     </Dialog>

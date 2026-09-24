@@ -70,8 +70,8 @@ const Reports = () => {
   const userRole = localStorage.getItem('userRole') || 'Employee';
   const departmentRole = localStorage.getItem('departmentRole') || 'Member';
   const userDepartment = localStorage.getItem('userDepartment') || '';
-  const isSupervisor = departmentRole === 'Supervisor' || userRole === 'Manager';
-  const isAdmin = userRole === 'Admin';
+  const isAdmin = userRole.toLowerCase() === 'admin' || userRole.toLowerCase() === 'hr';
+  const isSupervisor = !isAdmin && (departmentRole === 'Supervisor' || userRole === 'Manager');
 
   // Read companyName safely, defaulting to KN Advisors if null or undefined string
   const storedCompany = localStorage.getItem('companyName');
@@ -86,7 +86,9 @@ const Reports = () => {
     setError('');
     try {
       const params = { companyName };
-      if (isSupervisor && userDepartment) {
+      if (isAdmin) {
+        params.role = 'Admin';
+      } else if (isSupervisor && userDepartment) {
         params.role = 'Manager';
         params.departmentRole = departmentRole;
         params.supervisorDepartment = userDepartment;
@@ -125,7 +127,7 @@ const Reports = () => {
     } finally {
       setLoading(false);
     }
-  }, [companyName, isSupervisor, departmentRole, userDepartment, selectedMonth]);
+  }, [companyName, isAdmin, isSupervisor, departmentRole, userDepartment, selectedMonth]);
 
   useEffect(() => {
     fetchData();
@@ -238,6 +240,7 @@ const Reports = () => {
   const groupedDepartments = useMemo(() => {
     const map = {};
     const q = searchQuery.trim().toLowerCase();
+    const seenEmpIds = new Set();
 
     // First populate from users
     users.forEach((user) => {
@@ -251,9 +254,13 @@ const Reports = () => {
       }
 
       const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.employeeId || 'Employee';
-      if (q && !fullName.toLowerCase().includes(q) && !(user.designation || '').toLowerCase().includes(q)) {
+      const empId = (user.employeeId || '').trim().toLowerCase();
+
+      if (q && !fullName.toLowerCase().includes(q) && !(user.designation || '').toLowerCase().includes(q) && !empId.includes(q)) {
         return;
       }
+
+      if (empId) seenEmpIds.add(empId);
 
       if (!map[dept]) map[dept] = [];
       map[dept].push({
@@ -270,6 +277,13 @@ const Reports = () => {
 
     // Also include any employees present in reports who may not be in users table
     reports.forEach((r) => {
+      const name = getEmployeeName(r);
+      const empId = r.employeeId ? String(r.employeeId).trim() : name;
+      const lowerEmpId = (r.employeeId || '').trim().toLowerCase();
+
+      // If employee already placed from users, never duplicate into another department
+      if (lowerEmpId && seenEmpIds.has(lowerEmpId)) return;
+
       const dept = (r.department || '').trim() || 'General';
       if (isSupervisor && userDepartment) {
         if (dept.toLowerCase() !== userDepartment.toLowerCase()) return;
@@ -277,11 +291,11 @@ const Reports = () => {
         return;
       }
 
-      const name = getEmployeeName(r);
-      const empId = r.employeeId ? String(r.employeeId).trim() : name;
-      if (q && !name.toLowerCase().includes(q) && !(r.taskName || '').toLowerCase().includes(q)) {
+      if (q && !name.toLowerCase().includes(q) && !(r.taskName || '').toLowerCase().includes(q) && !lowerEmpId.includes(q)) {
         return;
       }
+
+      if (lowerEmpId) seenEmpIds.add(lowerEmpId);
 
       if (!map[dept]) map[dept] = [];
       const alreadyExists = map[dept].some(
@@ -314,6 +328,8 @@ const Reports = () => {
     const monthReports = reports.filter((r) => {
       if (isSupervisor && userDepartment) {
         if ((r.department || '').trim().toLowerCase() !== userDepartment.toLowerCase()) return false;
+      } else if (departmentFilter !== 'all') {
+        if ((r.department || '').trim().toLowerCase() !== departmentFilter.toLowerCase()) return false;
       }
       return String(r.date || '').slice(0, 7) === monthKey;
     });
@@ -321,6 +337,8 @@ const Reports = () => {
     const monthAttendances = attendances.filter((a) => {
       if (isSupervisor && userDepartment) {
         if ((a.department || '').trim().toLowerCase() !== userDepartment.toLowerCase()) return false;
+      } else if (departmentFilter !== 'all') {
+        if ((a.department || '').trim().toLowerCase() !== departmentFilter.toLowerCase()) return false;
       }
       return String(a.clockInDate || '').slice(0, 7) === monthKey;
     });
@@ -340,7 +358,7 @@ const Reports = () => {
       activeContributors,
       totalClockIns,
     };
-  }, [reports, attendances, selectedMonth, isSupervisor, userDepartment]);
+  }, [reports, attendances, selectedMonth, isSupervisor, userDepartment, departmentFilter]);
 
   // Latest report in current month (for quick banner notification)
   const latestReport = useMemo(() => {
@@ -349,12 +367,14 @@ const Reports = () => {
       .filter((r) => {
         if (isSupervisor && userDepartment) {
           if ((r.department || '').trim().toLowerCase() !== userDepartment.toLowerCase()) return false;
+        } else if (departmentFilter !== 'all') {
+          if ((r.department || '').trim().toLowerCase() !== departmentFilter.toLowerCase()) return false;
         }
         return String(r.date || '').slice(0, 7) === monthKey;
       })
       .sort((a, b) => (a.date < b.date ? 1 : -1));
     return monthReports[0] || null;
-  }, [reports, selectedMonth, isSupervisor, userDepartment]);
+  }, [reports, selectedMonth, isSupervisor, userDepartment, departmentFilter]);
 
   // Calculate stats for an individual employee
   const getEmployeeStats = useCallback((emp) => {
@@ -363,7 +383,7 @@ const Reports = () => {
       const matchId = emp.employeeId && String(r.employeeId).trim().toLowerCase() === String(emp.employeeId).trim().toLowerCase();
       const matchName = emp.name && getEmployeeName(r).toLowerCase() === emp.name.toLowerCase();
       const inMonth = String(r.date || '').slice(0, 7) === currentMonthKey;
-      return (matchId || matchName) && inMonth;
+      return (emp.employeeId ? matchId : matchName) && inMonth;
     });
 
     if (empReports.length === 0) {
@@ -446,6 +466,8 @@ const Reports = () => {
     const filteredReports = reports.filter((r) => {
       if (isSupervisor && userDepartment) {
         if ((r.department || '').trim().toLowerCase() !== userDepartment.toLowerCase()) return false;
+      } else if (departmentFilter !== 'all') {
+        if ((r.department || '').trim().toLowerCase() !== departmentFilter.toLowerCase()) return false;
       }
       return String(r.date || '').slice(0, 7) === monthKey;
     });
@@ -497,21 +519,19 @@ const Reports = () => {
             Work Reports & Attendance
           </Typography>
 
-          {isSupervisor && (
+          {isAdmin ? (
+            <Chip
+              label="Admin View · All Departments"
+              size="small"
+              sx={{ bgcolor: '#EEF2FF', color: '#14286D', fontWeight: 700, fontSize: '11px', border: '1px solid #DDE4FF' }}
+            />
+          ) : isSupervisor ? (
             <Chip
               label={`${userDepartment} Supervisor View`}
               size="small"
               sx={{ bgcolor: '#EEF2FF', color: '#14286D', fontWeight: 700, fontSize: '11px', border: '1px solid #DDE4FF' }}
             />
-          )}
-
-          {isAdmin && (
-            <Chip
-              label="Admin · All Departments"
-              size="small"
-              sx={{ bgcolor: '#F6F8FE', color: '#14286D', fontWeight: 700, fontSize: '11px', border: '1px solid #EDF0F7' }}
-            />
-          )}
+          ) : null}
         </Box>
 
         {/* Header Action Buttons */}
@@ -815,8 +835,8 @@ const Reports = () => {
                   '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#94a3b8' },
                 }}
               >
-                <MenuItem value="all" sx={{ fontSize: '13px', color: '#64748b' }}>
-                  not selected
+                <MenuItem value="all" sx={{ fontSize: '13px', fontWeight: 600 }}>
+                  All Departments
                 </MenuItem>
                 {allDepartments.map((dept) => (
                   <MenuItem key={dept} value={dept} sx={{ fontSize: '13px' }}>
@@ -1348,13 +1368,13 @@ const Reports = () => {
                                 // Check for clock-in attendance
                                 const attendance =
                                   (idKey && attendancesByEmpAndDate[idKey]) ||
-                                  (nameKey && attendancesByEmpAndDate[nameKey]) ||
+                                  (!eId && nameKey && attendancesByEmpAndDate[nameKey]) ||
                                   null;
 
                                 // Check for approved leave
                                 const leave =
                                   (idKey && leavesByEmpAndDate[idKey]) ||
-                                  (nameKey && leavesByEmpAndDate[nameKey]) ||
+                                  (!eId && nameKey && leavesByEmpAndDate[nameKey]) ||
                                   null;
 
                                 return (

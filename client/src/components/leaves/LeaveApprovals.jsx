@@ -9,10 +9,114 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import CloseIcon from '@mui/icons-material/Close';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import ViewModuleIcon from '@mui/icons-material/ViewModule';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import axios from '../../api/axios';
 import dayjs from 'dayjs';
 import { FiSearch } from 'react-icons/fi';
 import { durationLabel, formatLeaveDate, LEAVE_TYPE_META, statusColor, leaveIdentityParams } from '../../utils/leaveConfig';
+
+const stageLabel = (stage) => {
+  switch (stage) {
+    case 'Supervisor': return 'Department Supervisor';
+    case 'FinalApprover': return 'Final Approver';
+    case 'Processor': return 'HR Processor';
+    case 'Completed': return 'Completed';
+    default: return stage || 'Department Supervisor';
+  }
+};
+
+const getApproveButtonText = (stage) => {
+  switch (stage) {
+    case 'Supervisor': return 'Approve as Supervisor';
+    case 'FinalApprover': return 'Approve as Final Approver';
+    case 'Processor': return 'Complete & Process Leave';
+    default: return 'Approve Request';
+  }
+};
+
+const getJourneyStages = (leave) => {
+  const isRejected = leave.status === 'Rejected';
+  const isApproved = leave.status === 'Approved';
+  const currentStage = leave.approval_stage || 'Supervisor';
+
+  let s1Status = 'upcoming';
+  let s2Status = 'upcoming';
+  let s3Status = 'upcoming';
+
+  if (isRejected) {
+    if (currentStage === 'Supervisor') {
+      s1Status = 'rejected';
+      s2Status = 'skipped';
+      s3Status = 'skipped';
+    } else if (currentStage === 'FinalApprover') {
+      s1Status = 'completed';
+      s2Status = 'rejected';
+      s3Status = 'skipped';
+    } else {
+      s1Status = 'completed';
+      s2Status = 'completed';
+      s3Status = 'rejected';
+    }
+  } else if (isApproved || currentStage === 'Completed') {
+    s1Status = 'completed';
+    s2Status = 'completed';
+    s3Status = 'completed';
+  } else {
+    // Pending
+    if (currentStage === 'Supervisor') {
+      s1Status = 'active';
+      s2Status = 'upcoming';
+      s3Status = 'upcoming';
+    } else if (currentStage === 'FinalApprover') {
+      s1Status = 'completed';
+      s2Status = 'active';
+      s3Status = 'upcoming';
+    } else if (currentStage === 'Processor') {
+      s1Status = 'completed';
+      s2Status = 'completed';
+      s3Status = 'active';
+    }
+  }
+
+  return [
+    {
+      index: 1,
+      key: 'Supervisor',
+      title: 'Dept Supervisor',
+      roleSubtitle: leave.department ? `${leave.department} Supervisor` : 'Supervisor',
+      status: s1Status,
+      reviewer: leave.supervisor_name || (s1Status === 'completed' ? (leave.reviewer_name || 'Supervisor') : null),
+      comment: leave.supervisor_comment || (s1Status === 'rejected' ? leave.review_comment : null),
+      date: leave.supervisor_reviewed_at || (s1Status === 'completed' && !leave.final_approved_at ? leave.reviewed_at : null),
+    },
+    {
+      index: 2,
+      key: 'FinalApprover',
+      title: 'Final Approver',
+      roleSubtitle: 'Designated Reviewer',
+      status: s2Status,
+      reviewer: leave.final_approver_name || (s2Status === 'completed' ? leave.reviewer_name : null),
+      comment: leave.final_approver_comment || (s2Status === 'rejected' ? leave.review_comment : null),
+      date: leave.final_approved_at || (s2Status === 'completed' && !leave.processed_at ? leave.reviewed_at : null),
+    },
+    {
+      index: 3,
+      key: 'Processor',
+      title: 'HR Processor',
+      roleSubtitle: 'HR / Admin Final Action',
+      status: s3Status,
+      reviewer: leave.processor_name || (s3Status === 'completed' ? leave.reviewer_name : null),
+      comment: s3Status === 'rejected' ? leave.review_comment : (isApproved && leave.review_comment ? leave.review_comment : null),
+      date: leave.processed_at || (s3Status === 'completed' ? leave.reviewed_at : null),
+    },
+  ];
+};
 
 const employeeName = (leave) =>
   leave.employee_name ||
@@ -28,8 +132,10 @@ const LeaveApprovals = () => {
   const [rowsPerPage, setRowsPerPage] = useState(6);
   const [tab, setTab] = useState('Pending');
   const [viewMode, setViewMode] = useState('cards');
+  const [selectedLeaveId, setSelectedLeaveId] = useState(null);
   const [search, setSearch] = useState('');
   const [leaveType, setLeaveType] = useState('All');
+  const [departmentFilter, setDepartmentFilter] = useState('All');
   const [review, setReview] = useState(null);
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
@@ -41,8 +147,8 @@ const LeaveApprovals = () => {
   const [policies, setPolicies] = useState({ types: {} });
   const userRole = String(localStorage.getItem('userRole') || '').toLowerCase();
   const departmentRole = String(localStorage.getItem('departmentRole') || '').toLowerCase();
-  const isSupervisor = departmentRole === 'supervisor' || userRole === 'manager';
-  const isAdmin = userRole === 'admin' || userRole === 'hr' || userRole === 'manager';
+  const isAdmin = userRole === 'admin' || userRole === 'hr';
+  const isSupervisor = !isAdmin && (departmentRole === 'supervisor' || userRole === 'manager');
   const currentUserId = Number(localStorage.getItem('userId')) || 0;
 
   const fetchLeaves = useCallback(async () => {
@@ -117,13 +223,37 @@ const LeaveApprovals = () => {
     }
   };
 
+  const allDepartments = useMemo(() => {
+    const set = new Set();
+    leaves.forEach((l) => {
+      const d = (l.department || l.employee?.department || '').trim();
+      if (d) set.add(d);
+    });
+    return Array.from(set).sort();
+  }, [leaves]);
+
   const visibleLeaves = useMemo(() => {
-    if (tab !== 'Today') return leaves;
-    const today = dayjs().format('YYYY-MM-DD');
-    return leaves.filter(
-      (leave) => leave.status === 'Approved' && leave.start_date <= today && leave.end_date >= today
-    );
-  }, [leaves, tab]);
+    let list = leaves;
+    if (tab === 'Today') {
+      const today = dayjs().format('YYYY-MM-DD');
+      list = list.filter(
+        (leave) => leave.status === 'Approved' && leave.start_date <= today && leave.end_date >= today
+      );
+    }
+    if (departmentFilter !== 'All') {
+      list = list.filter((leave) => {
+        const d = (leave.department || leave.employee?.department || '').trim().toLowerCase();
+        return d === departmentFilter.toLowerCase();
+      });
+    }
+    return list;
+  }, [leaves, tab, departmentFilter]);
+
+  const activeLeave = useMemo(() => {
+    if (!visibleLeaves || visibleLeaves.length === 0) return null;
+    const found = visibleLeaves.find((l) => l.id === selectedLeaveId);
+    return found || visibleLeaves[0];
+  }, [visibleLeaves, selectedLeaveId]);
 
   const openReview = (leave, action) => {
     setReview({ leave, action });
@@ -189,7 +319,7 @@ const LeaveApprovals = () => {
               Leave Approvals
               {isAdmin ? (
                 <Chip
-                  label="Admin View"
+                  label="Admin View · All Departments"
                   size="small"
                   sx={{ bgcolor: '#EEF2FF', color: '#14286D', border: '1px solid #DDE4FF', fontWeight: 700, fontSize: '11px' }}
                 />
@@ -246,6 +376,21 @@ const LeaveApprovals = () => {
               ),
             }}
           />
+          {isAdmin && allDepartments.length > 0 && (
+            <TextField
+              select
+              size="small"
+              label="Department"
+              value={departmentFilter}
+              onChange={(e) => { setDepartmentFilter(e.target.value); setPage(0); }}
+              sx={{ minWidth: 170 }}
+            >
+              <MenuItem value="All">All Departments</MenuItem>
+              {allDepartments.map((dept) => (
+                <MenuItem key={dept} value={dept}>{dept}</MenuItem>
+              ))}
+            </TextField>
+          )}
           <TextField
             select
             size="small"
@@ -330,144 +475,100 @@ const LeaveApprovals = () => {
         {/* Content View: Cards View (Default) vs Table View */}
         {viewMode === 'cards' ? (
           visibleLeaves.length > 0 ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {visibleLeaves
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((leave) => {
-                  const meta = LEAVE_TYPE_META[leave.leave_type] || { color: '#2563EB', bg: '#EFF6FF' };
-                  const name = employeeName(leave);
-                  const fromSession = leave.half_day
-                    ? (leave.half_day_session === 'FirstHalf' || leave.half_day_session === 'Morning' ? 'First Half' : 'Second Half')
-                    : 'Full day';
-                  const toSession = leave.half_day
-                    ? (leave.half_day_session === 'FirstHalf' || leave.half_day_session === 'Morning' ? 'First Half' : 'Second Half')
-                    : 'Full day';
-                  const dept = leave.department || leave.employee?.department || 'KN Advisors';
-                  const desig = leave.employee?.designation;
+            <Grid container spacing={2.5} alignItems="flex-start">
+              {/* LEFT PANE: Request Stream List */}
+              <Grid item xs={12} md={5} lg={4.5}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, px: 0.5 }}>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Requests ({visibleLeaves.length})
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '11px', fontWeight: 600 }}>
+                    Page {page + 1} of {Math.max(1, Math.ceil(visibleLeaves.length / rowsPerPage))}
+                  </Typography>
+                </Box>
 
-                  return (
-                    <Paper
-                      key={leave.id}
-                      elevation={0}
-                      sx={{
-                        p: { xs: 2.25, sm: 3 },
-                        borderRadius: '16px',
-                        bgcolor: '#FFFFFF',
-                        border: '1px solid #E2E8F0',
-                        boxShadow: '0 2px 8px rgba(20, 40, 109, 0.04)',
-                        transition: 'all 0.2s ease-in-out',
-                        '&:hover': {
-                          boxShadow: '0 6px 20px rgba(20, 40, 109, 0.08)',
-                          borderColor: '#CBD5E1',
-                        },
-                      }}
-                    >
-                      {/* Top Row: Employee Profile, Leave Type, Status Title */}
-                      <Grid container spacing={2} alignItems="center">
-                        {/* Employee Avatar & Identity */}
-                        <Grid item xs={12} sm={5} md={4.5}>
-                          <Stack direction="row" spacing={1.75} alignItems="center">
-                            <Avatar
-                              src={leave.employee?.photo || undefined}
-                              sx={{
-                                width: 46,
-                                height: 46,
-                                bgcolor: '#14286D',
-                                fontWeight: 700,
-                                fontSize: 16,
-                                boxShadow: '0 2px 6px rgba(20,40,109,0.2)',
-                              }}
-                            >
-                              {name.slice(0, 1)}
-                            </Avatar>
-                            <Box sx={{ minWidth: 0 }}>
-                              <Typography sx={{ fontWeight: 800, fontSize: '15.5px', color: '#1B2A5B', lineHeight: 1.25 }}>
-                                {name}
-                              </Typography>
-                              <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.35, fontSize: '12px' }}>
-                                {dept}{desig ? ` · ${desig}` : ''}
-                                {leave.employeeId ? ` · ID: ${leave.employeeId}` : ''}
-                              </Typography>
-                            </Box>
-                          </Stack>
-                        </Grid>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1.5,
+                    maxHeight: { md: 'calc(100vh - 260px)' },
+                    overflowY: { md: 'auto' },
+                    pr: { md: 1 },
+                  }}
+                >
+                  {visibleLeaves
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((leave) => {
+                      const meta = LEAVE_TYPE_META[leave.leave_type] || { color: '#2563EB', bg: '#EFF6FF' };
+                      const name = employeeName(leave);
+                      const isSelected = activeLeave && activeLeave.id === leave.id;
+                      const hasAction = canReview(leave);
 
-                        {/* Leave Type with colored bullet indicator */}
-                        <Grid item xs={6} sm={3.5} md={4}>
-                          <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            Leave Type
-                          </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.35 }}>
-                            <Box sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: meta.color || '#2563EB', flexShrink: 0 }} />
-                            <Typography sx={{ fontWeight: 700, fontSize: '14px', color: '#1E293B' }}>
-                              {leave.leave_type}
-                            </Typography>
-                          </Box>
-                        </Grid>
+                      return (
+                        <Paper
+                          key={leave.id}
+                          onClick={() => setSelectedLeaveId(leave.id)}
+                          elevation={0}
+                          sx={{
+                            p: 2,
+                            borderRadius: '14px',
+                            bgcolor: isSelected ? '#F8FAFF' : '#FFFFFF',
+                            border: isSelected ? '2px solid #14286D' : '1px solid #E2E8F0',
+                            boxShadow: isSelected ? '0 4px 14px rgba(20, 40, 109, 0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease-in-out',
+                            position: 'relative',
+                            '&:hover': {
+                              borderColor: isSelected ? '#14286D' : '#CBD5E1',
+                              bgcolor: isSelected ? '#F8FAFF' : '#FAFBFC',
+                              transform: 'translateY(-1px)',
+                            },
+                          }}
+                        >
+                          {/* Top: Avatar, Name, Status */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0, pr: 1 }}>
+                              <Avatar
+                                src={leave.employee?.photo || undefined}
+                                sx={{
+                                  width: 38,
+                                  height: 38,
+                                  bgcolor: '#14286D',
+                                  fontWeight: 700,
+                                  fontSize: 14,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {name.slice(0, 1)}
+                              </Avatar>
+                              <Box sx={{ minWidth: 0 }}>
+                                <Typography noWrap sx={{ fontWeight: 700, fontSize: '14px', color: '#1B2A5B', lineHeight: 1.25 }}>
+                                  {name}
+                                </Typography>
+                                <Typography noWrap variant="caption" sx={{ color: '#64748B', fontSize: '11px', display: 'block', mt: 0.2 }}>
+                                  {leave.department || leave.employee?.department || 'KN Advisors'}
+                                  {leave.employeeId ? ` · ID: ${leave.employeeId}` : ''}
+                                </Typography>
+                              </Box>
+                            </Stack>
 
-                        {/* Leave Request Title & Current Status Badge */}
-                        <Grid item xs={6} sm={3.5} md={3.5} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-                          <Typography sx={{ fontWeight: 800, fontSize: '13.5px', color: '#1B2A5B', letterSpacing: '-0.2px' }}>
-                            Leave Request
-                          </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'flex-start', sm: 'flex-end' }, gap: 0.75, mt: 0.5, flexWrap: 'wrap' }}>
                             <Chip
                               size="small"
                               label={leave.status}
                               color={statusColor(leave.status)}
-                              sx={{ fontWeight: 700, fontSize: '11px', height: 22 }}
+                              sx={{ fontWeight: 700, fontSize: '10.5px', height: 20, flexShrink: 0 }}
                             />
-                            {leave.status === 'Pending' && leave.approval_stage && (
-                              <Chip
-                                size="small"
-                                label={`Stage: ${leave.approval_stage === 'FinalApprover' ? 'Final Approver' : leave.approval_stage}`}
-                                sx={{
-                                  bgcolor: '#FEF3C7',
-                                  color: '#92400E',
-                                  fontWeight: 700,
-                                  fontSize: '10.5px',
-                                  height: 22,
-                                  border: '1px solid #FDE68A',
-                                }}
-                              />
-                            )}
                           </Box>
-                        </Grid>
-                      </Grid>
 
-                      <Divider sx={{ my: 2, borderColor: '#F1F5F9' }} />
-
-                      {/* Middle Row: From / To / Duration */}
-                      <Grid container spacing={2} sx={{ mb: leave.reason ? 1.75 : 2 }}>
-                        <Grid item xs={12} sm={4}>
-                          <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            From
-                          </Typography>
-                          <Typography sx={{ fontWeight: 700, fontSize: '13.5px', color: '#1E293B', mt: 0.25 }}>
-                            {formatLeaveDate(leave.start_date)}{' '}
-                            <Typography component="span" sx={{ color: '#64748B', fontWeight: 500, fontSize: '12px' }}>
-                              / {fromSession}
-                            </Typography>
-                          </Typography>
-                        </Grid>
-
-                        <Grid item xs={12} sm={4}>
-                          <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            To
-                          </Typography>
-                          <Typography sx={{ fontWeight: 700, fontSize: '13.5px', color: '#1E293B', mt: 0.25 }}>
-                            {formatLeaveDate(leave.end_date)}{' '}
-                            <Typography component="span" sx={{ color: '#64748B', fontWeight: 500, fontSize: '12px' }}>
-                              / {toSession}
-                            </Typography>
-                          </Typography>
-                        </Grid>
-
-                        <Grid item xs={12} sm={4}>
-                          <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            Duration
-                          </Typography>
-                          <Box sx={{ mt: 0.25 }}>
+                          {/* Middle: Leave Type & Duration */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: meta.color || '#2563EB', flexShrink: 0 }} />
+                              <Typography sx={{ fontWeight: 600, fontSize: '12.5px', color: '#334155' }}>
+                                {leave.leave_type}
+                              </Typography>
+                            </Box>
                             <Chip
                               size="small"
                               label={durationLabel(leave)}
@@ -475,97 +576,411 @@ const LeaveApprovals = () => {
                                 bgcolor: '#EEF2FF',
                                 color: '#14286D',
                                 fontWeight: 700,
-                                fontSize: '11.5px',
-                                border: '1px solid #DDE4FF',
+                                fontSize: '11px',
+                                height: 20,
                               }}
                             />
                           </Box>
-                        </Grid>
-                      </Grid>
 
-                      {/* Reason & Contact Box */}
-                      {leave.reason && (
-                        <Box sx={{ bgcolor: '#F8FAFC', p: 1.75, borderRadius: '8px', border: '1px solid #EEF2F6', mb: 2 }}>
+                          {/* Dates Line */}
+                          <Typography variant="caption" sx={{ color: '#64748B', fontSize: '11.5px', display: 'block', mb: 1 }}>
+                            📅 {formatLeaveDate(leave.start_date)} – {formatLeaveDate(leave.end_date)}
+                          </Typography>
+
+                          {/* Bottom Row: Stage pill & Action required */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 0.75, borderTop: '1px dashed #F1F5F9' }}>
+                            <Typography variant="caption" sx={{ color: '#64748B', fontSize: '11px', fontWeight: 600 }}>
+                              Stage: {stageLabel(leave.approval_stage)}
+                            </Typography>
+
+                            {hasAction && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <Box
+                                  sx={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: '50%',
+                                    bgcolor: '#10B981',
+                                    boxShadow: '0 0 0 2.5px rgba(16,185,129,0.25)',
+                                  }}
+                                />
+                                <Typography sx={{ fontSize: '10.5px', fontWeight: 700, color: '#047857' }}>
+                                  Action required
+                                </Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        </Paper>
+                      );
+                    })}
+                </Box>
+              </Grid>
+
+              {/* RIGHT PANE: Dedicated Inspector & Approval Station */}
+              <Grid item xs={12} md={7} lg={7.5} sx={{ position: { md: 'sticky' }, top: 20 }}>
+                {activeLeave ? (
+                  (() => {
+                    const activeMeta = LEAVE_TYPE_META[activeLeave.leave_type] || { color: '#2563EB', bg: '#EFF6FF' };
+                    const activeName = employeeName(activeLeave);
+                    const activeFromSession = activeLeave.half_day
+                      ? (activeLeave.half_day_session === 'FirstHalf' || activeLeave.half_day_session === 'Morning' ? 'First Half' : 'Second Half')
+                      : 'Full day';
+                    const activeToSession = activeLeave.half_day
+                      ? (activeLeave.half_day_session === 'FirstHalf' || activeLeave.half_day_session === 'Morning' ? 'First Half' : 'Second Half')
+                      : 'Full day';
+                    const activeDept = activeLeave.department || activeLeave.employee?.department || 'KN Advisors';
+                    const activeDesig = activeLeave.employee?.designation;
+                    const journey = getJourneyStages(activeLeave);
+
+                    return (
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: { xs: 2.25, sm: 3 },
+                          borderRadius: '16px',
+                          bgcolor: '#FFFFFF',
+                          border: '1px solid #E2E8F0',
+                          boxShadow: '0 4px 16px rgba(20, 40, 109, 0.05)',
+                        }}
+                      >
+                        {/* Header: Employee Profile & Status */}
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+                          <Stack direction="row" spacing={2} alignItems="center">
+                            <Avatar
+                              src={activeLeave.employee?.photo || undefined}
+                              sx={{
+                                width: 50,
+                                height: 50,
+                                bgcolor: '#14286D',
+                                fontWeight: 800,
+                                fontSize: 18,
+                                boxShadow: '0 3px 10px rgba(20,40,109,0.2)',
+                              }}
+                            >
+                              {activeName.slice(0, 1)}
+                            </Avatar>
+                            <Box>
+                              <Typography sx={{ fontWeight: 800, fontSize: '17px', color: '#14286D', lineHeight: 1.25 }}>
+                                {activeName}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#64748B', fontSize: '12.5px', mt: 0.25 }}>
+                                {activeDept}{activeDesig ? ` · ${activeDesig}` : ''}{activeLeave.employeeId ? ` · ID: ${activeLeave.employeeId}` : ''}
+                              </Typography>
+                              {activeLeave.employee?.email && (
+                                <Typography variant="caption" sx={{ color: '#94A3B8', fontSize: '11.5px', display: 'block' }}>
+                                  {activeLeave.employee.email}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Stack>
+
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                            <Chip
+                              label={activeLeave.status}
+                              color={statusColor(activeLeave.status)}
+                              sx={{ fontWeight: 800, fontSize: '11px', height: 24 }}
+                            />
+                            {activeLeave.status === 'Pending' && activeLeave.approval_stage && (
+                              <Chip
+                                label={`Stage: ${stageLabel(activeLeave.approval_stage)}`}
+                                sx={{
+                                  bgcolor: '#FEF3C7',
+                                  color: '#92400E',
+                                  fontWeight: 700,
+                                  fontSize: '11px',
+                                  height: 24,
+                                  border: '1px solid #FDE68A',
+                                }}
+                              />
+                            )}
+                          </Box>
+                        </Box>
+
+                        <Divider sx={{ my: 2.25, borderColor: '#F1F5F9' }} />
+
+                        {/* 4 Metrics Grid */}
+                        <Grid container spacing={1.5} sx={{ mb: 2.25 }}>
+                          <Grid item xs={6} sm={3}>
+                            <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: '#F8FAFC', border: '1px solid #EEF2F6' }}>
+                              <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, fontSize: '10.5px', textTransform: 'uppercase' }}>
+                                Leave Type
+                              </Typography>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.35 }}>
+                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: activeMeta.color || '#2563EB' }} />
+                                <Typography sx={{ fontWeight: 700, fontSize: '13px', color: '#1E293B' }}>
+                                  {activeLeave.leave_type}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </Grid>
+
+                          <Grid item xs={6} sm={3}>
+                            <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: '#F8FAFC', border: '1px solid #EEF2F6' }}>
+                              <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, fontSize: '10.5px', textTransform: 'uppercase' }}>
+                                Duration
+                              </Typography>
+                              <Typography sx={{ fontWeight: 700, fontSize: '13px', color: '#1E293B', mt: 0.35 }}>
+                                {durationLabel(activeLeave)}
+                              </Typography>
+                            </Box>
+                          </Grid>
+
+                          <Grid item xs={6} sm={3}>
+                            <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: '#F8FAFC', border: '1px solid #EEF2F6' }}>
+                              <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, fontSize: '10.5px', textTransform: 'uppercase' }}>
+                                From Date
+                              </Typography>
+                              <Typography sx={{ fontWeight: 700, fontSize: '12px', color: '#1E293B', mt: 0.35 }}>
+                                {formatLeaveDate(activeLeave.start_date)}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#64748B', fontSize: '11px', display: 'block' }}>
+                                {activeFromSession}
+                              </Typography>
+                            </Box>
+                          </Grid>
+
+                          <Grid item xs={6} sm={3}>
+                            <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: '#F8FAFC', border: '1px solid #EEF2F6' }}>
+                              <Typography variant="caption" sx={{ color: '#94A3B8', fontWeight: 700, fontSize: '10.5px', textTransform: 'uppercase' }}>
+                                To Date
+                              </Typography>
+                              <Typography sx={{ fontWeight: 700, fontSize: '12px', color: '#1E293B', mt: 0.35 }}>
+                                {formatLeaveDate(activeLeave.end_date)}
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#64748B', fontSize: '11px', display: 'block' }}>
+                                {activeToSession}
+                              </Typography>
+                            </Box>
+                          </Grid>
+                        </Grid>
+
+                        {/* Reason Box */}
+                        <Box sx={{ p: 1.75, borderRadius: '10px', bgcolor: '#F8FAFC', border: '1px solid #EEF2F6', mb: 2.5 }}>
                           <Typography variant="caption" sx={{ color: '#64748B', fontWeight: 700, display: 'block', mb: 0.25 }}>
-                            Reason:
+                            Reason for Leave
                           </Typography>
                           <Typography variant="body2" sx={{ color: '#334155', fontSize: '13px', lineHeight: 1.5 }}>
-                            {leave.reason}
+                            {activeLeave.reason || 'No specific reason provided.'}
                           </Typography>
-                          {leave.contact_number && (
+                          {activeLeave.contact_number && (
                             <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mt: 0.75 }}>
-                              Contact while on leave: <strong>{leave.contact_number}</strong>
+                              Contact during leave: <strong>{activeLeave.contact_number}</strong>
                             </Typography>
                           )}
                         </Box>
-                      )}
 
-                      {/* Bottom Action Section: Authorization & Action Buttons */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, pt: 0.5 }}>
-                        <Box>
-                          {leave.status === 'Pending' ? (
-                            <Typography variant="caption" sx={{ color: '#64748B', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              {canReview(leave) ? (
-                                <span style={{ color: '#059669', fontWeight: 600 }}>Action required: You are authorized to review this request</span>
+                        {/* Approval Journey Pipeline Section (Vertical Stepper) */}
+                        <Box sx={{ mb: 2.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.75 }}>
+                            <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                              Approval Journey Pipeline
+                            </Typography>
+                            <Typography variant="caption" sx={{ fontSize: '11.5px', color: '#94A3B8', fontWeight: 500 }}>
+                              3-Tier Verification & Audit
+                            </Typography>
+                          </Box>
+
+                          {/* Vertical Stepper Nodes */}
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0, px: 0.5 }}>
+                            {journey.map((stage, idx) => {
+                              const isCompleted = stage.status === 'completed';
+                              const isActive = stage.status === 'active';
+                              const isStageRejected = stage.status === 'rejected';
+                              const isLast = idx === journey.length - 1;
+
+                              return (
+                                <Box key={stage.key} sx={{ display: 'flex', alignItems: 'flex-start', position: 'relative' }}>
+                                  {/* Left: Milestone Circle & Connector Line */}
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mr: 2 }}>
+                                    <Box
+                                      sx={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        bgcolor: isCompleted ? '#10B981' : isActive ? '#14286D' : isStageRejected ? '#EF4444' : '#F1F5F9',
+                                        color: isCompleted || isActive || isStageRejected ? '#FFFFFF' : '#94A3B8',
+                                        border: !isCompleted && !isActive && !isStageRejected ? '1.5px solid #CBD5E1' : 'none',
+                                        boxShadow: isActive ? '0 0 0 3px rgba(20, 40, 109, 0.15)' : 'none',
+                                        zIndex: 2,
+                                      }}
+                                    >
+                                      {isCompleted ? (
+                                        <CheckCircleIcon sx={{ fontSize: 16 }} />
+                                      ) : isStageRejected ? (
+                                        <CancelIcon sx={{ fontSize: 16 }} />
+                                      ) : (
+                                        <Typography sx={{ fontSize: 11, fontWeight: 800 }}>{stage.index}</Typography>
+                                      )}
+                                    </Box>
+
+                                    {!isLast && (
+                                      <Box
+                                        sx={{
+                                          width: 2,
+                                          height: 36,
+                                          bgcolor: isCompleted ? '#10B981' : '#E2E8F0',
+                                          my: 0.5,
+                                        }}
+                                      />
+                                    )}
+                                  </Box>
+
+                                  {/* Right: Milestone Info */}
+                                  <Box sx={{ flex: 1, pb: isLast ? 0 : 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#1E293B' }}>
+                                        {stage.title}
+                                      </Typography>
+                                      {isCompleted && (
+                                        <Chip size="small" label="Approved" sx={{ height: 18, fontSize: '9.5px', fontWeight: 700, bgcolor: '#DCFCE7', color: '#15803D' }} />
+                                      )}
+                                      {isActive && (
+                                        <Chip size="small" label="In Review" sx={{ height: 18, fontSize: '9.5px', fontWeight: 700, bgcolor: '#EFF6FF', color: '#1D4ED8' }} />
+                                      )}
+                                      {isStageRejected && (
+                                        <Chip size="small" label="Rejected" sx={{ height: 18, fontSize: '9.5px', fontWeight: 700, bgcolor: '#FEE2E2', color: '#B91C1C' }} />
+                                      )}
+                                    </Box>
+
+                                    <Typography variant="caption" sx={{ color: '#64748B', fontSize: '11.5px', display: 'block', mt: 0.25 }}>
+                                      {stage.reviewer ? `Reviewed by ${stage.reviewer}` : stage.roleSubtitle}
+                                      {stage.date ? ` · ${dayjs(stage.date).format('DD MMM YYYY, hh:mm A')}` : ''}
+                                    </Typography>
+
+                                    {stage.comment && (
+                                      <Box
+                                        sx={{
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: 0.5,
+                                          mt: 0.5,
+                                          px: 1,
+                                          py: 0.35,
+                                          bgcolor: isStageRejected ? '#FEE2E2' : '#F8FAFC',
+                                          border: `1px solid ${isStageRejected ? '#FECACA' : '#E2E8F0'}`,
+                                          borderRadius: '6px',
+                                        }}
+                                      >
+                                        <ChatBubbleOutlineIcon sx={{ fontSize: 11, color: isStageRejected ? '#DC2626' : '#64748B' }} />
+                                        <Typography sx={{ fontSize: '11px', color: isStageRejected ? '#991B1B' : '#475569', fontStyle: 'italic' }}>
+                                          "{stage.comment}"
+                                        </Typography>
+                                      </Box>
+                                    )}
+                                  </Box>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        </Box>
+
+                        <Divider sx={{ my: 2.25, borderColor: '#F1F5F9' }} />
+
+                        {/* Decision & Action Bar */}
+                        {canReview(activeLeave) ? (
+                          <Box
+                            sx={{
+                              p: 2,
+                              borderRadius: '12px',
+                              bgcolor: '#F8FAFF',
+                              border: '1.5px solid #C7D2FE',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: 1.5,
+                            }}
+                          >
+                            <Box>
+                              <Typography sx={{ fontSize: '13px', fontWeight: 800, color: '#14286D' }}>
+                                Action required: You are authorized to review this stage ({stageLabel(activeLeave.approval_stage)})
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: '#4338CA', fontSize: '11px' }}>
+                                Applicant leave quota will be updated upon finalization.
+                              </Typography>
+                            </Box>
+
+                            <Stack direction="row" spacing={1.5} alignItems="center">
+                              <Button
+                                variant="contained"
+                                onClick={() => openReview(activeLeave, 'Approved')}
+                                sx={{
+                                  bgcolor: '#14286D',
+                                  color: '#FFFFFF',
+                                  fontWeight: 700,
+                                  fontSize: '13px',
+                                  textTransform: 'none',
+                                  borderRadius: '8px',
+                                  px: 3,
+                                  py: 0.85,
+                                  boxShadow: '0 2px 6px rgba(20, 40, 109, 0.25)',
+                                  '&:hover': { bgcolor: '#0E1E4F' },
+                                }}
+                              >
+                                {getApproveButtonText(activeLeave.approval_stage)}
+                              </Button>
+                              <Button
+                                variant="text"
+                                color="error"
+                                onClick={() => openReview(activeLeave, 'Rejected')}
+                                sx={{
+                                  fontWeight: 700,
+                                  fontSize: '13px',
+                                  textTransform: 'none',
+                                  px: 2,
+                                  py: 0.85,
+                                  '&:hover': { bgcolor: '#FEE2E2' },
+                                }}
+                              >
+                                Reject
+                              </Button>
+                            </Stack>
+                          </Box>
+                        ) : (
+                          <Box
+                            sx={{
+                              p: 1.5,
+                              borderRadius: '10px',
+                              bgcolor: activeLeave.status === 'Approved' ? '#F0FDF4' : activeLeave.status === 'Rejected' ? '#FEF2F2' : '#F8FAFC',
+                              border: `1px solid ${activeLeave.status === 'Approved' ? '#BBF7D0' : activeLeave.status === 'Rejected' ? '#FECACA' : '#E2E8F0'}`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1,
+                            }}
+                          >
+                            {activeLeave.status === 'Approved' ? (
+                              <CheckCircleIcon sx={{ fontSize: 18, color: '#10B981' }} />
+                            ) : activeLeave.status === 'Rejected' ? (
+                              <CancelIcon sx={{ fontSize: 18, color: '#DC2626' }} />
+                            ) : (
+                              <ScheduleIcon sx={{ fontSize: 18, color: '#64748B' }} />
+                            )}
+                            <Typography variant="body2" sx={{ fontSize: '12.5px', color: '#334155' }}>
+                              {activeLeave.status === 'Pending' ? (
+                                <>Waiting for review by <strong>{stageLabel(activeLeave.approval_stage)}</strong></>
+                              ) : activeLeave.status === 'Approved' ? (
+                                <>Leave fully approved & processed {activeLeave.reviewer_name ? `by ${activeLeave.reviewer_name}` : ''}{activeLeave.reviewed_at ? ` on ${dayjs(activeLeave.reviewed_at).format('DD MMM YYYY, hh:mm A')}` : ''}</>
                               ) : (
-                                `Waiting for review by ${leave.approval_stage === 'FinalApprover' ? 'final approver' : (leave.approval_stage || 'reviewer')}`
+                                <>Leave request rejected {activeLeave.reviewer_name ? `by ${activeLeave.reviewer_name}` : ''}{activeLeave.reviewed_at ? ` on ${dayjs(activeLeave.reviewed_at).format('DD MMM YYYY, hh:mm A')}` : ''}</>
                               )}
                             </Typography>
-                          ) : (
-                            <Typography variant="caption" sx={{ color: '#64748B' }}>
-                              Decision recorded by <strong>{leave.reviewer_name || 'Approver'}</strong>
-                              {leave.reviewed_at ? ` on ${dayjs(leave.reviewed_at).format('DD MMM YYYY, hh:mm A')}` : ''}
-                              {leave.review_comment ? ` — "${leave.review_comment}"` : ''}
-                            </Typography>
-                          )}
-                        </Box>
-
-                        {canReview(leave) && (
-                          <Stack direction="row" spacing={1.5} alignItems="center">
-                            <Button
-                              variant="contained"
-                              onClick={() => openReview(leave, 'Approved')}
-                              sx={{
-                                bgcolor: '#14286D',
-                                color: '#FFFFFF',
-                                fontWeight: 700,
-                                fontSize: '13px',
-                                textTransform: 'none',
-                                borderRadius: '8px',
-                                px: 3.5,
-                                py: 0.8,
-                                boxShadow: '0 2px 6px rgba(20, 40, 109, 0.25)',
-                                '&:hover': {
-                                  bgcolor: '#0E1E4F',
-                                },
-                              }}
-                            >
-                              {leave.approval_stage === 'Processor' ? 'Process Leave' : 'Approve'}
-                            </Button>
-                            <Button
-                              variant="text"
-                              color="error"
-                              onClick={() => openReview(leave, 'Rejected')}
-                              sx={{
-                                fontWeight: 700,
-                                fontSize: '13px',
-                                textTransform: 'none',
-                                px: 2.5,
-                                py: 0.8,
-                                '&:hover': {
-                                  bgcolor: '#FEE2E2',
-                                },
-                              }}
-                            >
-                              Reject
-                            </Button>
-                          </Stack>
+                          </Box>
                         )}
-                      </Box>
-                    </Paper>
-                  );
-                })}
-            </Box>
+                      </Paper>
+                    );
+                  })()
+                ) : (
+                  <Paper elevation={0} sx={{ p: 4, textAlign: 'center', borderRadius: '16px', border: '1px dashed #CBD5E1' }}>
+                    <Typography variant="body1" sx={{ color: '#64748B' }}>
+                      Select a leave request on the left to inspect its details and approval journey.
+                    </Typography>
+                  </Paper>
+                )}
+              </Grid>
+            </Grid>
           ) : (
             <Paper
               elevation={0}

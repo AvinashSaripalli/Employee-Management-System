@@ -26,6 +26,7 @@ app.use('/api', userRoutes);
 
 const { ensureLeaveSchema } = require('./utils/leaveSchema');
 const { backfillCompanyMembership } = require('./utils/companyMembership');
+const { initAutoClockOutScheduler } = require('./utils/autoClockOut');
 
 const leaveRoutes = require('./routes/leaveRoutes');
 app.use('/api/leaves', verifyToken, leaveRoutes);
@@ -50,6 +51,9 @@ app.use('/api/messages', messageRoutes);
 
 const crmRoutes = require('./routes/crmRoutes');
 app.use('/api/crm', crmRoutes);
+
+const notificationRoutes = require('./routes/notificationRoutes');
+app.use('/api/notifications', verifyToken, notificationRoutes);
 
 const distPath = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(distPath)) {
@@ -137,6 +141,7 @@ ensureLeaveSchema()
     console.error('Startup data sync failed:', err.message);
   })
   .finally(() => {
+    initAutoClockOutScheduler();
     server.listen(port, () => {
       console.log(`Server running on http://localhost:${port}`);
     });
