@@ -31,8 +31,6 @@ import {
   HiOutlineArrowPath,
 } from 'react-icons/hi2';
 import AppShell from './AppShell';
-import ApplyLeave from '../leaves/ApplyLeave';
-import MyLeaves from '../leaves/MyLeaves';
 import ManageLeaves from '../leaves/ManageLeaves';
 import UserProfile from '../profile/UserProfile';
 import WorkReports from '../reports/WorkReports';
@@ -319,11 +317,11 @@ const Sidebar = () => {
       case 'My Work Reports': return <WorkReports />;
       case 'Messenger': return <Messenger />;
       case 'CRM': return <Crm />;
-      case 'Apply Leave': return <ApplyLeave />;
-      case 'My Leaves': return <MyLeaves />;
-      case 'Manage Leaves': return <ManageLeaves />;
+      case 'Apply Leave':
+      case 'My Leaves':
+      case 'Manage Leaves': return <ManageLeaves initialTab={selectedComponent} />;
       case 'Profile': return <UserProfile />;
-      default: return <MyLeaves />;
+      default: return <ManageLeaves />;
     }
   };
 
@@ -622,15 +620,7 @@ const Sidebar = () => {
         },
         {
           text: 'Manage Leaves',
-          icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves')} />,
-        },
-        {
-          text: 'My Leaves',
-          icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'My Leaves')} />,
-        },
-        {
-          text: 'Apply Leave',
-          icon: <HiOutlineDocumentText {...iconStyle(selectedComponent === 'Apply Leave')} />,
+          icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves' || selectedComponent === 'My Leaves' || selectedComponent === 'Apply Leave')} />,
         },
         {
           text: 'CRM',
@@ -663,17 +653,9 @@ const Sidebar = () => {
           icon: <HiOutlineChartBar {...iconStyle(selectedComponent === 'Work Reports')} />,
         },
         {
-          text: 'My Leaves',
-          icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'My Leaves')} />,
-        },
-        {
-          text: 'Apply Leave',
-          icon: <HiOutlineDocumentText {...iconStyle(selectedComponent === 'Apply Leave')} />,
-        },
-        ...(canReviewLeaves ? [{
           text: 'Manage Leaves',
-          icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves')} />,
-        }] : []),
+          icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves' || selectedComponent === 'My Leaves' || selectedComponent === 'Apply Leave')} />,
+        },
         {
           text: 'CRM',
           icon: <HiOutlineBriefcase {...iconStyle(selectedComponent === 'CRM')} />,

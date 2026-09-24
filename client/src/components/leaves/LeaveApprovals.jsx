@@ -16,10 +16,12 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
+import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import axios from '../../api/axios';
 import dayjs from 'dayjs';
 import { FiSearch } from 'react-icons/fi';
 import { durationLabel, formatLeaveDate, LEAVE_TYPE_META, statusColor, leaveIdentityParams } from '../../utils/leaveConfig';
+import ApplyLeaveDialog from './ApplyLeaveDialog';
 
 const stageLabel = (stage) => {
   switch (stage) {
@@ -124,7 +126,7 @@ const employeeName = (leave) =>
   leave.employee?.email ||
   'Employee';
 
-const LeaveApprovals = () => {
+const LeaveApprovals = ({ onOpenApplyLeave }) => {
   const [leaves, setLeaves] = useState([]);
   const [counts, setCounts] = useState({ total: 0, approved: 0, pending: 0, rejected: 0, cancelled: 0, onLeaveToday: 0 });
   const [todayList, setTodayList] = useState([]);
@@ -133,6 +135,7 @@ const LeaveApprovals = () => {
   const [tab, setTab] = useState('Pending');
   const [viewMode, setViewMode] = useState('cards');
   const [selectedLeaveId, setSelectedLeaveId] = useState(null);
+  const [applyDialogOpen, setApplyDialogOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [leaveType, setLeaveType] = useState('All');
   const [departmentFilter, setDepartmentFilter] = useState('All');
@@ -311,7 +314,7 @@ const LeaveApprovals = () => {
   const typeOptions = ['All', ...Object.keys(policies.types || {})];
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
+    <Box sx={{ width: '100%' }}>
       <Box sx={{ width: '100%' }}>
         <Box sx={{ mb: 2.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
           <Box>
@@ -336,28 +339,56 @@ const LeaveApprovals = () => {
             </Typography>
           </Box>
 
-          {isAdmin && (
+          <Stack direction="row" spacing={1.25} alignItems="center">
             <Button
-              variant="outlined"
-              startIcon={<SettingsIcon sx={{ fontSize: 18 }} />}
-              onClick={() => setSettingsOpen(true)}
+              variant="contained"
+              startIcon={<AddCircleOutlineIcon sx={{ fontSize: 18 }} />}
+              onClick={() => {
+                if (onOpenApplyLeave) {
+                  onOpenApplyLeave();
+                } else {
+                  setApplyDialogOpen(true);
+                }
+              }}
               sx={{
                 borderRadius: '8px',
-                borderColor: '#DDE4FF',
-                color: '#14286D',
-                bgcolor: '#ffffff',
+                bgcolor: '#14286D',
+                color: '#ffffff',
                 fontWeight: 700,
                 fontSize: '13px',
                 textTransform: 'none',
                 height: 35,
-                px: 1.8,
-                boxShadow: '0 1px 3px rgba(20, 40, 109, 0.05)',
-                '&:hover': { bgcolor: '#EEF2FF', borderColor: '#14286D' },
+                px: 2,
+                boxShadow: '0 2px 6px rgba(20, 40, 109, 0.2)',
+                '&:hover': { bgcolor: '#0D1B4D' },
               }}
             >
-              Approval Settings
+              Apply Leave
             </Button>
-          )}
+
+            {isAdmin && (
+              <Button
+                variant="outlined"
+                startIcon={<SettingsIcon sx={{ fontSize: 18 }} />}
+                onClick={() => setSettingsOpen(true)}
+                sx={{
+                  borderRadius: '8px',
+                  borderColor: '#DDE4FF',
+                  color: '#14286D',
+                  bgcolor: '#ffffff',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  textTransform: 'none',
+                  height: 35,
+                  px: 1.8,
+                  boxShadow: '0 1px 3px rgba(20, 40, 109, 0.05)',
+                  '&:hover': { bgcolor: '#EEF2FF', borderColor: '#14286D' },
+                }}
+              >
+                Approval Settings
+              </Button>
+            )}
+          </Stack>
         </Box>
 
         {/* Filter & View Mode Controls */}
@@ -1328,6 +1359,16 @@ const LeaveApprovals = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Quick Apply Leave Modal Dialog */}
+      <ApplyLeaveDialog
+        open={applyDialogOpen}
+        onClose={() => setApplyDialogOpen(false)}
+        onSuccess={() => {
+          fetchLeaves();
+          setSnackbar({ open: true, message: 'Leave application submitted successfully', severity: 'success' });
+        }}
+      />
 
       <Snackbar
         open={snackbar.open}

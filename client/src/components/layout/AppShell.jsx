@@ -1082,22 +1082,22 @@ const AppShell = ({
             <MenuItem onClick={requestLogout} sx={{ py: 1, color: 'error.main' }}>
               <ListItemIcon sx={{ color: 'inherit' }}><HiOutlineArrowRightOnRectangle size={18} /></ListItemIcon>
               <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: 'inherit' }}>Sign out</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: 'inherit' }}>Logout</Typography>
                 <Typography variant="caption" color="text.secondary">End this session securely</Typography>
               </Box>
             </MenuItem>
           </Menu>
 
           <Dialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)} maxWidth="xs" fullWidth>
-            <DialogTitle>Sign out of your account?</DialogTitle>
+            <DialogTitle>Log out of your account?</DialogTitle>
             <DialogContent>
               <Typography variant="body2" color="text.secondary">
-                You will need to sign in again to access your employee workspace.
+                You will need to log in again to access your employee workspace.
               </Typography>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2 }}>
               <Button onClick={() => setLogoutDialogOpen(false)}>Cancel</Button>
-              <Button color="error" variant="contained" onClick={confirmLogout}>Sign out</Button>
+              <Button color="error" variant="contained" onClick={confirmLogout}>Logout</Button>
             </DialogActions>
           </Dialog>
 

@@ -1,5 +1,5 @@
-import LeaveApprovals from './LeaveApprovals';
+import ManageLeaves from './ManageLeaves';
 
-const LeaveManagement = () => <LeaveApprovals />;
+const LeaveManagement = () => <ManageLeaves />;
 
 export default LeaveManagement;

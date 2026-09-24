@@ -36,11 +36,11 @@ export const formatLeaveDate = (value) => {
 export const durationLabel = (leave) => {
   if (!leave) return '';
   if (leave.half_day) {
-    return `Half day (${leave.half_day_session || 'AM'})`;
+    return `Half Day (${leave.half_day_session || 'AM'})`;
   }
   const days = Number(leave.days);
   if (!Number.isNaN(days) && days > 0) {
-    return `${days} day${days === 1 ? '' : 's'}`;
+    return `${days} ${days === 1 ? 'Day' : 'Days'}`;
   }
   return '—';
 };

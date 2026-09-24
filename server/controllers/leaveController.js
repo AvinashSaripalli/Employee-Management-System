@@ -379,6 +379,23 @@ exports.leaveApply = async (req, res) => {
       employeeId = actor.employeeId || employeeId;
       companyName = actor.companyName || companyName;
     }
+
+    // Allow Admin or Supervisor to apply on behalf of a specific employee
+    const targetEmpId = firstValue(req.body?.targetEmployeeId);
+    if (targetEmpId && (isAdmin(actor, req) || actor?.departmentRole === 'Supervisor')) {
+      const targetUser = await User.findOne({
+        where: {
+          employeeId: targetEmpId,
+          companyName: { [Op.iLike]: companyName },
+          exists: 1,
+        },
+      });
+      if (targetUser) {
+        actor = targetUser;
+        employeeId = targetUser.employeeId;
+      }
+    }
+
     if (!actor && !employeeId) {
       return res.status(401).json({ error: 'Unable to identify the signed-in employee' });
     }

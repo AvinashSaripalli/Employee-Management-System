@@ -50,7 +50,7 @@ const workingDaysBetween = (start, end, halfDay, holidaySet) => {
   return count;
 };
 
-const ApplyLeave = () => {
+const ApplyLeave = ({ onLeaveSubmitted }) => {
   const [leaveType, setLeaveType] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -181,6 +181,9 @@ const ApplyLeave = () => {
       });
       handleClear();
       await loadData();
+      if (onLeaveSubmitted) {
+        setTimeout(() => onLeaveSubmitted(), 1200);
+      }
     } catch (error) {
       setSnackbar({
         open: true,
@@ -305,7 +308,7 @@ const ApplyLeave = () => {
   ];
 
   return (
-    <Box sx={{ maxWidth: 1380, mx: 'auto', mt: 2, px: { xs: 1, md: 2 } }}>
+    <Box sx={{ width: '100%', pb: 3 }}>
       <Grid container spacing={3}>
         <Grid item xs={12} md={8}>
           <Grid container spacing={1.5} sx={{ mb: 2 }}>
