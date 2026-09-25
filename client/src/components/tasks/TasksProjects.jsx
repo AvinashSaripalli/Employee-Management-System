@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, Grid, Paper } from '@mui/material';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Box, Typography, Button, ToggleButton, ToggleButtonGroup, Grid, Paper, Chip } from '@mui/material';
 import { FiPlus } from 'react-icons/fi';
 import { GridView as GridViewIcon, BarChart as BarChartIcon, ViewKanban as KanbanIcon, CalendarToday as CalendarIcon } from '@mui/icons-material';
 import useTasks from './hooks/useTasks';
@@ -23,9 +23,47 @@ export default function TasksProjects(){
   const [viewMode, setViewMode] = useState('list');
   const [selectedIds, setSelectedIds] = useState([]);
 
-  const { tasks, filtered, users, loading, reload } = useTasks({ filter, myTasksOnly, search, deps:[search] });
-  const currentEmployeeId = localStorage.getItem('userEmployeeId')||'';
-  const currentRole = localStorage.getItem('userRole')||'';
+  // Role detection
+  const currentEmployeeId = localStorage.getItem('userEmployeeId') || '';
+  const currentRole = localStorage.getItem('userRole') || '';
+  const currentDeptRole = localStorage.getItem('departmentRole') || 'Member';
+  const currentUserDept = localStorage.getItem('userDepartment') || '';
+
+  const isAdmin = currentRole === 'Admin' || currentRole === 'HR';
+  const isSupervisor = !isAdmin && (currentDeptRole === 'Supervisor' || currentRole === 'Manager');
+  const isEmployee = !isAdmin && !isSupervisor;
+
+  // RBAC Filter States
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [employeeFilter, setEmployeeFilter] = useState('all');
+  const [supervisorScope, setSupervisorScope] = useState('dept'); // 'dept' | 'my'
+  const [empScope, setEmpScope] = useState('all'); // 'all' | 'assigned' | 'created' | 'observing'
+
+  const { tasks, filtered, users, loading, reload } = useTasks({
+    filter,
+    myTasksOnly: isAdmin ? myTasksOnly : false,
+    scope: isEmployee ? empScope : (isSupervisor && supervisorScope === 'my' ? 'my' : 'all'),
+    department: isAdmin ? departmentFilter : (isSupervisor ? currentUserDept : 'all'),
+    employeeId: employeeFilter,
+    search,
+    deps: [search, departmentFilter, supervisorScope, empScope, employeeFilter],
+  });
+
+  // Extract distinct departments from users
+  const departments = useMemo(() => {
+    return Array.from(new Set(users.map(u => u.department).filter(Boolean))).sort();
+  }, [users]);
+
+  // Assignable users for task creation dialog
+  const formUsers = useMemo(() => {
+    if (isSupervisor && currentUserDept) {
+      return users.filter(u => u.department === currentUserDept || u.employeeId === currentEmployeeId);
+    }
+    if (isEmployee) {
+      return users.filter(u => u.employeeId === currentEmployeeId || (currentUserDept && u.department === currentUserDept));
+    }
+    return users;
+  }, [users, isSupervisor, isEmployee, currentUserDept, currentEmployeeId]);
 
   // advanced filtering
   const displayed = filtered.filter(t=>{
@@ -35,7 +73,7 @@ export default function TasksProjects(){
     return true;
   });
 
-  const stats = useTaskStats(tasks, users, currentEmployeeId);
+  const stats = useTaskStats(displayed, users, currentEmployeeId);
 
   // form state
   const [openForm, setOpenForm]=useState(false);
@@ -53,9 +91,24 @@ export default function TasksProjects(){
   const [viewChecklistInput, setViewChecklistInput]=useState('');
 
   const canAct = useCallback((task)=>{
-    const isAdmin = currentRole==='Admin'||currentRole==='Manager';
-    return isAdmin || task.createdBy===currentEmployeeId || task.responsibleId===currentEmployeeId;
-  },[currentRole, currentEmployeeId]);
+    if (!task) return false;
+    if (isAdmin) return true;
+    if (isSupervisor) {
+      const isDept = task.responsible?.department === currentUserDept || task.creator?.department === currentUserDept;
+      return isDept || task.createdBy === currentEmployeeId || task.responsibleId === currentEmployeeId;
+    }
+    return task.createdBy === currentEmployeeId || task.responsibleId === currentEmployeeId;
+  }, [isAdmin, isSupervisor, currentUserDept, currentEmployeeId]);
+
+  const canDelete = useCallback((task)=>{
+    if (!task) return false;
+    if (isAdmin) return true;
+    if (isSupervisor) {
+      const isDept = task.responsible?.department === currentUserDept || task.creator?.department === currentUserDept;
+      return isDept || task.createdBy === currentEmployeeId;
+    }
+    return task.createdBy === currentEmployeeId;
+  }, [isAdmin, isSupervisor, currentUserDept, currentEmployeeId]);
 
   const handleOpenCreate = ()=>{
     setInitialData(null); setIsEditMode(false); setSelectedTaskId(null); setOpenForm(true);
@@ -79,6 +132,10 @@ export default function TasksProjects(){
     }catch(e){ alert(e.response?.data?.error||'Error'); }
   };
   const handleDelete = async (task)=>{
+    if(!canDelete(task)){
+      alert("You do not have permission to delete this task.");
+      return;
+    }
     if(!window.confirm(`Delete "${task.title}"?`)) return;
     await taskService.deleteTask(task.id); reload();
   };
@@ -91,7 +148,6 @@ export default function TasksProjects(){
   };
   const handleKanbanStatus = async (task, newStatus)=>{
     if(task.status===newStatus) return;
-    // map status to action? simple direct update via status change: use updateTask
     await taskService.updateTask(task.id, { status: newStatus });
     reload();
   };
@@ -129,8 +185,18 @@ export default function TasksProjects(){
   };
   const handleBulk = async (action)=>{
     if(action==='clear') setSelectedIds([]);
-    else if(action==='delete'){ if(window.confirm(`Delete ${selectedIds.length} tasks?`)){ await taskService.bulkDelete(selectedIds); setSelectedIds([]); reload(); } }
-    else if(action==='complete'){ await taskService.bulkStatus(selectedIds, 'complete'); setSelectedIds([]); reload(); }
+    else if(action==='delete'){
+      if(window.confirm(`Delete ${selectedIds.length} tasks?`)){
+        await taskService.bulkDelete(selectedIds);
+        setSelectedIds([]);
+        reload();
+      }
+    }
+    else if(action==='complete'){
+      await taskService.bulkStatus(selectedIds, 'complete');
+      setSelectedIds([]);
+      reload();
+    }
   };
   const handleExport = ()=>{
     const rows=[['ID','Title','Assignee','Priority','Status','Deadline','Progress']];
@@ -146,8 +212,39 @@ export default function TasksProjects(){
     <Box sx={{ p:{xs:2,md:3} }}>
       <Box sx={{ display:'flex', justifyContent:'space-between', alignItems:'center', mb:2, flexWrap:'wrap', gap:1.5 }}>
         <Box>
-          <Typography variant="h5" fontWeight={800}>Tasks & Projects</Typography>
-          <Typography variant="caption" color="text.secondary">Plan, assign and track work — now with Board & Timeline</Typography>
+          <Box sx={{ display:'flex', alignItems:'center', gap:1, flexWrap:'wrap' }}>
+            <Typography variant="h5" fontWeight={800} color="#0F172A">
+              Tasks & Projects
+            </Typography>
+            {isAdmin && (
+              <Chip
+                label="Admin View · All Departments"
+                size="small"
+                sx={{ bgcolor: '#EEF2FF', color: '#14286D', border: '1px solid #C7D2FE', fontWeight: 700, fontSize: '11px' }}
+              />
+            )}
+            {isSupervisor && (
+              <Chip
+                label={`${currentUserDept} Supervisor View`}
+                size="small"
+                sx={{ bgcolor: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0', fontWeight: 700, fontSize: '11px' }}
+              />
+            )}
+            {isEmployee && (
+              <Chip
+                label="My Tasks Workspace"
+                size="small"
+                sx={{ bgcolor: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0', fontWeight: 700, fontSize: '11px' }}
+              />
+            )}
+          </Box>
+          <Typography variant="caption" color="text.secondary">
+            {isAdmin
+              ? 'Organization-wide planning, assignment and tracking across all departments'
+              : isSupervisor
+              ? `Manage and monitor task progress for ${currentUserDept} team and personal tasks`
+              : 'View and update your personal assigned tasks, created tasks, and subtasks'}
+          </Typography>
         </Box>
         <Box sx={{ display:'flex', alignItems:'center', gap:1 }}>
           <ToggleButtonGroup size="small" exclusive value={viewMode} onChange={(_,v)=> v && setViewMode(v)} sx={{ bgcolor:'#EEF2FA', borderRadius:2, '& .Mui-selected':{ bgcolor:'#fff', color:'primary.main' } }}>
@@ -156,21 +253,51 @@ export default function TasksProjects(){
             <ToggleButton value="timeline"><CalendarIcon sx={{ fontSize:16, mr:0.5 }}/>Timeline</ToggleButton>
             <ToggleButton value="stats"><BarChartIcon sx={{ fontSize:16, mr:0.5 }}/>Stats</ToggleButton>
           </ToggleButtonGroup>
-          <Button variant="contained" startIcon={<FiPlus size={16}/>} onClick={handleOpenCreate} sx={{ borderRadius:2, textTransform:'none', fontWeight:700 }}>Add Task</Button>
+          <Button variant="contained" startIcon={<FiPlus size={16}/>} onClick={handleOpenCreate} sx={{ borderRadius:2, textTransform:'none', fontWeight:700, bgcolor:'#14286D', '&:hover':{ bgcolor:'#0E1D50' } }}>Add Task</Button>
         </Box>
       </Box>
 
-      {viewMode!=='stats' && (
-        <TaskFilters search={search} setSearch={setSearch} filter={filter} setFilter={setFilter} myTasksOnly={myTasksOnly} setMyTasksOnly={setMyTasksOnly} priorityFilter={priorityFilter} setPriorityFilter={setPriorityFilter} deadlineFrom={deadlineFrom} setDeadlineFrom={setDeadlineFrom} deadlineTo={deadlineTo} setDeadlineTo={setDeadlineTo} selectedIds={selectedIds} onBulkAction={handleBulk} onExport={handleExport} tasksCount={displayed.length} />
-      )}
+      <TaskFilters
+        search={search}
+        setSearch={setSearch}
+        filter={filter}
+        setFilter={setFilter}
+        myTasksOnly={myTasksOnly}
+        setMyTasksOnly={setMyTasksOnly}
+        priorityFilter={priorityFilter}
+        setPriorityFilter={setPriorityFilter}
+        deadlineFrom={deadlineFrom}
+        setDeadlineFrom={setDeadlineFrom}
+        deadlineTo={deadlineTo}
+        setDeadlineTo={setDeadlineTo}
+        selectedIds={selectedIds}
+        onBulkAction={handleBulk}
+        onExport={handleExport}
+        tasksCount={displayed.length}
+        // RBAC props
+        isAdmin={isAdmin}
+        isSupervisor={isSupervisor}
+        isEmployee={isEmployee}
+        currentUserDept={currentUserDept}
+        departmentFilter={departmentFilter}
+        setDepartmentFilter={setDepartmentFilter}
+        departments={departments}
+        employeeFilter={employeeFilter}
+        setEmployeeFilter={setEmployeeFilter}
+        users={users}
+        supervisorScope={supervisorScope}
+        setSupervisorScope={setSupervisorScope}
+        empScope={empScope}
+        setEmpScope={setEmpScope}
+      />
 
-      {viewMode==='list' && <TaskTable tasks={displayed} loading={loading} selectedIds={selectedIds} setSelectedIds={setSelectedIds} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} />}
-      {viewMode==='kanban' && <TaskKanban tasks={displayed} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} onStatusChange={handleKanbanStatus} />}
+      {viewMode==='list' && <TaskTable tasks={displayed} loading={loading} selectedIds={selectedIds} setSelectedIds={setSelectedIds} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} canDelete={canDelete} />}
+      {viewMode==='kanban' && <TaskKanban tasks={displayed} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} onStatusChange={handleKanbanStatus} canDelete={canDelete} />}
       {viewMode==='timeline' && <TaskTimeline tasks={displayed} />}
-      {viewMode==='stats' && <TaskStatsBoard stats={stats} onView={handleView} />}
+      {viewMode==='stats' && <TaskStatsBoard stats={stats} onView={handleView} isAdmin={isAdmin} isSupervisor={isSupervisor} isEmployee={isEmployee} userDepartment={currentUserDept} />}
 
-      <TaskFormDialog open={openForm} onClose={()=>setOpenForm(false)} onSubmit={handleSubmit} users={users} tasks={tasks} initialData={initialData} isEditMode={isEditMode} />
-      <TaskDetailsDialog open={Boolean(viewTask)} task={viewTask} activities={activities} loadingActivities={loadingActivities} users={users} canAct={canAct} onClose={()=>setViewTask(null)} onStatusAction={handleStatusAction} onAddChecklist={handleAddChecklist} onToggleChecklist={handleToggleChecklist} onDeleteChecklist={handleDeleteChecklist} onAddMember={handleAddMember} onRemoveMember={handleRemoveMember} viewChecklistInput={viewChecklistInput} setViewChecklistInput={setViewChecklistInput} teamAddType={teamAddType} setTeamAddType={setTeamAddType} teamAddUser={teamAddUser} setTeamAddUser={setTeamAddUser} viewTab={viewTab} setViewTab={setViewTab} />
+      <TaskFormDialog open={openForm} onClose={()=>setOpenForm(false)} onSubmit={handleSubmit} users={formUsers} tasks={tasks} initialData={initialData} isEditMode={isEditMode} defaultAssigneeId={isEmployee ? currentEmployeeId : ''} />
+      <TaskDetailsDialog open={Boolean(viewTask)} task={viewTask} activities={activities} loadingActivities={loadingActivities} users={formUsers} canAct={canAct} onClose={()=>setViewTask(null)} onStatusAction={handleStatusAction} onAddChecklist={handleAddChecklist} onToggleChecklist={handleToggleChecklist} onDeleteChecklist={handleDeleteChecklist} onAddMember={handleAddMember} onRemoveMember={handleRemoveMember} viewChecklistInput={viewChecklistInput} setViewChecklistInput={setViewChecklistInput} teamAddType={teamAddType} setTeamAddType={setTeamAddType} teamAddUser={teamAddUser} setTeamAddUser={setTeamAddUser} viewTab={viewTab} setViewTab={setViewTab} />
     </Box>
   );
 }

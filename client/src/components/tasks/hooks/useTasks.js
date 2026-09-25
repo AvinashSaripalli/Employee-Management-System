@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as svc from '../services/taskService';
 
-export default function useTasks({ filter='all', myTasksOnly=false, search='', deps=[] }={}) {
+export default function useTasks({ filter='all', myTasksOnly=false, search='', department='all', scope='all', employeeId='all', deps=[] }={}) {
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -12,10 +12,13 @@ export default function useTasks({ filter='all', myTasksOnly=false, search='', d
       const params={};
       if(filter!=='all') params.status=filter;
       if(myTasksOnly) params.myTasks='true';
+      if(scope && scope!=='all') params.scope=scope;
+      if(department && department!=='all') params.department=department;
+      if(employeeId && employeeId!=='all') params.employeeId=employeeId;
       const data = await svc.fetchTasks(params);
       setTasks(data);
     }catch(e){ console.error(e); } finally{ setLoading(false); }
-  },[filter, myTasksOnly]);
+  },[filter, myTasksOnly, scope, department, employeeId]);
 
   const loadUsers = useCallback(async ()=>{
     try{ const data = await svc.fetchUsers(); setUsers(data);}catch(e){ console.error(e); }

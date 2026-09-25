@@ -98,6 +98,79 @@ const taskInclude = (includeChecklist = true) => {
   return include;
 };
 
+const resolveUserContext = async (req) => {
+  if (!req.user || !req.user.id) return null;
+  const actor = await User.findByPk(req.user.id);
+  if (!actor) return null;
+  await ensureCompanyMembership(actor, DEFAULT_COMPANY);
+
+  const employeeId = actor.employeeId || String(actor.id);
+  const role = (actor.role || "").trim();
+  const normalizedRole = role.toLowerCase();
+  const departmentRole = (actor.departmentRole || "").trim();
+  const userDepartment = actor.department || "";
+  const companyName = req.query?.companyName || req.body?.companyName || actor.companyName || DEFAULT_COMPANY;
+
+  const isAdmin = normalizedRole === "admin" || normalizedRole === "hr";
+  const isSupervisor = !isAdmin && (departmentRole === "Supervisor" || normalizedRole === "manager");
+  const isEmployee = !isAdmin && !isSupervisor;
+
+  return {
+    actor,
+    employeeId,
+    role,
+    departmentRole,
+    userDepartment,
+    companyName,
+    isAdmin,
+    isSupervisor,
+    isEmployee,
+  };
+};
+
+const canUserAccessTask = (ctx, task) => {
+  if (!ctx || !task) return { canView: false, canEdit: false, canDelete: false, canChangeStatus: false };
+
+  if (ctx.isAdmin) {
+    return { canView: true, canEdit: true, canDelete: true, canChangeStatus: true };
+  }
+
+  const isCreator = task.createdBy === ctx.employeeId;
+  const isResponsible = task.responsibleId === ctx.employeeId;
+  const isMember = (task.members || []).some(
+    (m) => (m.userId || m.user?.employeeId) === ctx.employeeId
+  );
+
+  // If directly involved
+  if (isCreator) {
+    return { canView: true, canEdit: true, canDelete: true, canChangeStatus: true };
+  }
+
+  if (isResponsible) {
+    return { canView: true, canEdit: true, canDelete: false, canChangeStatus: true };
+  }
+
+  if (isMember) {
+    return { canView: true, canEdit: false, canDelete: false, canChangeStatus: false };
+  }
+
+  // If Supervisor, check if task belongs to a member of supervisor's department
+  if (ctx.isSupervisor && ctx.userDepartment) {
+    const respDept = task.responsible?.department;
+    const creatDept = task.creator?.department;
+    const hasDeptMember = (task.members || []).some(
+      (m) => m.user?.department === ctx.userDepartment
+    );
+
+    if (respDept === ctx.userDepartment || creatDept === ctx.userDepartment || hasDeptMember) {
+      return { canView: true, canEdit: true, canDelete: true, canChangeStatus: true };
+    }
+  }
+
+  // Otherwise, no access
+  return { canView: false, canEdit: false, canDelete: false, canChangeStatus: false };
+};
+
 const getEmployeeId = async (userId) => {
   const user = await User.findByPk(userId);
   if (!user) return null;
@@ -181,36 +254,167 @@ const formatTask = (task) => ({
 });
 
 exports.getTasks = async (req, res) => {
-  const { companyName, status, myTasks } = req.query;
-
-  if (!companyName) {
-    return res.status(400).json({ error: "Company name is required" });
-  }
-
   try {
+    const ctx = await resolveUserContext(req);
+    if (!ctx) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+
+    const { status, myTasks, scope, department, employeeId: filterEmpId } = req.query;
+    const companyName = ctx.companyName;
+
     const where = { companyName };
-    if (status) {
+    if (status && Number(status)) {
       where.status = Number(status);
     }
 
-    const employeeId = await getEmployeeId(req.user.id);
-    if (myTasks === "true" && employeeId) {
-      where.responsibleId = employeeId;
+    // Role-Based Filtering
+    if (ctx.isAdmin) {
+      // 1. ADMIN: Can view all tasks in the company, with optional department & employee filters
+      const andConditions = [];
+
+      if (department && department !== "all") {
+        const deptUsers = await User.findAll({
+          where: { companyName, department },
+          attributes: ["employeeId"],
+        });
+        const deptEmpIds = deptUsers.map((u) => u.employeeId).filter(Boolean);
+        const deptMemberRows = await TaskMember.findAll({
+          where: { userId: deptEmpIds },
+          attributes: ["taskId"],
+        });
+        const deptMemberTaskIds = deptMemberRows.map((m) => m.taskId);
+
+        andConditions.push({
+          [Op.or]: [
+            { responsibleId: deptEmpIds },
+            { createdBy: deptEmpIds },
+            { id: deptMemberTaskIds },
+          ],
+        });
+      }
+
+      if (filterEmpId && filterEmpId !== "all") {
+        const empMemberRows = await TaskMember.findAll({
+          where: { userId: filterEmpId },
+          attributes: ["taskId"],
+        });
+        const empTaskIds = empMemberRows.map((m) => m.taskId);
+        andConditions.push({
+          [Op.or]: [
+            { responsibleId: filterEmpId },
+            { createdBy: filterEmpId },
+            { id: empTaskIds },
+          ],
+        });
+      } else if (myTasks === "true" || scope === "my") {
+        const myMemberRows = await TaskMember.findAll({
+          where: { userId: ctx.employeeId },
+          attributes: ["taskId"],
+        });
+        const myTaskIds = myMemberRows.map((m) => m.taskId);
+        andConditions.push({
+          [Op.or]: [
+            { responsibleId: ctx.employeeId },
+            { createdBy: ctx.employeeId },
+            { id: myTaskIds },
+          ],
+        });
+      }
+
+      if (andConditions.length > 0) {
+        where[Op.and] = andConditions;
+      }
+    } else if (ctx.isSupervisor) {
+      // 2. SUPERVISOR: Can view their own tasks + all department users' tasks
+      const deptUsers = await User.findAll({
+        where: { companyName, department: ctx.userDepartment },
+        attributes: ["employeeId"],
+      });
+      const deptEmpIds = Array.from(
+        new Set([...deptUsers.map((u) => u.employeeId).filter(Boolean), ctx.employeeId])
+      );
+
+      // If requested "My Tasks Only" (either scope=my or myTasks=true):
+      if (myTasks === "true" || scope === "my") {
+        const myMemberRows = await TaskMember.findAll({
+          where: { userId: ctx.employeeId },
+          attributes: ["taskId"],
+        });
+        const myTaskIds = myMemberRows.map((m) => m.taskId);
+        where[Op.or] = [
+          { responsibleId: ctx.employeeId },
+          { createdBy: ctx.employeeId },
+          { id: myTaskIds },
+        ];
+      } else {
+        // All tasks for supervisor's department + supervisor's personal tasks
+        const deptMemberRows = await TaskMember.findAll({
+          where: { userId: deptEmpIds },
+          attributes: ["taskId"],
+        });
+        const deptTaskIds = deptMemberRows.map((m) => m.taskId);
+
+        // If filtering by a specific employee inside supervisor's department
+        if (filterEmpId && filterEmpId !== "all" && deptEmpIds.includes(filterEmpId)) {
+          const empMemberRows = await TaskMember.findAll({
+            where: { userId: filterEmpId },
+            attributes: ["taskId"],
+          });
+          const empTaskIds = empMemberRows.map((m) => m.taskId);
+          where[Op.or] = [
+            { responsibleId: filterEmpId },
+            { createdBy: filterEmpId },
+            { id: empTaskIds },
+          ];
+        } else {
+          where[Op.or] = [
+            { responsibleId: deptEmpIds },
+            { createdBy: deptEmpIds },
+            { id: deptTaskIds },
+          ];
+        }
+      }
+    } else {
+      // 3. EMPLOYEE: Can view ONLY their own tasks (assigned, created, or member)
+      const myMemberRows = await TaskMember.findAll({
+        where: { userId: ctx.employeeId },
+        attributes: ["taskId"],
+      });
+      const myTaskIds = myMemberRows.map((m) => m.taskId);
+
+      if (scope === "assigned") {
+        where.responsibleId = ctx.employeeId;
+      } else if (scope === "created") {
+        where.createdBy = ctx.employeeId;
+      } else if (scope === "observing") {
+        where.id = myTaskIds;
+      } else {
+        where[Op.or] = [
+          { responsibleId: ctx.employeeId },
+          { createdBy: ctx.employeeId },
+          { id: myTaskIds },
+        ];
+      }
     }
 
     const results = await Task.findAll({
       where,
-      include: [...taskInclude(false), {
-        model: Task,
-        as: "subtasks",
-        attributes: ["id", "title", "status"],
-        required: false,
-      }, {
-        model: TaskChecklistItem,
-        as: "checklist",
-        attributes: ["id", "title", "isComplete"],
-        separate: true,
-      }],
+      include: [
+        ...taskInclude(false),
+        {
+          model: Task,
+          as: "subtasks",
+          attributes: ["id", "title", "status"],
+          required: false,
+        },
+        {
+          model: TaskChecklistItem,
+          as: "checklist",
+          attributes: ["id", "title", "isComplete"],
+          separate: true,
+        },
+      ],
       order: [["created_at", "DESC"]],
     });
 
@@ -223,13 +427,29 @@ exports.getTasks = async (req, res) => {
 
 exports.getTask = async (req, res) => {
   try {
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
     const task = await Task.findByPk(req.params.id, {
       include: taskInclude(true),
     });
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
     }
-    res.json(formatTask(task));
+
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canView) {
+      return res.status(403).json({ error: "You do not have permission to view this task" });
+    }
+
+    res.json({
+      ...formatTask(task),
+      permissions: {
+        canEdit: access.canEdit,
+        canDelete: access.canDelete,
+        canChangeStatus: access.canChangeStatus,
+      },
+    });
   } catch (error) {
     console.error("Error fetching task:", error);
     res.status(500).json({ error: "Database error" });
@@ -237,11 +457,14 @@ exports.getTask = async (req, res) => {
 };
 
 exports.createTask = async (req, res) => {
+  const ctx = await resolveUserContext(req);
+  if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
   const {
     title, description, responsibleId, deadline, priority, parentId,
     taskControl, checklist, members,
   } = req.body;
-  const companyName = req.body.companyName || req.user?.companyName;
+  const companyName = ctx.companyName;
 
   if (!title || !title.trim()) {
     return res.status(400).json({ error: "Task title is required" });
@@ -251,8 +474,23 @@ exports.createTask = async (req, res) => {
   }
 
   try {
-    const creatorEmployeeId = await getEmployeeId(req.user.id);
-    const assigneeId = responsibleId || creatorEmployeeId;
+    const creatorEmployeeId = ctx.employeeId;
+    let assigneeId = responsibleId || creatorEmployeeId;
+
+    // Validate that assignee is allowed based on requester role
+    if (ctx.isEmployee) {
+      // Regular employee assigns to self by default unless collaborating
+      if (!assigneeId) assigneeId = creatorEmployeeId;
+    } else if (ctx.isSupervisor) {
+      // Supervisor can assign to department members or self
+      if (assigneeId && assigneeId !== creatorEmployeeId) {
+        const targetUser = await User.findOne({ where: { employeeId: assigneeId, companyName } });
+        if (targetUser && targetUser.department !== ctx.userDepartment) {
+          return res.status(403).json({ error: "Supervisors can only assign tasks to employees within their department" });
+        }
+      }
+    }
+
     if (!assigneeId) {
       return res.status(400).json({ error: "Assign a responsible employee" });
     }
@@ -314,12 +552,22 @@ exports.updateTask = async (req, res) => {
   } = req.body;
 
   try {
-    const task = await Task.findByPk(req.params.id);
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
+    const task = await Task.findByPk(req.params.id, {
+      include: taskInclude(true),
+    });
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
     }
 
-    const employeeId = await getEmployeeId(req.user.id);
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canEdit) {
+      return res.status(403).json({ error: "You do not have permission to edit this task" });
+    }
+
+    const employeeId = ctx.employeeId;
 
     const normalized = {
       title: title !== undefined ? (title || "").trim() : undefined,
@@ -415,10 +663,21 @@ exports.updateTask = async (req, res) => {
 
 exports.deleteTask = async (req, res) => {
   try {
-    const task = await Task.findByPk(req.params.id);
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
+    const task = await Task.findByPk(req.params.id, {
+      include: taskInclude(false),
+    });
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
     }
+
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canDelete) {
+      return res.status(403).json({ error: "You do not have permission to delete this task" });
+    }
+
     await task.destroy();
     res.json({ message: "Task deleted successfully" });
   } catch (error) {
@@ -432,24 +691,24 @@ exports.updateTaskStatus = async (req, res) => {
   const taskId = req.params.id;
 
   try {
-    const task = await Task.findByPk(taskId);
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
+    const task = await Task.findByPk(taskId, {
+      include: taskInclude(true),
+    });
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
     }
 
-    const employeeId = await getEmployeeId(req.user.id);
-    if (!employeeId) {
-      return res.status(403).json({ error: "Access denied" });
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canChangeStatus) {
+      return res.status(403).json({ error: "You are not allowed to change the status of this task" });
     }
 
+    const employeeId = ctx.employeeId;
     const isCreator = task.createdBy === employeeId;
-    const isResponsible = task.responsibleId === employeeId;
-    const isAdmin = isAdminOrManager(req.user.role);
-
-    if (!isCreator && !isResponsible && !isAdmin) {
-      return res.status(403).json({ error: "You are not allowed to change this task" });
-    }
-
+    const canApproveOrDisapprove = ctx.isAdmin || isCreator || (ctx.isSupervisor && access.canEdit);
     const current = task.status;
 
     const completeFlow = () => {
@@ -466,8 +725,8 @@ exports.updateTaskStatus = async (req, res) => {
       start: { from: [STATUS.NEW, STATUS.PENDING, STATUS.REVIEW, STATUS.DEFERRED], to: STATUS.IN_PROGRESS },
       pause: { from: [STATUS.IN_PROGRESS], to: STATUS.PENDING },
       complete: { from: [STATUS.PENDING, STATUS.IN_PROGRESS], to: null, flow: completeFlow },
-      approve: { from: [STATUS.REVIEW], to: STATUS.COMPLETED, allowed: isAdmin || isCreator },
-      disapprove: { from: [STATUS.REVIEW], to: STATUS.PENDING, allowed: isAdmin || isCreator },
+      approve: { from: [STATUS.REVIEW], to: STATUS.COMPLETED, allowed: canApproveOrDisapprove },
+      disapprove: { from: [STATUS.REVIEW], to: STATUS.PENDING, allowed: canApproveOrDisapprove },
       defer: { from: [STATUS.NEW, STATUS.PENDING, STATUS.IN_PROGRESS, STATUS.REVIEW], to: STATUS.DEFERRED },
       renew: { from: [STATUS.DEFERRED], to: STATUS.PENDING },
       deny: { from: [STATUS.NEW, STATUS.PENDING, STATUS.IN_PROGRESS, STATUS.REVIEW], to: STATUS.DECLINED },
@@ -480,7 +739,7 @@ exports.updateTaskStatus = async (req, res) => {
         return res.status(400).json({ error: "Unknown action" });
       }
       if (transition.allowed === false) {
-        return res.status(403).json({ error: "Only the creator can perform this action" });
+        return res.status(403).json({ error: "Only the supervisor, creator, or administrator can approve or reject this task" });
       }
       if (!transition.from.includes(current)) {
         return res.status(400).json({
@@ -492,8 +751,8 @@ exports.updateTaskStatus = async (req, res) => {
       if (!Object.values(STATUS).includes(target)) {
         return res.status(400).json({ error: "Invalid status value" });
       }
-      if (target === STATUS.COMPLETED && task.taskControl && !isCreator) {
-        return res.status(403).json({ error: "Task requires creator approval" });
+      if (target === STATUS.COMPLETED && task.taskControl && !isCreator && !canApproveOrDisapprove) {
+        return res.status(403).json({ error: "Task requires creator or supervisor approval" });
       }
       transition = { to: target };
     } else {
@@ -535,9 +794,17 @@ exports.addChecklistItem = async (req, res) => {
   }
 
   try {
-    const task = await Task.findByPk(taskId);
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
+    const task = await Task.findByPk(taskId, { include: taskInclude(false) });
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
+    }
+
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canView) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     const maxSort = await TaskChecklistItem.max("sortIndex", { where: { taskId } });
@@ -547,7 +814,7 @@ exports.addChecklistItem = async (req, res) => {
       sortIndex: (maxSort || 0) + 1,
     });
 
-    const employeeId = await getEmployeeId(req.user.id);
+    const employeeId = ctx.employeeId;
     await logActivity(taskId, employeeId, "checklist_add", "title", null, item.title);
 
     res.status(201).json(item);
@@ -561,12 +828,22 @@ exports.updateChecklistItem = async (req, res) => {
   const { title } = req.body;
 
   try {
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
     const item = await TaskChecklistItem.findByPk(req.params.itemId);
     if (!item) {
       return res.status(404).json({ error: "Checklist item not found" });
     }
+
+    const task = await Task.findByPk(item.taskId, { include: taskInclude(false) });
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canView) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
     if (title !== undefined && item.title !== title) {
-      const employeeId = await getEmployeeId(req.user.id);
+      const employeeId = ctx.employeeId;
       await logActivity(item.taskId, employeeId, "checklist_update", "title", item.title, title);
     }
     await item.update({ title: title !== undefined ? title : item.title });
@@ -579,11 +856,21 @@ exports.updateChecklistItem = async (req, res) => {
 
 exports.toggleChecklistItem = async (req, res) => {
   try {
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
     const item = await TaskChecklistItem.findByPk(req.params.itemId);
     if (!item) {
       return res.status(404).json({ error: "Checklist item not found" });
     }
-    const employeeId = await getEmployeeId(req.user.id);
+
+    const task = await Task.findByPk(item.taskId, { include: taskInclude(false) });
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canView) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const employeeId = ctx.employeeId;
     await logActivity(
       item.taskId, employeeId, "checklist_toggle", item.title,
       item.isComplete ? "Complete" : "Incomplete",
@@ -599,11 +886,21 @@ exports.toggleChecklistItem = async (req, res) => {
 
 exports.deleteChecklistItem = async (req, res) => {
   try {
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
     const item = await TaskChecklistItem.findByPk(req.params.itemId);
     if (!item) {
       return res.status(404).json({ error: "Checklist item not found" });
     }
-    const employeeId = await getEmployeeId(req.user.id);
+
+    const task = await Task.findByPk(item.taskId, { include: taskInclude(false) });
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canEdit) {
+      return res.status(403).json({ error: "You do not have permission to delete checklist items from this task" });
+    }
+
+    const employeeId = ctx.employeeId;
     await logActivity(item.taskId, employeeId, "checklist_delete", "title", item.title, null);
     await item.destroy();
     res.json({ message: "Checklist item deleted" });
@@ -615,9 +912,17 @@ exports.deleteChecklistItem = async (req, res) => {
 
 exports.getTaskActivities = async (req, res) => {
   try {
-    const task = await Task.findByPk(req.params.id);
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
+    const task = await Task.findByPk(req.params.id, { include: taskInclude(false) });
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
+    }
+
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canView) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     const activities = await TaskActivity.findAll({
@@ -668,9 +973,17 @@ exports.getPriorityOptions = (req, res) => {
 
 exports.getTaskMembers = async (req, res) => {
   try {
-    const task = await Task.findByPk(req.params.id);
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
+    const task = await Task.findByPk(req.params.id, { include: taskInclude(false) });
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
+    }
+
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canView) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     const members = await TaskMember.findAll({
@@ -724,9 +1037,17 @@ exports.addTaskMember = async (req, res) => {
   }
 
   try {
-    const task = await Task.findByPk(req.params.id);
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
+    const task = await Task.findByPk(req.params.id, { include: taskInclude(false) });
     if (!task) {
       return res.status(404).json({ error: "Task not found" });
+    }
+
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canEdit) {
+      return res.status(403).json({ error: "You do not have permission to modify members for this task" });
     }
 
     const existing = await TaskMember.findOne({
@@ -738,7 +1059,7 @@ exports.addTaskMember = async (req, res) => {
 
     const member = await TaskMember.create({ taskId: task.id, userId, type });
 
-    const employeeId = await getEmployeeId(req.user.id);
+    const employeeId = ctx.employeeId;
     await logActivity(
       task.id, employeeId, "member_add",
       type === "A" ? "Accomplisher" : "Observer", null, userId
@@ -779,12 +1100,21 @@ exports.addTaskMember = async (req, res) => {
 
 exports.removeTaskMember = async (req, res) => {
   try {
+    const ctx = await resolveUserContext(req);
+    if (!ctx) return res.status(401).json({ error: "Unauthorized" });
+
     const member = await TaskMember.findByPk(req.params.memberId);
     if (!member) {
       return res.status(404).json({ error: "Member not found" });
     }
 
-    const employeeId = await getEmployeeId(req.user.id);
+    const task = await Task.findByPk(member.taskId, { include: taskInclude(false) });
+    const access = canUserAccessTask(ctx, task);
+    if (!access.canEdit) {
+      return res.status(403).json({ error: "You do not have permission to remove members from this task" });
+    }
+
+    const employeeId = ctx.employeeId;
     await logActivity(
       member.taskId, employeeId, "member_remove",
       member.type === "A" ? "Accomplisher" : "Observer", member.userId, null

@@ -10,7 +10,7 @@ const priorityStyle = {
   0: { bg: '#F1F5F9', color: '#64748B', icon: '●', label: 'Low' },
 };
 
-export default function TaskTable({ tasks, loading, selectedIds, setSelectedIds, onView, onEdit, onDelete }) {
+export default function TaskTable({ tasks, loading, selectedIds, setSelectedIds, onView, onEdit, onDelete, canDelete }) {
   const [expanded, setExpanded] = useState({});
   const [statusAnchor, setStatusAnchor] = useState(null);
   const [statusTask, setStatusTask] = useState(null);
@@ -200,7 +200,9 @@ export default function TaskTable({ tasks, loading, selectedIds, setSelectedIds,
                     <Box sx={{ display: 'flex', gap: 0.3, justifyContent: 'center', opacity: isHovered || isSelected ? 1 : 0.55, transition: 'opacity 0.15s' }}>
                       <Tooltip title="View"><IconButton size="small" onClick={() => onView(task)} sx={{ width: 28, height: 28, bgcolor: '#EFF6FF', color: '#2563EB', '&:hover': { bgcolor: '#DBEAFE' } }}><FiEye size={14} /></IconButton></Tooltip>
                       <Tooltip title="Edit"><IconButton size="small" onClick={() => onEdit(task)} sx={{ width: 28, height: 28, bgcolor: '#EEF2FF', color: '#4F46E5', '&:hover': { bgcolor: '#E0E7FF' } }}><FiEdit2 size={14} /></IconButton></Tooltip>
-                      <Tooltip title="Delete"><IconButton size="small" onClick={() => onDelete(task)} sx={{ width: 28, height: 28, bgcolor: '#FEF2F2', color: '#DC2626', '&:hover': { bgcolor: '#FEE2E2' } }}><FiTrash2 size={14} /></IconButton></Tooltip>
+                      {(!canDelete || canDelete(task)) && (
+                        <Tooltip title="Delete"><IconButton size="small" onClick={() => onDelete(task)} sx={{ width: 28, height: 28, bgcolor: '#FEF2F2', color: '#DC2626', '&:hover': { bgcolor: '#FEE2E2' } }}><FiTrash2 size={14} /></IconButton></Tooltip>
+                      )}
                     </Box>
                   </TableCell>
                 </TableRow>

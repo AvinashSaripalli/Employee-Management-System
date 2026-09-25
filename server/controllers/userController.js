@@ -481,15 +481,20 @@ exports.getNextEmployeeId = async (req, res) => {
 };
 
 exports.getUsersList = async (req, res) => {
-  const { companyName } = req.query;
+  const { companyName, department } = req.query;
 
   if (!companyName) {
     return res.status(400).json({ error: 'Company name is required' });
   }
 
   try {
+    const where = { companyName, exists: 1 };
+    if (department && department !== 'all') {
+      where.department = department;
+    }
+
     const results = await User.findAll({
-      where: { companyName, exists: 1 },
+      where,
       order: [['id', 'ASC']],
     });
 

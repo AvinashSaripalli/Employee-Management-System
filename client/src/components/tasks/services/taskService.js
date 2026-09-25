@@ -4,7 +4,7 @@ const auth = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` }
 const company = () => localStorage.getItem('companyName') || '';
 
 export const fetchTasks = (params={}) => axios.get('/tasks', { headers: auth(), params: { companyName: company(), ...params } }).then(r=>r.data);
-export const fetchUsers = () => axios.get('/users/employees', { headers: auth(), params:{ companyName: company() } }).then(r=>r.data);
+export const fetchUsers = (params={}) => axios.get('/users/employees', { headers: auth(), params:{ companyName: company(), ...params } }).then(r=>r.data);
 export const createTask = (payload) => axios.post('/tasks', { ...payload, companyName: company() }, { headers: auth() }).then(r=>r.data);
 export const updateTask = (id, payload) => axios.put(`/tasks/${id}`, payload, { headers: auth() }).then(r=>r.data);
 export const deleteTask = (id) => axios.delete(`/tasks/${id}`, { headers: auth() }).then(r=>r.data);

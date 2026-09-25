@@ -8,7 +8,7 @@ const initialState = {
   checklist: [], accomplishers: [], observers: [], attachments: [], estimatedHours: '', tags: []
 };
 
-export default function TaskFormDialog({ open, onClose, onSubmit, users, tasks, initialData, isEditMode }) {
+export default function TaskFormDialog({ open, onClose, onSubmit, users, tasks, initialData, isEditMode, defaultAssigneeId }) {
   const [tab, setTab] = useState(0);
   const [formData, setFormData] = useState(initialState);
   const [newChecklistItem, setNewChecklistItem] = useState('');
@@ -17,10 +17,10 @@ export default function TaskFormDialog({ open, onClose, onSubmit, users, tasks, 
   useEffect(()=>{
     if(open){
       if(initialData) setFormData(prev=> ({...initialState, ...initialData}));
-      else setFormData(initialState);
+      else setFormData({ ...initialState, responsibleId: defaultAssigneeId || '' });
       setTab(0);
     }
-  },[open, initialData]);
+  },[open, initialData, defaultAssigneeId]);
 
   const handleChange = (field, value)=> setFormData(prev=> ({...prev, [field]: value}));
 

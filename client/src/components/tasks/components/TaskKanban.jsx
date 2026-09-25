@@ -4,7 +4,7 @@ import { FiEye, FiEdit2, FiTrash2, FiClock, FiAlertCircle } from 'react-icons/fi
 import { STATUS_META, PRIORITY_META, STATUS_ORDER } from '../utils/taskConstants';
 import { getProgress, isOverdue } from '../utils/taskHelpers';
 
-export default function TaskKanban({ tasks, onView, onEdit, onDelete, onStatusChange }) {
+export default function TaskKanban({ tasks, onView, onEdit, onDelete, onStatusChange, canDelete }) {
   const cols = STATUS_ORDER.map(s=> ({ status:s, meta: STATUS_META[s], tasks: tasks.filter(t=> t.status===s ) }));
 
   const handleDrop = (e, newStatus)=>{
@@ -47,7 +47,9 @@ export default function TaskKanban({ tasks, onView, onEdit, onDelete, onStatusCh
                       <Box sx={{ display:'flex', gap:0.5, mt:1, justifyContent:'flex-end' }}>
                         <Tooltip title="View"><IconButton size="small" onClick={()=>onView(task)}><FiEye size={14}/></IconButton></Tooltip>
                         <Tooltip title="Edit"><IconButton size="small" onClick={()=>onEdit(task)}><FiEdit2 size={14}/></IconButton></Tooltip>
-                        <Tooltip title="Delete"><IconButton size="small" onClick={()=>onDelete(task)}><FiTrash2 size={14}/></IconButton></Tooltip>
+                        {(!canDelete || canDelete(task)) && (
+                          <Tooltip title="Delete"><IconButton size="small" onClick={()=>onDelete(task)}><FiTrash2 size={14}/></IconButton></Tooltip>
+                        )}
                       </Box>
                     </CardContent>
                   </Card>
