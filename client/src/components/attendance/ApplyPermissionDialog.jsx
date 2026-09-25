@@ -226,30 +226,47 @@ const ApplyPermissionDialog = ({
               onClick={() => setPermissionType('Early Sign-Out')}
               sx={{
                 flex: 1,
-                p: 1.5,
-                border: '1.5px solid',
-                borderColor: permissionType === 'Early Sign-Out' ? '#14286D' : '#E2E8F0',
-                bgcolor: permissionType === 'Early Sign-Out' ? '#F0F4FF' : '#FFFFFF',
-                borderRadius: '10px',
+                p: 1.75,
+                border: '2px solid',
+                borderColor: permissionType === 'Early Sign-Out' ? '#F59E0B' : '#E2E8F0',
+                background: permissionType === 'Early Sign-Out'
+                  ? 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)'
+                  : '#FFFFFF',
+                boxShadow: permissionType === 'Early Sign-Out'
+                  ? '0 4px 14px rgba(245, 158, 11, 0.2)'
+                  : 'none',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 1.2,
-                transition: 'all 0.15s ease',
+                gap: 1.25,
+                transition: 'all 0.2s ease',
               }}
             >
               <FormControlLabel
                 value="Early Sign-Out"
-                control={<Radio size="small" sx={{ p: 0.5, color: '#14286D', '&.Mui-checked': { color: '#14286D' } }} />}
+                control={<Radio size="small" sx={{ p: 0.5, color: '#D97706', '&.Mui-checked': { color: '#D97706' } }} />}
                 label=""
                 sx={{ m: 0 }}
               />
-              <ExitToAppIcon sx={{ color: permissionType === 'Early Sign-Out' ? '#14286D' : '#64748B', fontSize: 20 }} />
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  bgcolor: permissionType === 'Early Sign-Out' ? 'rgba(217, 119, 6, 0.18)' : '#F1F5F9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <ExitToAppIcon sx={{ color: permissionType === 'Early Sign-Out' ? '#D97706' : '#64748B', fontSize: 20 }} />
+              </Box>
               <Box>
-                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                <Typography sx={{ fontSize: '13.5px', fontWeight: 800, color: permissionType === 'Early Sign-Out' ? '#92400E' : '#0F172A' }}>
                   Early Sign-Out
                 </Typography>
-                <Typography sx={{ fontSize: '11px', color: '#64748B' }}>
+                <Typography sx={{ fontSize: '11px', color: permissionType === 'Early Sign-Out' ? '#B45309' : '#64748B' }}>
                   Leaving before standard shift ends
                 </Typography>
               </Box>
@@ -259,30 +276,47 @@ const ApplyPermissionDialog = ({
               onClick={() => setPermissionType('Late Sign-In')}
               sx={{
                 flex: 1,
-                p: 1.5,
-                border: '1.5px solid',
-                borderColor: permissionType === 'Late Sign-In' ? '#14286D' : '#E2E8F0',
-                bgcolor: permissionType === 'Late Sign-In' ? '#F0F4FF' : '#FFFFFF',
-                borderRadius: '10px',
+                p: 1.75,
+                border: '2px solid',
+                borderColor: permissionType === 'Late Sign-In' ? '#6366F1' : '#E2E8F0',
+                background: permissionType === 'Late Sign-In'
+                  ? 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)'
+                  : '#FFFFFF',
+                boxShadow: permissionType === 'Late Sign-In'
+                  ? '0 4px 14px rgba(99, 102, 241, 0.2)'
+                  : 'none',
+                borderRadius: '12px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 1.2,
-                transition: 'all 0.15s ease',
+                gap: 1.25,
+                transition: 'all 0.2s ease',
               }}
             >
               <FormControlLabel
                 value="Late Sign-In"
-                control={<Radio size="small" sx={{ p: 0.5, color: '#14286D', '&.Mui-checked': { color: '#14286D' } }} />}
+                control={<Radio size="small" sx={{ p: 0.5, color: '#4F46E5', '&.Mui-checked': { color: '#4F46E5' } }} />}
                 label=""
                 sx={{ m: 0 }}
               />
-              <LoginIcon sx={{ color: permissionType === 'Late Sign-In' ? '#14286D' : '#64748B', fontSize: 20 }} />
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  bgcolor: permissionType === 'Late Sign-In' ? 'rgba(79, 70, 229, 0.18)' : '#F1F5F9',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <LoginIcon sx={{ color: permissionType === 'Late Sign-In' ? '#4F46E5' : '#64748B', fontSize: 20 }} />
+              </Box>
               <Box>
-                <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                <Typography sx={{ fontSize: '13.5px', fontWeight: 800, color: permissionType === 'Late Sign-In' ? '#3730A3' : '#0F172A' }}>
                   Late Sign-In
                 </Typography>
-                <Typography sx={{ fontSize: '11px', color: '#64748B' }}>
+                <Typography sx={{ fontSize: '11px', color: permissionType === 'Late Sign-In' ? '#4338CA' : '#64748B' }}>
                   Arriving after standard shift start
                 </Typography>
               </Box>
@@ -343,6 +377,7 @@ const ApplyPermissionDialog = ({
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
               {DURATION_OPTIONS.map((opt) => {
                 const isSelected = durationHours === opt.value;
+                const isEarlyOut = permissionType === 'Early Sign-Out';
                 return (
                   <Chip
                     key={opt.value}
@@ -350,16 +385,33 @@ const ApplyPermissionDialog = ({
                     onClick={() => setDurationHours(opt.value)}
                     sx={{
                       cursor: 'pointer',
-                      fontWeight: 600,
+                      fontWeight: 700,
                       fontSize: '12px',
                       borderRadius: '8px',
                       px: 1,
-                      border: '1px solid',
-                      borderColor: isSelected ? '#14286D' : '#E2E8F0',
-                      bgcolor: isSelected ? '#14286D' : '#F8FAFC',
+                      border: '1.5px solid',
+                      borderColor: isSelected
+                        ? isEarlyOut ? '#F59E0B' : '#6366F1'
+                        : '#E2E8F0',
+                      background: isSelected
+                        ? isEarlyOut
+                          ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                          : 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)'
+                        : '#F8FAFC',
                       color: isSelected ? '#FFFFFF' : '#334155',
+                      boxShadow: isSelected
+                        ? isEarlyOut
+                          ? '0 2px 8px rgba(245, 158, 11, 0.3)'
+                          : '0 2px 8px rgba(99, 102, 241, 0.3)'
+                        : 'none',
+                      transition: 'all 0.15s ease',
                       '&:hover': {
-                        bgcolor: isSelected ? '#0E1D50' : '#E2E8F0',
+                        borderColor: isSelected
+                          ? isEarlyOut ? '#D97706' : '#4F46E5'
+                          : '#CBD5E1',
+                        bgcolor: isSelected
+                          ? isEarlyOut ? '#D97706' : '#4F46E5'
+                          : '#F1F5F9',
                       },
                     }}
                   />
@@ -413,15 +465,23 @@ const ApplyPermissionDialog = ({
           disabled={submitting || (remainingQuota !== null && remainingQuota <= 0)}
           variant="contained"
           sx={{
-            bgcolor: '#14286D',
-            '&:hover': { bgcolor: '#0E1D50' },
+            background: permissionType === 'Early Sign-Out'
+              ? 'linear-gradient(135deg, #D97706 0%, #B45309 100%)'
+              : 'linear-gradient(135deg, #4F46E5 0%, #3730A3 100%)',
+            '&:hover': {
+              background: permissionType === 'Early Sign-Out'
+                ? 'linear-gradient(135deg, #B45309 0%, #92400E 100%)'
+                : 'linear-gradient(135deg, #3730A3 0%, #312E81 100%)',
+            },
             textTransform: 'none',
             fontWeight: 700,
             fontSize: '13.5px',
-            borderRadius: '8px',
+            borderRadius: '9px',
             px: 3,
-            py: 0.8,
-            boxShadow: '0 4px 6px -1px rgba(20, 40, 109, 0.2)',
+            py: 0.85,
+            boxShadow: permissionType === 'Early Sign-Out'
+              ? '0 4px 12px rgba(217, 119, 6, 0.25)'
+              : '0 4px 12px rgba(79, 70, 229, 0.25)',
           }}
           startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : <CheckCircleOutlineIcon />}
         >

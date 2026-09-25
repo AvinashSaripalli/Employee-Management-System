@@ -547,7 +547,7 @@ const Attendance = () => {
               Detailed List
             </ToggleButton>
             <ToggleButton value="permissions" sx={{ textTransform: 'none', fontWeight: 600, fontSize: '12px', px: 1.2 }}>
-              <AccessTimeIcon sx={{ fontSize: 16, mr: 0.5 }} />
+              <AccessTimeIcon sx={{ fontSize: 16, mr: 0.5, color: viewMode === 'permissions' ? '#ffffff' : '#4F46E5' }} />
               Permissions & Regularization
             </ToggleButton>
           </ToggleButtonGroup>

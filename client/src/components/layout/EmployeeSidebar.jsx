@@ -601,7 +601,7 @@ const Sidebar = () => {
         <Button
           size="small"
           variant="outlined"
-          startIcon={<HiOutlineClock size={14} />}
+          startIcon={<HiOutlineClock size={15} color="#4F46E5" />}
           onClick={() => {
             setDetailsAnchor(null);
             setPermissionDialogType(clockedIn ? 'Early Sign-Out' : 'Late Sign-In');
@@ -611,13 +611,21 @@ const Sidebar = () => {
           sx={{
             fontSize: '11.5px',
             textTransform: 'none',
-            fontWeight: 600,
+            fontWeight: 700,
             borderRadius: '8px',
-            borderColor: '#cbd5e1',
-            color: '#334155',
-            py: 0.5,
+            borderColor: '#C7D2FE',
+            color: '#3730A3',
+            bgcolor: '#EEF2FF',
+            py: 0.65,
             mb: isCompletedToday ? 1 : 0,
-            '&:hover': { borderColor: '#14286D', color: '#14286D', bgcolor: '#f8fafc' },
+            boxShadow: '0 1px 3px rgba(79, 70, 229, 0.08)',
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              borderColor: '#818CF8',
+              bgcolor: '#E0E7FF',
+              color: '#312E81',
+              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.16)',
+            },
           }}
         >
           Request Permission (Late In / Early Out)
@@ -814,18 +822,73 @@ const Sidebar = () => {
 
           {elapsedSeconds < 8 * 3600 && (
             todayEarlyPermission ? (
-              <Box sx={{ mb: 2, p: 1.25, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <HiOutlineCheckCircle color="#16a34a" size={18} />
-                <Typography sx={{ fontSize: '12px', color: '#166534', fontWeight: 600 }}>
-                  Approved Early Sign-Out active ({todayEarlyPermission.durationHours}h · {todayEarlyPermission.expectedTime})
-                </Typography>
+              <Box
+                sx={{
+                  mb: 2,
+                  p: 1.5,
+                  background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+                  border: '1px solid #A7F3D0',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.25,
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.08)',
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    bgcolor: '#10B981',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  <HiOutlineCheckCircle color="#FFFFFF" size={18} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '12px', color: '#065F46', fontWeight: 700 }}>
+                    Approved Early Sign-Out Active
+                  </Typography>
+                  <Typography sx={{ fontSize: '11px', color: '#047857' }}>
+                    {todayEarlyPermission.durationHours}h authorized · Planned depart at {todayEarlyPermission.expectedTime}
+                  </Typography>
+                </Box>
               </Box>
             ) : (
-              <Box sx={{ mb: 2, p: 1.5, bgcolor: '#fffbeb', border: '1px solid #fef08a', borderRadius: '10px' }}>
+              <Box
+                sx={{
+                  mb: 2,
+                  p: 1.75,
+                  background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+                  border: '1px solid #FCD34D',
+                  borderRadius: '12px',
+                  boxShadow: '0 2px 8px rgba(245, 158, 11, 0.12)',
+                }}
+              >
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                  <Typography sx={{ fontSize: '12px', color: '#92400e', fontWeight: 700 }}>
-                    Early Departure (&lt; 8h worked)
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: '8px',
+                        bgcolor: 'rgba(217, 119, 6, 0.18)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <HiOutlineClock color="#D97706" size={16} />
+                    </Box>
+                    <Typography sx={{ fontSize: '12.5px', color: '#92400E', fontWeight: 800 }}>
+                      Early Departure Alert
+                    </Typography>
+                  </Box>
                   <Button
                     size="small"
                     onClick={() => {
@@ -833,22 +896,27 @@ const Sidebar = () => {
                       setPermissionDialogOpen(true);
                     }}
                     sx={{
-                      fontSize: '11px',
+                      fontSize: '11.5px',
                       fontWeight: 700,
                       textTransform: 'none',
-                      bgcolor: '#d97706',
-                      color: '#fff',
-                      px: 1.2,
-                      py: 0.3,
-                      borderRadius: '6px',
-                      '&:hover': { bgcolor: '#b45309' },
+                      background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                      color: '#FFFFFF',
+                      px: 1.5,
+                      py: 0.45,
+                      borderRadius: '8px',
+                      boxShadow: '0 2px 6px rgba(217, 119, 6, 0.3)',
+                      transition: 'all 0.15s ease',
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, #D97706 0%, #B45309 100%)',
+                        boxShadow: '0 3px 8px rgba(217, 119, 6, 0.4)',
+                      },
                     }}
                   >
                     Request Permission
                   </Button>
                 </Box>
-                <Typography sx={{ fontSize: '11px', color: '#b45309', mt: 0.5 }}>
-                  You can submit an Early Sign-Out permission to excuse departing before your 8-hour shift.
+                <Typography sx={{ fontSize: '11px', color: '#B45309', mt: 0.8, lineHeight: 1.4 }}>
+                  You have worked under 8 hours today. You can submit an Early Sign-Out permission to excuse departing early.
                 </Typography>
               </Box>
             )

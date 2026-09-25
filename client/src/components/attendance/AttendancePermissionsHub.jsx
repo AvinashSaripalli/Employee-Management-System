@@ -179,24 +179,77 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
     }
   };
 
+  const PermissionTypeBadge = ({ type, duration }) => {
+    const isEarlyOut = type === 'Early Sign-Out';
+    return (
+      <Box
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.75,
+          px: 1.2,
+          py: 0.45,
+          borderRadius: '20px',
+          bgcolor: isEarlyOut ? '#FFF7ED' : '#EEF2FF',
+          border: `1px solid ${isEarlyOut ? '#FED7AA' : '#C7D2FE'}`,
+          boxShadow: isEarlyOut
+            ? '0 1px 2px rgba(234, 88, 12, 0.08)'
+            : '0 1px 2px rgba(79, 70, 229, 0.08)',
+        }}
+      >
+        {isEarlyOut ? (
+          <ExitToAppIcon sx={{ color: '#EA580C', fontSize: 16 }} />
+        ) : (
+          <LoginIcon sx={{ color: '#4F46E5', fontSize: 16 }} />
+        )}
+        <Typography
+          sx={{
+            fontSize: '12px',
+            fontWeight: 700,
+            color: isEarlyOut ? '#C2410C' : '#3730A3',
+            letterSpacing: '0.2px',
+          }}
+        >
+          {type}
+        </Typography>
+      </Box>
+    );
+  };
+
   const statusBadge = (status) => {
     switch (status) {
       case 'Approved':
         return (
           <Chip
             size="small"
-            icon={<CheckCircleIcon style={{ fontSize: 14, color: '#166534' }} />}
+            icon={<CheckCircleIcon style={{ fontSize: 14, color: '#059669' }} />}
             label="Approved"
-            sx={{ bgcolor: '#DCFCE7', color: '#166534', fontWeight: 700, fontSize: '11px', borderRadius: '6px' }}
+            sx={{
+              bgcolor: '#ECFDF5',
+              color: '#065F46',
+              border: '1px solid #A7F3D0',
+              fontWeight: 700,
+              fontSize: '11px',
+              borderRadius: '20px',
+              boxShadow: '0 1px 2px rgba(5, 150, 105, 0.08)',
+            }}
           />
         );
       case 'Rejected':
         return (
           <Chip
             size="small"
-            icon={<CancelIcon style={{ fontSize: 14, color: '#991B1B' }} />}
+            icon={<CancelIcon style={{ fontSize: 14, color: '#DC2626' }} />}
             label="Rejected"
-            sx={{ bgcolor: '#FEE2E2', color: '#991B1B', fontWeight: 700, fontSize: '11px', borderRadius: '6px' }}
+            sx={{
+              bgcolor: '#FEF2F2',
+              color: '#991B1B',
+              border: '1px solid #FECACA',
+              fontWeight: 700,
+              fontSize: '11px',
+              borderRadius: '20px',
+              boxShadow: '0 1px 2px rgba(220, 38, 38, 0.08)',
+            }}
           />
         );
       case 'Cancelled':
@@ -204,16 +257,31 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
           <Chip
             size="small"
             label="Cancelled"
-            sx={{ bgcolor: '#F1F5F9', color: '#64748B', fontWeight: 600, fontSize: '11px', borderRadius: '6px' }}
+            sx={{
+              bgcolor: '#F8FAFC',
+              color: '#64748B',
+              border: '1px solid #E2E8F0',
+              fontWeight: 600,
+              fontSize: '11px',
+              borderRadius: '20px',
+            }}
           />
         );
       default:
         return (
           <Chip
             size="small"
-            icon={<HourglassEmptyIcon style={{ fontSize: 14, color: '#B45309' }} />}
-            label="Pending"
-            sx={{ bgcolor: '#FEF3C7', color: '#B45309', fontWeight: 700, fontSize: '11px', borderRadius: '6px' }}
+            icon={<HourglassEmptyIcon style={{ fontSize: 13, color: '#D97706' }} />}
+            label="Pending Review"
+            sx={{
+              bgcolor: '#FFFBEB',
+              color: '#92400E',
+              border: '1px solid #FDE68A',
+              fontWeight: 700,
+              fontSize: '11px',
+              borderRadius: '20px',
+              boxShadow: '0 1px 2px rgba(217, 119, 6, 0.08)',
+            }}
           />
         );
     }
@@ -364,24 +432,34 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
                 elevation={0}
                 sx={{
                   p: 2.2,
-                  borderRadius: '12px',
-                  border: '1px solid #E2E8F0',
-                  bgcolor: '#F8FAFC',
+                  borderRadius: '14px',
+                  border: '1px solid #BFDBFE',
+                  background: 'linear-gradient(135deg, #F0F7FF 0%, #E0EFFF 100%)',
+                  boxShadow: '0 2px 6px rgba(37, 99, 235, 0.06)',
+                  position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
-                <Typography sx={{ fontSize: '12px', color: '#64748B', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Remaining This Month
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 0.5 }}>
-                  <Typography sx={{ fontSize: '26px', fontWeight: 800, color: '#0F172A' }}>
-                    {quota.remainingCount}
-                  </Typography>
-                  <Typography sx={{ fontSize: '13px', color: '#64748B' }}>
-                    / {quota.monthlyLimit} requests available
-                  </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box>
+                    <Typography sx={{ fontSize: '11.5px', color: '#1E40AF', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Monthly Quota Available
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mt: 0.5 }}>
+                      <Typography sx={{ fontSize: '28px', fontWeight: 800, color: '#1E3A8A' }}>
+                        {quota.remainingCount}
+                      </Typography>
+                      <Typography sx={{ fontSize: '13px', color: '#3B82F6', fontWeight: 600 }}>
+                        / {quota.monthlyLimit} requests
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB' }}>
+                    <AccessTimeIcon sx={{ fontSize: 22 }} />
+                  </Box>
                 </Box>
-                <Typography sx={{ fontSize: '11px', color: '#94A3B8', mt: 0.5 }}>
-                  Up to 2 hours per occurrence
+                <Typography sx={{ fontSize: '11.5px', color: '#1D4ED8', mt: 1, fontWeight: 500 }}>
+                  Max 2 hours per occurrence · Resets 1st of month
                 </Typography>
               </Paper>
             </Grid>
@@ -391,19 +469,29 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
                 elevation={0}
                 sx={{
                   p: 2.2,
-                  borderRadius: '12px',
-                  border: '1px solid #E2E8F0',
-                  bgcolor: '#F0FDF4',
+                  borderRadius: '14px',
+                  border: '1px solid #A7F3D0',
+                  background: 'linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%)',
+                  boxShadow: '0 2px 6px rgba(16, 185, 129, 0.06)',
+                  position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
-                <Typography sx={{ fontSize: '12px', color: '#166534', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Approved This Month
-                </Typography>
-                <Typography sx={{ fontSize: '26px', fontWeight: 800, color: '#166534', mt: 0.5 }}>
-                  {quota.approvedCount}
-                </Typography>
-                <Typography sx={{ fontSize: '11px', color: '#15803D', mt: 0.5 }}>
-                  Regularized without attendance penalty
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box>
+                    <Typography sx={{ fontSize: '11.5px', color: '#065F46', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Approved This Month
+                    </Typography>
+                    <Typography sx={{ fontSize: '28px', fontWeight: 800, color: '#065F46', mt: 0.5 }}>
+                      {quota.approvedCount}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: 'rgba(16, 185, 129, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#059669' }}>
+                    <CheckCircleIcon sx={{ fontSize: 22 }} />
+                  </Box>
+                </Box>
+                <Typography sx={{ fontSize: '11.5px', color: '#047857', mt: 1, fontWeight: 500 }}>
+                  Regularized without salary or shift penalty
                 </Typography>
               </Paper>
             </Grid>
@@ -413,19 +501,29 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
                 elevation={0}
                 sx={{
                   p: 2.2,
-                  borderRadius: '12px',
-                  border: '1px solid #E2E8F0',
-                  bgcolor: '#FFFBEB',
+                  borderRadius: '14px',
+                  border: '1px solid #FDE68A',
+                  background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+                  boxShadow: '0 2px 6px rgba(245, 158, 11, 0.06)',
+                  position: 'relative',
+                  overflow: 'hidden',
                 }}
               >
-                <Typography sx={{ fontSize: '12px', color: '#B45309', fontWeight: 600, textTransform: 'uppercase' }}>
-                  Pending Review
-                </Typography>
-                <Typography sx={{ fontSize: '26px', fontWeight: 800, color: '#B45309', mt: 0.5 }}>
-                  {quota.pendingCount}
-                </Typography>
-                <Typography sx={{ fontSize: '11px', color: '#B45309', mt: 0.5 }}>
-                  Awaiting supervisor approval
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box>
+                    <Typography sx={{ fontSize: '11.5px', color: '#92400E', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Pending Approval
+                    </Typography>
+                    <Typography sx={{ fontSize: '28px', fontWeight: 800, color: '#92400E', mt: 0.5 }}>
+                      {quota.pendingCount}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ width: 40, height: 40, borderRadius: '10px', bgcolor: 'rgba(245, 158, 11, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D97706' }}>
+                    <HourglassEmptyIcon sx={{ fontSize: 22 }} />
+                  </Box>
+                </Box>
+                <Typography sx={{ fontSize: '11.5px', color: '#B45309', mt: 1, fontWeight: 500 }}>
+                  Awaiting supervisor / management review
                 </Typography>
               </Paper>
             </Grid>
@@ -481,16 +579,7 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
                     {myPermissions.map((row) => (
                       <TableRow key={row.id} hover>
                         <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            {row.permissionType === 'Early Sign-Out' ? (
-                              <ExitToAppIcon sx={{ color: '#D97706', fontSize: 18 }} />
-                            ) : (
-                              <LoginIcon sx={{ color: '#2563EB', fontSize: 18 }} />
-                            )}
-                            <Typography sx={{ fontWeight: 700, fontSize: '12.5px', color: '#0F172A' }}>
-                              {row.permissionType}
-                            </Typography>
-                          </Box>
+                          <PermissionTypeBadge type={row.permissionType} />
                         </TableCell>
                         <TableCell sx={{ fontSize: '12.5px', fontWeight: 600, color: '#334155' }}>
                           {row.date}
@@ -669,16 +758,7 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                          {row.permissionType === 'Early Sign-Out' ? (
-                            <ExitToAppIcon sx={{ color: '#D97706', fontSize: 17 }} />
-                          ) : (
-                            <LoginIcon sx={{ color: '#2563EB', fontSize: 17 }} />
-                          )}
-                          <Typography sx={{ fontWeight: 700, fontSize: '12px', color: '#0F172A' }}>
-                            {row.permissionType}
-                          </Typography>
-                        </Box>
+                        <PermissionTypeBadge type={row.permissionType} />
                       </TableCell>
                       <TableCell sx={{ fontSize: '12.5px', fontWeight: 600, color: '#334155' }}>
                         {row.date}
@@ -715,32 +795,34 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
                               variant="contained"
                               onClick={() => handleOpenReview(row, 'approve')}
                               sx={{
-                                bgcolor: '#16A34A',
-                                '&:hover': { bgcolor: '#15803D' },
+                                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                                '&:hover': { background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' },
+                                color: '#FFFFFF',
                                 fontSize: '11.5px',
                                 textTransform: 'none',
                                 fontWeight: 700,
-                                px: 1.5,
-                                py: 0.3,
-                                borderRadius: '6px',
+                                px: 1.8,
+                                py: 0.4,
+                                borderRadius: '8px',
+                                boxShadow: '0 2px 5px rgba(16, 185, 129, 0.3)',
                               }}
                             >
                               Approve
                             </Button>
                             <Button
                               size="small"
-                              variant="outlined"
                               onClick={() => handleOpenReview(row, 'reject')}
                               sx={{
-                                borderColor: '#DC2626',
-                                color: '#DC2626',
-                                '&:hover': { bgcolor: '#FEF2F2', borderColor: '#B91C1C' },
+                                bgcolor: '#FFF1F2',
+                                border: '1px solid #FECDD3',
+                                color: '#E11D48',
+                                '&:hover': { bgcolor: '#FFE4E6', borderColor: '#FDA4AF', color: '#BE123C' },
                                 fontSize: '11.5px',
                                 textTransform: 'none',
                                 fontWeight: 700,
-                                px: 1.5,
-                                py: 0.3,
-                                borderRadius: '6px',
+                                px: 1.8,
+                                py: 0.4,
+                                borderRadius: '8px',
                               }}
                             >
                               Reject
@@ -790,15 +872,29 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
         </DialogTitle>
         <DialogContent sx={{ py: 1.5 }}>
           {selectedPermission && (
-            <Box sx={{ mb: 2, p: 1.5, bgcolor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 700, color: '#0F172A' }}>
-                {selectedPermission.employeeName} ({selectedPermission.permissionType})
+            <Box
+              sx={{
+                mb: 2,
+                p: 2,
+                borderRadius: '12px',
+                border: '1px solid',
+                borderColor: selectedPermission.permissionType === 'Early Sign-Out' ? '#FDE68A' : '#C7D2FE',
+                background: selectedPermission.permissionType === 'Early Sign-Out'
+                  ? 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)'
+                  : 'linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.75 }}>
+                <Typography sx={{ fontSize: '13.5px', fontWeight: 800, color: '#0F172A' }}>
+                  {selectedPermission.employeeName}
+                </Typography>
+                <PermissionTypeBadge type={selectedPermission.permissionType} />
+              </Box>
+              <Typography sx={{ fontSize: '12px', color: '#475569', fontWeight: 600 }}>
+                Date: {selectedPermission.date} · Expected Punch: {selectedPermission.expectedTime} ({selectedPermission.durationHours}h)
               </Typography>
-              <Typography sx={{ fontSize: '11.5px', color: '#64748B' }}>
-                Date: {selectedPermission.date} · Time: {selectedPermission.expectedTime} ({selectedPermission.durationHours}h)
-              </Typography>
-              <Typography sx={{ fontSize: '11.5px', color: '#334155', mt: 0.5 }}>
-                Reason: "{selectedPermission.reason}"
+              <Typography sx={{ fontSize: '12px', color: '#334155', mt: 0.75, fontStyle: 'italic', bgcolor: 'rgba(255, 255, 255, 0.6)', p: 1, borderRadius: '6px' }}>
+                "{selectedPermission.reason}"
               </Typography>
             </Box>
           )}
@@ -818,11 +914,11 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
             }
             value={reviewComment}
             onChange={(e) => setReviewComment(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px', fontSize: '12.5px' } }}
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px', fontSize: '12.5px', bgcolor: '#F8FAFC' } }}
           />
         </DialogContent>
-        <DialogActions sx={{ px: 2, pb: 1.5 }}>
-          <Button onClick={() => setReviewModalOpen(false)} sx={{ color: '#64748B', textTransform: 'none' }}>
+        <DialogActions sx={{ px: 2.5, pb: 2 }}>
+          <Button onClick={() => setReviewModalOpen(false)} sx={{ color: '#64748B', textTransform: 'none', fontWeight: 600 }}>
             Cancel
           </Button>
           <Button
@@ -830,12 +926,22 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
             disabled={reviewSubmitting}
             variant="contained"
             sx={{
-              bgcolor: reviewAction === 'approve' ? '#16A34A' : '#DC2626',
-              '&:hover': { bgcolor: reviewAction === 'approve' ? '#15803D' : '#B91C1C' },
+              background: reviewAction === 'approve'
+                ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                : 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+              '&:hover': {
+                background: reviewAction === 'approve'
+                  ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                  : 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)',
+              },
+              boxShadow: reviewAction === 'approve'
+                ? '0 4px 10px rgba(16, 185, 129, 0.3)'
+                : '0 4px 10px rgba(239, 68, 68, 0.3)',
               textTransform: 'none',
               fontWeight: 700,
               borderRadius: '8px',
               px: 2.5,
+              py: 0.6,
             }}
           >
             {reviewSubmitting ? 'Submitting...' : reviewAction === 'approve' ? 'Confirm Approval' : 'Confirm Rejection'}
