@@ -26,6 +26,7 @@ import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
 import dayjs from 'dayjs';
 import { downloadCSV, formatHours, formatDate } from '../../utils/reportUtils';
+import AttendancePermissionsHub from './AttendancePermissionsHub';
 
 const Attendance = () => {
   const [attendances, setAttendances] = useState([]);
@@ -545,6 +546,10 @@ const Attendance = () => {
               <ViewListIcon sx={{ fontSize: 16, mr: 0.5 }} />
               Detailed List
             </ToggleButton>
+            <ToggleButton value="permissions" sx={{ textTransform: 'none', fontWeight: 600, fontSize: '12px', px: 1.2 }}>
+              <AccessTimeIcon sx={{ fontSize: 16, mr: 0.5 }} />
+              Permissions & Regularization
+            </ToggleButton>
           </ToggleButtonGroup>
 
           <Button
@@ -741,8 +746,20 @@ const Attendance = () => {
           boxShadow: '0 2px 10px rgba(20, 40, 109, 0.04)',
         }}
       >
-        {/* Toolbar: Month Navigation, Search, Department Filter */}
-        <Box
+        {viewMode === 'permissions' ? (
+          <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
+            <AttendancePermissionsHub
+              isAdmin={isAdmin}
+              isSupervisor={isSupervisor}
+              isEmployee={isEmployee}
+              userDepartment={userDepartment}
+              userEmployeeId={userEmployeeId}
+            />
+          </Box>
+        ) : (
+          <>
+            {/* Toolbar: Month Navigation, Search, Department Filter */}
+            <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
@@ -1653,6 +1670,8 @@ const Attendance = () => {
               onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
               sx={{ borderTop: '1px solid #EDF0F7' }}
             />
+          </>
+        )}
           </>
         )}
       </Paper>

@@ -1,4 +1,4 @@
-const { Task, Leave, Report, Attendance, Message, User } = require('../models');
+const { Task, Leave, Report, Attendance, Message, User, AttendancePermission } = require('../models');
 const { Op } = require('sequelize');
 
 /**
@@ -245,6 +245,69 @@ exports.getNotifications = async (req, res) => {
         detail: `Your ${leave.leave_type} request for ${leave.start_date} was ${leave.status.toLowerCase()}.`,
         createdAt: leave.reviewed_at || leave.final_approved_at || leave.created_at || now,
         target: 'My Leaves',
+        actionLabel: 'View Status',
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3B. ATTENDANCE PERMISSIONS (Late Sign-In & Early Sign-Out)
+    // -------------------------------------------------------------
+    if (isAdmin || isSupervisor) {
+      const permWhere = {
+        companyName: { [Op.iLike]: effectiveCompany },
+        status: 'Pending',
+      };
+      if (isSupervisor && department && department !== 'all') {
+        permWhere.department = { [Op.iLike]: department.trim() };
+      }
+
+      const pendingPerms = await AttendancePermission.findAll({
+        where: permWhere,
+        order: [['id', 'DESC']],
+        limit: 8,
+      });
+
+      for (const p of pendingPerms) {
+        notifications.push({
+          id: `perm-review-${p.id}`,
+          category: 'attendance',
+          badge: p.permissionType,
+          severity: 'action',
+          actorName: p.employeeName || 'Team Member',
+          subtitle: `${p.department || 'Department'} · ${p.durationHours}h (${p.expectedTime})`,
+          title: `${p.permissionType} Request`,
+          detail: `${p.employeeName} requested ${p.permissionType} on ${p.date} (${p.durationHours}h). Reason: ${p.reason ? p.reason.slice(0, 60) : ''}...`,
+          createdAt: p.createdAt || p.created_at || now,
+          target: 'Time & Attendance',
+          actionLabel: 'Review Request',
+        });
+      }
+    }
+
+    // For Employee: Approved or Rejected permission decisions
+    const myPermDecisions = await AttendancePermission.findAll({
+      where: {
+        employeeId,
+        companyName: { [Op.iLike]: effectiveCompany },
+        status: { [Op.in]: ['Approved', 'Rejected'] },
+      },
+      order: [['id', 'DESC']],
+      limit: 5,
+    });
+
+    for (const p of myPermDecisions) {
+      const isApproved = p.status === 'Approved';
+      notifications.push({
+        id: `perm-decision-${p.id}`,
+        category: 'attendance',
+        badge: p.status,
+        severity: isApproved ? 'success' : 'urgent',
+        actorName: p.reviewerName || 'Supervisor / HR',
+        subtitle: `${p.permissionType} · ${p.date}`,
+        title: `${p.permissionType} ${p.status}`,
+        detail: `Your request for ${p.date} was ${p.status.toLowerCase()}${p.reviewerComment ? `: "${p.reviewerComment}"` : '.'}`,
+        createdAt: p.reviewedAt || p.reviewed_at || now,
+        target: 'Time & Attendance',
         actionLabel: 'View Status',
       });
     }

@@ -41,6 +41,7 @@ import Crm from '../crm/Crm';
 import Attendance from '../attendance/Attendance';
 import Reports from '../reports/Reports';
 import WorkReportFormDialog from '../reports/WorkReportFormDialog';
+import ApplyPermissionDialog from '../attendance/ApplyPermissionDialog';
 import axios from '../../api/axios';
 
 const Sidebar = () => {
@@ -63,6 +64,22 @@ const Sidebar = () => {
   const [currentDeptRole, setCurrentDeptRole] = useState(
     localStorage.getItem('departmentRole') || 'Member'
   );
+  const [permissionDialogOpen, setPermissionDialogOpen] = useState(false);
+  const [permissionDialogType, setPermissionDialogType] = useState('Early Sign-Out');
+  const [todayEarlyPermission, setTodayEarlyPermission] = useState(null);
+
+  useEffect(() => {
+    if (confirmClockOutOpen) {
+      const empId = localStorage.getItem('userEmployeeId');
+      if (empId) {
+        axios.get('/attendance/permissions/active-today', { params: { employeeId: empId } })
+          .then((res) => {
+            setTodayEarlyPermission(res.data?.earlyOutPermission || null);
+          })
+          .catch((err) => console.error('Error checking active permission:', err));
+      }
+    }
+  }, [confirmClockOutOpen]);
 
   const navigate = useNavigate();
 
@@ -580,6 +597,32 @@ const Sidebar = () => {
           </Box>
         </Box>
 
+        <Divider sx={{ my: 1.25 }} />
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<HiOutlineClock size={14} />}
+          onClick={() => {
+            setDetailsAnchor(null);
+            setPermissionDialogType(clockedIn ? 'Early Sign-Out' : 'Late Sign-In');
+            setPermissionDialogOpen(true);
+          }}
+          fullWidth
+          sx={{
+            fontSize: '11.5px',
+            textTransform: 'none',
+            fontWeight: 600,
+            borderRadius: '8px',
+            borderColor: '#cbd5e1',
+            color: '#334155',
+            py: 0.5,
+            mb: isCompletedToday ? 1 : 0,
+            '&:hover': { borderColor: '#14286D', color: '#14286D', bgcolor: '#f8fafc' },
+          }}
+        >
+          Request Permission (Late In / Early Out)
+        </Button>
+
         {isCompletedToday && (
           <Button
             size="small"
@@ -769,6 +812,48 @@ const Sidebar = () => {
             </Box>
           </Box>
 
+          {elapsedSeconds < 8 * 3600 && (
+            todayEarlyPermission ? (
+              <Box sx={{ mb: 2, p: 1.25, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <HiOutlineCheckCircle color="#16a34a" size={18} />
+                <Typography sx={{ fontSize: '12px', color: '#166534', fontWeight: 600 }}>
+                  Approved Early Sign-Out active ({todayEarlyPermission.durationHours}h · {todayEarlyPermission.expectedTime})
+                </Typography>
+              </Box>
+            ) : (
+              <Box sx={{ mb: 2, p: 1.5, bgcolor: '#fffbeb', border: '1px solid #fef08a', borderRadius: '10px' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                  <Typography sx={{ fontSize: '12px', color: '#92400e', fontWeight: 700 }}>
+                    Early Departure (&lt; 8h worked)
+                  </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      setPermissionDialogType('Early Sign-Out');
+                      setPermissionDialogOpen(true);
+                    }}
+                    sx={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      textTransform: 'none',
+                      bgcolor: '#d97706',
+                      color: '#fff',
+                      px: 1.2,
+                      py: 0.3,
+                      borderRadius: '6px',
+                      '&:hover': { bgcolor: '#b45309' },
+                    }}
+                  >
+                    Request Permission
+                  </Button>
+                </Box>
+                <Typography sx={{ fontSize: '11px', color: '#b45309', mt: 0.5 }}>
+                  You can submit an Early Sign-Out permission to excuse departing before your 8-hour shift.
+                </Typography>
+              </Box>
+            )
+          )}
+
           <Typography sx={{ fontSize: '12.5px', color: '#475569', lineHeight: 1.5 }}>
             Clocking out will conclude your shift for today. Next, you will immediately be prompted to submit your daily work report.
           </Typography>
@@ -819,6 +904,21 @@ const Sidebar = () => {
         onSubmitted={() => {
           setOpenReportDialog(false);
           setSelectedComponent('Work Reports');
+        }}
+      />
+
+      <ApplyPermissionDialog
+        open={permissionDialogOpen}
+        onClose={() => setPermissionDialogOpen(false)}
+        defaultType={permissionDialogType}
+        onSuccess={() => {
+          setSnackbarOpen(true);
+          const empId = localStorage.getItem('userEmployeeId');
+          if (empId) {
+            axios.get('/attendance/permissions/active-today', { params: { employeeId: empId } })
+              .then((res) => setTodayEarlyPermission(res.data?.earlyOutPermission || null))
+              .catch((e) => console.error(e));
+          }
         }}
       />
     </>

@@ -136,6 +136,7 @@ ensureLeaveSchema()
   .then(() => require('./models').CrmContact.sync())
   .then(() => require('./models').CrmProduct.sync())
   .then(() => require('./models').CrmQuote.sync())
+  .then(() => require('./models').AttendancePermission.sync({ alter: true }))
   .then(() => require('./utils/seedCrm').seedCrm())
   .catch((err) => {
     console.error('Startup data sync failed:', err.message);
