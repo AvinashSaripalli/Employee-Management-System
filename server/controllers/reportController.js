@@ -205,11 +205,13 @@ exports.createReport = async (req, res) => {
       ? "KN Advisors"
       : rawCompany;
 
-  if (!date || !taskName) {
+  if (!date) {
     return res
       .status(400)
-      .json({ error: "Date and task name are required" });
+      .json({ error: "Date is required" });
   }
+
+  const effectiveTaskName = (taskName && String(taskName).trim()) || "Daily Work Report";
 
   try {
     // Enforcement 1: Employee must have clocked in on that date to submit a work report!
@@ -272,14 +274,22 @@ exports.createReport = async (req, res) => {
       }
     }
 
+    let effectiveHoursWorked = Number(hoursWorked) || 0;
+    if (!effectiveHoursWorked && attendanceRecord?.workedTime) {
+      const parts = String(attendanceRecord.workedTime).split(":").map(Number);
+      if (parts.length >= 2 && parts.every((n) => !isNaN(n))) {
+        effectiveHoursWorked = Math.round((parts[0] + parts[1] / 60 + (parts[2] || 0) / 3600) * 100) / 100;
+      }
+    }
+
     const report = await Report.create({
       employeeId,
       employeeName,
       department,
       date,
-      taskName,
+      taskName: effectiveTaskName,
       workDescription,
-      hoursWorked: hoursWorked || 0,
+      hoursWorked: effectiveHoursWorked,
       companyName: effectiveCompany,
       clockInTime: clockInTime || attendanceRecord?.clockInTime || null,
       clockOutTime: clockOutTime || attendanceRecord?.clockOutTime || null,

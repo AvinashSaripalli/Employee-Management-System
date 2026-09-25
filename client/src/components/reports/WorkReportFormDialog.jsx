@@ -166,17 +166,12 @@ const WorkReportFormDialog = ({
   const validate = () => {
     const next = {};
     if (!form.date) next.date = 'Date is required';
-    if (!form.taskName.trim()) next.taskName = 'Task name is required';
 
     const cleaned = form.workDescription
       .split('\n')
       .map((line) => line.trim().replace(/^\d+\.\s*/, ''))
       .filter(Boolean);
     if (cleaned.length === 0) next.workDescription = 'Enter at least one work item';
-
-    if (!lockHours && (form.hoursWorked === '' || form.hoursWorked == null)) {
-      next.hoursWorked = 'Hours worked is required';
-    }
 
     if (hasClockedIn === false) {
       setFormError(`You must clock in first on ${formatDate(form.date)} before submitting a work report.`);
@@ -201,11 +196,20 @@ const WorkReportFormDialog = ({
     setSuccessNotice('');
 
     try {
+      const firstWorkItem = descriptionArray[0] || 'Daily Work Report';
+      const effectiveTaskName = (form.taskName && form.taskName.trim()) || (firstWorkItem.length > 80 ? firstWorkItem.slice(0, 77) + '...' : firstWorkItem);
+
+      const effectiveHours = (form.hoursWorked && !isNaN(Number(form.hoursWorked)) && Number(form.hoursWorked) > 0)
+        ? Number(form.hoursWorked)
+        : attendanceRecord?.workedTime
+        ? timeToHours(attendanceRecord.workedTime)
+        : timeToHours(localStorage.getItem('workedTime')) || 0;
+
       const payload = {
         ...form,
-        taskName: form.taskName.trim(),
+        taskName: effectiveTaskName,
         workDescription: JSON.stringify(descriptionArray),
-        hoursWorked: timeToHours(form.hoursWorked),
+        hoursWorked: effectiveHours,
         employeeId,
         employeeName: `${localStorage.getItem('userFirstName') || ''} ${localStorage.getItem('userLastName') || ''}`.trim(),
         department,
@@ -396,21 +400,11 @@ const WorkReportFormDialog = ({
             }
           />
 
-          <TextField
-            label="Task Name"
-            fullWidth
-            value={form.taskName}
-            onChange={(e) => setForm((prev) => ({ ...prev, taskName: e.target.value }))}
-            placeholder="e.g. Bug fix in payroll module / Client review"
-            error={!!errors.taskName}
-            helperText={errors.taskName}
-          />
-
           <Box>
             <TextField
               label="Work Description"
               multiline
-              rows={5}
+              rows={6}
               fullWidth
               value={form.workDescription}
               onChange={handleWorkDescriptionChange}
@@ -420,21 +414,6 @@ const WorkReportFormDialog = ({
               helperText={errors.workDescription || 'Press Enter to automatically number the next work item'}
             />
           </Box>
-
-          <TextField
-            label="Hours Worked"
-            type="number"
-            fullWidth
-            value={form.hoursWorked}
-            onChange={(e) => setForm((prev) => ({ ...prev, hoursWorked: e.target.value }))}
-            disabled={lockHours}
-            helperText={
-              lockHours
-                ? "Hours are locked from today's clock session"
-                : 'In decimal hours, e.g. 8 or 8.5'
-            }
-            error={!!errors.hoursWorked}
-          />
         </Box>
       </DialogContent>
 
