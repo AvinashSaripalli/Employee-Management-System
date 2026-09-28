@@ -19,6 +19,20 @@ const CrmContact = require("./CrmContact");
 const CrmProduct = require("./CrmProduct");
 const CrmQuote = require("./CrmQuote");
 const AttendancePermission = require("./AttendancePermission");
+const Notification = require("./Notification");
+
+Notification.belongsTo(User, {
+  foreignKey: "recipientId",
+  targetKey: "employeeId",
+  as: "recipient",
+  constraints: false,
+});
+User.hasMany(Notification, {
+  foreignKey: "recipientId",
+  sourceKey: "employeeId",
+  as: "notifications",
+  constraints: false,
+});
 
 Workgroup.belongsTo(User, {
   foreignKey: "employeeId",
@@ -159,4 +173,5 @@ module.exports = {
   CrmProduct,
   CrmQuote,
   AttendancePermission,
+  Notification,
 };

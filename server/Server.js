@@ -94,6 +94,7 @@ io.on('connection', (socket) => {
     socket.employeeId = user.employeeId;
     socket.companyName = user.companyName;
     socket.join(`company:${user.companyName}`);
+    socket.join(`user:${user.employeeId}`);
     io.to(`company:${user.companyName}`).emit('presence:update', { online: Array.from(onlineUsers.keys()).filter((id) => {
       // only those in same company (approx)
       return true;
@@ -137,6 +138,7 @@ ensureLeaveSchema()
   .then(() => require('./models').CrmProduct.sync())
   .then(() => require('./models').CrmQuote.sync())
   .then(() => require('./models').AttendancePermission.sync({ alter: true }))
+  .then(() => require('./models').Notification.sync({ alter: true }))
   .then(() => require('./utils/seedCrm').seedCrm())
   .catch((err) => {
     console.error('Startup data sync failed:', err.message);

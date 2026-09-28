@@ -1,12 +1,16 @@
-const { Task, Leave, Report, Attendance, Message, User, AttendancePermission } = require('../models');
+const { Task, Leave, Report, Attendance, Message, User, AttendancePermission, Notification } = require('../models');
 const { Op } = require('sequelize');
 
 /**
  * Advanced Notification Controller
- * Aggregates live presence, overdue work reports, tasks, leave approvals, and messages.
+ * Aggregates persistent database notifications with live operational alerts.
  */
 exports.getNotifications = async (req, res) => {
-  const { employeeId, companyName, role, department, departmentRole } = req.query;
+  const employeeId = req.query.employeeId || req.user?.employeeId;
+  const companyName = req.query.companyName || req.user?.companyName;
+  const role = req.query.role || req.user?.role;
+  const department = req.query.department || req.user?.department;
+  const departmentRole = req.query.departmentRole || req.user?.departmentRole;
 
   if (!employeeId) {
     return res.status(400).json({ error: 'employeeId is required' });
@@ -28,7 +32,41 @@ exports.getNotifications = async (req, res) => {
 
   try {
     // -------------------------------------------------------------
-    // 1. ATTENDANCE & SHIFT NOTIFICATIONS
+    // 0. PERSISTENT NOTIFICATIONS FROM DATABASE
+    // -------------------------------------------------------------
+    const dbNotifications = await Notification.findAll({
+      where: {
+        recipientId: employeeId,
+        companyName: { [Op.iLike]: effectiveCompany },
+        isDismissed: false,
+      },
+      order: [['created_at', 'DESC']],
+      limit: 50,
+    });
+
+    for (const n of dbNotifications) {
+      notifications.push({
+        id: `db-${n.id}`,
+        dbId: n.id,
+        isPersistent: true,
+        isRead: Boolean(n.isRead),
+        readAt: n.readAt,
+        category: n.category,
+        badge: n.type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        severity: n.severity || 'info',
+        actorName: n.senderName || 'System',
+        subtitle: n.category ? n.category.toUpperCase() : 'NOTIFICATION',
+        title: n.title,
+        detail: n.message,
+        createdAt: n.createdAt,
+        target: n.target,
+        targetId: n.targetId,
+        actionLabel: n.actionLabel || 'View',
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 1. ATTENDANCE & SHIFT OPERATIONAL ALERTS
     // -------------------------------------------------------------
     // A. Check for currently active shift today
     const activeShift = await Attendance.findOne({
@@ -43,13 +81,15 @@ exports.getNotifications = async (req, res) => {
     if (activeShift) {
       notifications.push({
         id: `shift-active-${activeShift.id}`,
+        isPersistent: false,
+        isRead: false,
         category: 'shift',
         badge: 'In Progress',
         severity: 'info',
         actorName: 'Time & Attendance',
-        subtitle: `Shift clocked in at ${activeShift.clockInTime ? activeShift.clockInTime.slice(0, 5) : 'today'}`,
+        subtitle: `Clocked in at ${activeShift.clockInTime ? activeShift.clockInTime.slice(0, 5) : 'today'}`,
         title: 'Active Shift in Progress',
-        detail: `You are currently clocked in. Remember to finish your tasks and file your daily work report.`,
+        detail: `You are currently clocked in. Remember to finalize tasks and file your daily work report upon completion.`,
         createdAt: activeShift.clockInDate ? new Date(`${activeShift.clockInDate}T${activeShift.clockInTime || '09:00:00'}`) : now,
         target: 'Time & Attendance',
         actionLabel: 'View Shift',
@@ -90,6 +130,8 @@ exports.getNotifications = async (req, res) => {
         if (isPast) {
           notifications.push({
             id: `report-overdue-${dateStr}`,
+            isPersistent: false,
+            isRead: false,
             category: 'report',
             badge: 'Overdue',
             severity: 'urgent',
@@ -104,6 +146,8 @@ exports.getNotifications = async (req, res) => {
         } else if (dateStr === todayStr && att.clockOutTime) {
           notifications.push({
             id: `report-due-today-${dateStr}`,
+            isPersistent: false,
+            isRead: false,
             category: 'report',
             badge: 'Due Today',
             severity: 'action',
@@ -120,7 +164,7 @@ exports.getNotifications = async (req, res) => {
     }
 
     // -------------------------------------------------------------
-    // 2. TASK & PROJECT NOTIFICATIONS
+    // 2. LIVE TASK NOTIFICATIONS (Overdue / Due Soon)
     // -------------------------------------------------------------
     const activeTasks = await Task.findAll({
       where: {
@@ -143,6 +187,8 @@ exports.getNotifications = async (req, res) => {
       if (isOverdue) {
         notifications.push({
           id: `task-overdue-${task.id}`,
+          isPersistent: false,
+          isRead: false,
           category: 'task',
           badge: 'Overdue',
           severity: 'urgent',
@@ -153,10 +199,13 @@ exports.getNotifications = async (req, res) => {
           createdAt: deadline,
           target: isAdmin ? 'Tasks and Projects' : 'Tasks',
           actionLabel: 'Open Task',
+          targetId: task.id,
         });
       } else if (isDueSoon) {
         notifications.push({
           id: `task-due-${task.id}`,
+          isPersistent: false,
+          isRead: false,
           category: 'task',
           badge: 'Due Soon',
           severity: 'action',
@@ -167,202 +216,33 @@ exports.getNotifications = async (req, res) => {
           createdAt: task.updatedAt || now,
           target: isAdmin ? 'Tasks and Projects' : 'Tasks',
           actionLabel: 'Open Task',
-        });
-      } else if (task.responsibleId === employeeId) {
-        notifications.push({
-          id: `task-assigned-${task.id}`,
-          category: 'task',
-          badge: 'Assigned',
-          severity: 'info',
-          actorName: 'Tasks & Projects',
-          subtitle: 'Assigned Task',
-          title: task.title,
-          detail: task.description ? (task.description.length > 90 ? `${task.description.slice(0, 90)}...` : task.description) : 'Active task in progress.',
-          createdAt: task.createdAt,
-          target: isAdmin ? 'Tasks and Projects' : 'Tasks',
-          actionLabel: 'View Task',
+          targetId: task.id,
         });
       }
     }
 
     // -------------------------------------------------------------
-    // 3. LEAVE NOTIFICATIONS
+    // 3. MESSENGER NOTIFICATIONS (Privacy-Protected)
     // -------------------------------------------------------------
-    // A. For Admin or Supervisor: Pending leaves needing approval
-    if (isAdmin || isSupervisor) {
-      const pendingLeaveWhere = {
-        companyName: { [Op.iLike]: effectiveCompany },
-        status: 'Pending',
-      };
-      if (isSupervisor && department && department !== 'all') {
-        pendingLeaveWhere.department = { [Op.iLike]: department.trim() };
-      }
-
-      const pendingLeaves = await Leave.findAll({
-        where: pendingLeaveWhere,
-        order: [['id', 'DESC']],
-        limit: 8,
-      });
-
-      for (const leave of pendingLeaves) {
-        notifications.push({
-          id: `leave-review-${leave.id}`,
-          category: 'leave',
-          badge: 'Pending Review',
-          severity: 'action',
-          actorName: leave.employee_name || 'Team Member',
-          subtitle: `${leave.department || 'Department'} · ${leave.leave_type || 'Leave'} (${leave.days || 1} day)`,
-          title: `Leave Request from ${leave.employee_name || 'Employee'}`,
-          detail: `${leave.leave_type} requested from ${leave.start_date} to ${leave.end_date}.`,
-          createdAt: leave.createdAt,
-          target: 'Manage Leaves',
-          actionLabel: 'Review Request',
-        });
-      }
-    }
-
-    // B. For Employee: Decision on personal leave requests (Approved or Rejected)
-    const personalLeaves = await Leave.findAll({
-      where: {
-        employeeId,
-        companyName: { [Op.iLike]: effectiveCompany },
-        status: { [Op.in]: ['Approved', 'Rejected'] },
-      },
-      order: [['id', 'DESC']],
-      limit: 5,
-    });
-
-    for (const leave of personalLeaves) {
-      const isApproved = leave.status === 'Approved';
-      notifications.push({
-        id: `leave-decision-${leave.id}`,
-        category: 'leave',
-        badge: leave.status,
-        severity: isApproved ? 'success' : 'urgent',
-        actorName: 'Leave Management',
-        subtitle: `${leave.leave_type} (${leave.start_date})`,
-        title: `Leave Request ${leave.status}`,
-        detail: `Your ${leave.leave_type} request for ${leave.start_date} was ${leave.status.toLowerCase()}.`,
-        createdAt: leave.reviewed_at || leave.final_approved_at || leave.created_at || now,
-        target: 'My Leaves',
-        actionLabel: 'View Status',
-      });
-    }
-
-    // -------------------------------------------------------------
-    // 3B. ATTENDANCE PERMISSIONS (Late Sign-In & Early Sign-Out)
-    // -------------------------------------------------------------
-    if (isAdmin || isSupervisor) {
-      const permWhere = {
-        companyName: { [Op.iLike]: effectiveCompany },
-        status: 'Pending',
-      };
-      if (isSupervisor && department && department !== 'all') {
-        permWhere.department = { [Op.iLike]: department.trim() };
-      }
-
-      const pendingPerms = await AttendancePermission.findAll({
-        where: permWhere,
-        order: [['id', 'DESC']],
-        limit: 8,
-      });
-
-      for (const p of pendingPerms) {
-        notifications.push({
-          id: `perm-review-${p.id}`,
-          category: 'attendance',
-          badge: p.permissionType,
-          severity: 'action',
-          actorName: p.employeeName || 'Team Member',
-          subtitle: `${p.department || 'Department'} · ${p.durationHours}h (${p.expectedTime})`,
-          title: `${p.permissionType} Request`,
-          detail: `${p.employeeName} requested ${p.permissionType} on ${p.date} (${p.durationHours}h). Reason: ${p.reason ? p.reason.slice(0, 60) : ''}...`,
-          createdAt: p.createdAt || p.created_at || now,
-          target: 'Time & Attendance',
-          actionLabel: 'Review Request',
-        });
-      }
-    }
-
-    // For Employee: Approved or Rejected permission decisions
-    const myPermDecisions = await AttendancePermission.findAll({
-      where: {
-        employeeId,
-        companyName: { [Op.iLike]: effectiveCompany },
-        status: { [Op.in]: ['Approved', 'Rejected'] },
-      },
-      order: [['id', 'DESC']],
-      limit: 5,
-    });
-
-    for (const p of myPermDecisions) {
-      const isApproved = p.status === 'Approved';
-      notifications.push({
-        id: `perm-decision-${p.id}`,
-        category: 'attendance',
-        badge: p.status,
-        severity: isApproved ? 'success' : 'urgent',
-        actorName: p.reviewerName || 'Supervisor / HR',
-        subtitle: `${p.permissionType} · ${p.date}`,
-        title: `${p.permissionType} ${p.status}`,
-        detail: `Your request for ${p.date} was ${p.status.toLowerCase()}${p.reviewerComment ? `: "${p.reviewerComment}"` : '.'}`,
-        createdAt: p.reviewedAt || p.reviewed_at || now,
-        target: 'Time & Attendance',
-        actionLabel: 'View Status',
-      });
-    }
-
-    // -------------------------------------------------------------
-    // 4. WORK REPORT REVIEWS (for Supervisors/Admin)
-    // -------------------------------------------------------------
-    if (isAdmin || isSupervisor) {
-      const recentReportsWhere = {
-        companyName: { [Op.iLike]: effectiveCompany },
-      };
-      if (isSupervisor && department && department !== 'all') {
-        recentReportsWhere.department = { [Op.iLike]: department.trim() };
-      }
-
-      const recentReports = await Report.findAll({
-        where: recentReportsWhere,
-        order: [['id', 'DESC']],
-        limit: 5,
-      });
-
-      for (const rep of recentReports) {
-        if (rep.employeeId !== employeeId) {
-          notifications.push({
-            id: `report-submitted-${rep.id}`,
-            category: 'report',
-            badge: 'Submitted',
-            severity: 'info',
-            actorName: rep.employeeName || 'Team Member',
-            subtitle: `${rep.department || 'Department'} · ${rep.hoursWorked}h logged`,
-            title: `Work Report: ${rep.employeeName}`,
-            detail: `${rep.taskName || 'Daily tasks'} (${rep.hoursWorked}h) on ${rep.date}.`,
-            createdAt: rep.createdAt,
-            target: 'Work Reports',
-            actionLabel: 'Review Report',
-          });
-        }
-      }
-    }
-
-    // -------------------------------------------------------------
-    // 5. MESSENGER NOTIFICATIONS
-    // -------------------------------------------------------------
+    // Only notify if conversation involves this specific employee or is company-wide
     const recentMessages = await Message.findAll({
       where: {
         companyName: { [Op.iLike]: effectiveCompany },
         senderEmployeeId: { [Op.ne]: employeeId },
+        [Op.or]: [
+          { conversationId: { [Op.like]: `%${employeeId}%` } },
+          { conversationId: { [Op.like]: 'company:%' } },
+        ],
       },
       order: [['id', 'DESC']],
-      limit: 4,
+      limit: 5,
     });
 
     for (const msg of recentMessages) {
       notifications.push({
         id: `msg-${msg.id}`,
+        isPersistent: false,
+        isRead: false,
         category: 'message',
         badge: 'Message',
         severity: 'info',
@@ -376,8 +256,11 @@ exports.getNotifications = async (req, res) => {
       });
     }
 
-    // Sort: Urgent (4) -> Action (3) -> Success (2) -> Info (1), then newest first
+    // Sort: Unread first, then by priority weight (urgent: 4, action: 3, success: 2, info: 1), then newest
     notifications.sort((a, b) => {
+      if (a.isRead !== b.isRead) {
+        return a.isRead ? 1 : -1;
+      }
       const priorityWeight = { urgent: 4, action: 3, success: 2, info: 1 };
       const weightDiff = (priorityWeight[b.severity] || 0) - (priorityWeight[a.severity] || 0);
       if (weightDiff !== 0) return weightDiff;
@@ -386,10 +269,121 @@ exports.getNotifications = async (req, res) => {
 
     res.json({
       total: notifications.length,
+      unreadCount: notifications.filter((n) => !n.isRead).length,
       notifications,
     });
   } catch (error) {
     console.error('Error fetching notifications:', error);
     res.status(500).json({ error: error.message });
+  }
+};
+
+/**
+ * Mark a single notification as read
+ */
+exports.markAsRead = async (req, res) => {
+  const { id } = req.params;
+  const employeeId = req.user?.employeeId || req.body.employeeId;
+
+  try {
+    const rawId = String(id).replace(/^db-/, '');
+    const numId = parseInt(rawId, 10);
+
+    if (!isNaN(numId)) {
+      await Notification.update(
+        { isRead: true, readAt: new Date() },
+        { where: { id: numId, ...(employeeId ? { recipientId: employeeId } : {}) } }
+      );
+    }
+
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error('Error marking notification as read:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * Mark all notifications for this employee as read
+ */
+exports.markAllAsRead = async (req, res) => {
+  const employeeId = req.user?.employeeId || req.body.employeeId;
+  const companyName = req.user?.companyName || req.body.companyName;
+
+  if (!employeeId) {
+    return res.status(400).json({ error: 'employeeId is required' });
+  }
+
+  try {
+    await Notification.update(
+      { isRead: true, readAt: new Date() },
+      {
+        where: {
+          recipientId: employeeId,
+          ...(companyName ? { companyName } : {}),
+          isRead: false,
+        },
+      }
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error marking all notifications as read:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * Dismiss a single notification
+ */
+exports.dismissNotification = async (req, res) => {
+  const { id } = req.params;
+  const employeeId = req.user?.employeeId || req.body.employeeId;
+
+  try {
+    const rawId = String(id).replace(/^db-/, '');
+    const numId = parseInt(rawId, 10);
+
+    if (!isNaN(numId)) {
+      await Notification.update(
+        { isDismissed: true },
+        { where: { id: numId, ...(employeeId ? { recipientId: employeeId } : {}) } }
+      );
+    }
+
+    res.json({ success: true, id });
+  } catch (err) {
+    console.error('Error dismissing notification:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * Clear all read notifications
+ */
+exports.clearAllNotifications = async (req, res) => {
+  const employeeId = req.user?.employeeId || req.body.employeeId;
+  const companyName = req.user?.companyName || req.body.companyName;
+
+  if (!employeeId) {
+    return res.status(400).json({ error: 'employeeId is required' });
+  }
+
+  try {
+    await Notification.update(
+      { isDismissed: true },
+      {
+        where: {
+          recipientId: employeeId,
+          ...(companyName ? { companyName } : {}),
+          isRead: true,
+        },
+      }
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error clearing notifications:', err);
+    res.status(500).json({ error: err.message });
   }
 };

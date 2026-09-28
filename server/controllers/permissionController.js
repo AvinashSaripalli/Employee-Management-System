@@ -1,5 +1,6 @@
 const { AttendancePermission, User } = require('../models');
 const { Op } = require('sequelize');
+const { dispatchNotification, notifyAdminsAndSupervisors } = require('../utils/notificationDispatcher');
 
 // Helper to determine start and end dates of a month
 const getMonthRange = (monthStr) => {
@@ -116,6 +117,22 @@ exports.applyPermission = async (req, res) => {
       durationHours: duration,
       reason: reason.trim(),
       status: 'Pending',
+    });
+
+    notifyAdminsAndSupervisors(req.app, {
+      department: permission.department,
+      companyName: effectiveCompany,
+      excludeEmployeeId: employeeId,
+      senderId: employeeId,
+      senderName: permission.employeeName,
+      category: 'attendance',
+      type: 'permission_requested',
+      title: `${permission.permissionType} Request from ${permission.employeeName}`,
+      message: `${permission.employeeName} requested ${permission.permissionType} for ${permission.durationHours}h on ${permission.date} (${permission.expectedTime}). Reason: ${permission.reason}`,
+      severity: 'action',
+      target: 'Time & Attendance',
+      targetId: permission.id,
+      actionLabel: 'Review Request',
     });
 
     return res.status(201).json({
@@ -252,6 +269,21 @@ exports.reviewPermission = async (req, res) => {
       reviewerRole: reviewerRole || 'Supervisor',
       reviewerComment: reviewerComment ? String(reviewerComment).trim() : null,
       reviewedAt: new Date(),
+    });
+
+    dispatchNotification(req.app, {
+      recipientId: permission.employeeId,
+      senderId: reviewerId ? String(reviewerId) : null,
+      senderName: reviewerName || 'Supervisor / HR',
+      companyName: permission.companyName,
+      category: 'attendance',
+      type: 'permission_reviewed',
+      title: `${permission.permissionType} ${newStatus}`,
+      message: `Your ${permission.permissionType} request for ${permission.date} was ${newStatus.toLowerCase()}${reviewerComment ? ': "' + reviewerComment.trim() + '"' : '.'}`,
+      severity: newStatus === 'Approved' ? 'success' : 'urgent',
+      target: 'Time & Attendance',
+      targetId: permission.id,
+      actionLabel: 'View Status',
     });
 
     return res.json({

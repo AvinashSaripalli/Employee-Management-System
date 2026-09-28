@@ -428,10 +428,36 @@ exports.updateUserDetails = async (req, res) => {
   const photo = req.file ? `/uploads/${req.file.filename}` : null;
 
   try {
+    const normalizedDob = dateOfBirth && /^\d{4}-\d{2}-\d{2}$/.test(String(dateOfBirth).trim())
+      ? String(dateOfBirth).trim()
+      : null;
+
+    let skillsFormatted = null;
+    if (Array.isArray(technicalSkills)) {
+      skillsFormatted = technicalSkills.filter(Boolean).join(', ');
+    } else if (typeof technicalSkills === 'string') {
+      skillsFormatted = technicalSkills.trim() || null;
+    }
+
     const values = {
-      firstName, lastName, companyName, role, gender, designation, email, phoneNumber,
-      department, bloodGroup, technicalSkills, dateOfBirth, jobLocation,
+      firstName: firstName ? String(firstName).trim() : undefined,
+      lastName: lastName !== undefined ? String(lastName).trim() : undefined,
+      companyName: companyName !== undefined ? String(companyName).trim() : undefined,
+      role: role !== undefined ? role : undefined,
+      gender: gender !== undefined ? gender : undefined,
+      designation: designation !== undefined ? String(designation).trim() : undefined,
+      email: email !== undefined ? String(email).trim() : undefined,
+      phoneNumber: phoneNumber !== undefined ? String(phoneNumber).trim() : undefined,
+      department: department !== undefined ? department : undefined,
+      bloodGroup: bloodGroup !== undefined ? bloodGroup : undefined,
+      technicalSkills: skillsFormatted,
+      dateOfBirth: normalizedDob,
+      jobLocation: jobLocation !== undefined ? jobLocation : undefined,
     };
+
+    // Remove undefined values
+    Object.keys(values).forEach((key) => values[key] === undefined && delete values[key]);
+
     if (photo) {
       values.photo = photo;
     }

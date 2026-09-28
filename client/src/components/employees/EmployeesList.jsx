@@ -397,7 +397,16 @@ const EmployeesList = ({ onClose }) => {
             )}
           </TableBody>
         </Table>
-        <ViewEmployeeDialog open={viewDialogOpen} onClose={handleViewDialogClose} user={viewUser} />
+        <ViewEmployeeDialog
+          open={viewDialogOpen}
+          onClose={handleViewDialogClose}
+          user={viewUser}
+          onEdit={(targetUser) => {
+            handleViewDialogClose();
+            setSelectedUser(targetUser);
+            setEditDialogOpen(true);
+          }}
+        />
       </TableContainer>
 
       {/* Row Context Menu */}

@@ -1,6 +1,7 @@
 const { Task, TaskChecklistItem, User, TaskActivity, TaskMember } = require("../models");
 const { Op } = require("sequelize");
 const { ensureCompanyMembership, DEFAULT_COMPANY } = require("../utils/companyMembership");
+const { dispatchNotification, notifyAdminsAndSupervisors } = require("../utils/notificationDispatcher");
 
 const STATUS = {
   NEW: 1,
@@ -538,6 +539,25 @@ exports.createTask = async (req, res) => {
     }
 
     const created = await Task.findByPk(task.id, { include: taskInclude(true) });
+
+    // Notify assignee if assigned to someone else
+    if (assigneeId && assigneeId !== creatorEmployeeId) {
+      dispatchNotification(req.app, {
+        recipientId: assigneeId,
+        senderId: creatorEmployeeId,
+        senderName: `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim() || 'Manager',
+        companyName,
+        category: 'task',
+        type: 'task_assigned',
+        title: `New Task Assigned: ${task.title}`,
+        message: `You were assigned to task "${task.title}". Priority: ${task.priority === 2 ? 'High' : 'Normal'}${task.deadline ? ', Due: ' + String(task.deadline).slice(0, 10) : ''}.`,
+        severity: 'action',
+        target: 'Tasks',
+        targetId: task.id,
+        actionLabel: 'View Task',
+      });
+    }
+
     res.status(201).json(formatTask(created));
   } catch (error) {
     console.error("Error creating task:", error);
@@ -777,6 +797,57 @@ exports.updateTaskStatus = async (req, res) => {
       task.id, employeeId, "status", "status",
       fmtStatus(current), fmtStatus(updates.status)
     );
+
+    // Notifications for status transitions
+    if (updates.status === STATUS.REVIEW && task.createdBy && task.createdBy !== employeeId) {
+      dispatchNotification(req.app, {
+        recipientId: task.createdBy,
+        senderId: employeeId,
+        senderName: `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim() || 'Assignee',
+        companyName: ctx.companyName,
+        category: 'task',
+        type: 'task_review',
+        title: `Task Submitted for Review: ${task.title}`,
+        message: `${ctx.user?.firstName || 'Assignee'} submitted "${task.title}" for your approval.`,
+        severity: 'action',
+        target: 'Tasks and Projects',
+        targetId: task.id,
+        actionLabel: 'Review Task',
+      });
+    } else if (updates.status === STATUS.COMPLETED) {
+      const targetRecipient = isCreator ? task.responsibleId : task.createdBy;
+      if (targetRecipient && targetRecipient !== employeeId) {
+        dispatchNotification(req.app, {
+          recipientId: targetRecipient,
+          senderId: employeeId,
+          senderName: `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim() || 'Team Member',
+          companyName: ctx.companyName,
+          category: 'task',
+          type: 'task_completed',
+          title: `Task Completed: ${task.title}`,
+          message: `Task "${task.title}" was marked as completed.`,
+          severity: 'success',
+          target: 'Tasks',
+          targetId: task.id,
+          actionLabel: 'View Task',
+        });
+      }
+    } else if (current === STATUS.REVIEW && updates.status === STATUS.PENDING && task.responsibleId && task.responsibleId !== employeeId) {
+      dispatchNotification(req.app, {
+        recipientId: task.responsibleId,
+        senderId: employeeId,
+        senderName: `${ctx.user?.firstName || ''} ${ctx.user?.lastName || ''}`.trim() || 'Reviewer',
+        companyName: ctx.companyName,
+        category: 'task',
+        type: 'task_returned',
+        title: `Task Returned for Revision: ${task.title}`,
+        message: `Task "${task.title}" was returned for revision.`,
+        severity: 'urgent',
+        target: 'Tasks',
+        targetId: task.id,
+        actionLabel: 'View Task',
+      });
+    }
     const updated = await Task.findByPk(task.id, { include: taskInclude(true) });
     res.json(formatTask(updated));
   } catch (error) {

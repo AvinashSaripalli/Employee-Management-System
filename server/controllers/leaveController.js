@@ -1,6 +1,7 @@
 const { Leave, User, Department, LeaveApprovalSetting } = require('../models');
 const { Op } = require('sequelize');
 const { ensureCompanyMembership, DEFAULT_COMPANY } = require('../utils/companyMembership');
+const { dispatchNotification, notifyAdminsAndSupervisors } = require('../utils/notificationDispatcher');
 const {
   TOTAL_ANNUAL_LEAVE_QUOTA,
   LEAVE_TYPES,
@@ -512,6 +513,23 @@ exports.leaveApply = async (req, res) => {
       companyName,
     });
 
+    // Notify Department Supervisors and Admins
+    notifyAdminsAndSupervisors(req.app, {
+      department: leave.department,
+      companyName,
+      excludeEmployeeId: employeeId,
+      senderId: employeeId,
+      senderName: leave.employee_name,
+      category: 'leave',
+      type: 'leave_applied',
+      title: `Leave Request from ${leave.employee_name}`,
+      message: `${leave.leave_type} requested for ${leave.days || 1} day(s) from ${leave.start_date} to ${leave.end_date}.`,
+      severity: 'action',
+      target: 'Manage Leaves',
+      targetId: leave.id,
+      actionLabel: 'Review Request',
+    });
+
     res.status(201).json({
       message: `Leave request submitted. Next step: ${stageLabel(approvalStage)}`,
       leave,
@@ -765,6 +783,22 @@ exports.updateLeaveStatus = async (req, res) => {
         reviewer_name: reviewer,
         reviewed_at: new Date(),
       });
+
+      dispatchNotification(req.app, {
+        recipientId: leave.employeeId,
+        senderId: employeeId,
+        senderName: reviewer,
+        companyName,
+        category: 'leave',
+        type: 'leave_rejected',
+        title: `Leave Request Rejected`,
+        message: `Your ${leave.leave_type} request for ${leave.start_date} was rejected. Reason: ${comment || 'No reason provided'}.`,
+        severity: 'urgent',
+        target: 'Manage Leaves',
+        targetId: leave.id,
+        actionLabel: 'View Status',
+      });
+
       return res.json({ message: 'Leave rejected successfully', leave });
     }
 
@@ -797,6 +831,23 @@ exports.updateLeaveStatus = async (req, res) => {
     }
 
     await leave.update(updates);
+
+    if (updates.status === 'Approved') {
+      dispatchNotification(req.app, {
+        recipientId: leave.employeeId,
+        senderId: employeeId,
+        senderName: reviewer,
+        companyName,
+        category: 'leave',
+        type: 'leave_approved',
+        title: `Leave Request Approved`,
+        message: `Your ${leave.leave_type} request for ${leave.start_date} to ${leave.end_date} has been approved.`,
+        severity: 'success',
+        target: 'Manage Leaves',
+        targetId: leave.id,
+        actionLabel: 'View Status',
+      });
+    }
 
     res.json({ message: `Leave advanced to ${stageLabel(updates.approval_stage)}`, leave });
   } catch (error) {

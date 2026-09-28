@@ -1,5 +1,6 @@
 const { Report, User, Attendance } = require("../models");
 const { Op } = require("sequelize");
+const { dispatchNotification, notifyAdminsAndSupervisors } = require("../utils/notificationDispatcher");
 
 const employeeInclude = {
   model: User,
@@ -297,6 +298,22 @@ exports.createReport = async (req, res) => {
       feedback: feedback || "Pending",
     });
 
+    notifyAdminsAndSupervisors(req.app, {
+      department: report.department,
+      companyName: effectiveCompany,
+      excludeEmployeeId: employeeId,
+      senderId: employeeId,
+      senderName: report.employeeName,
+      category: 'report',
+      type: 'report_submitted',
+      title: `Work Report: ${report.employeeName}`,
+      message: `${report.employeeName} logged ${report.hoursWorked}h on ${report.date}. Summary: ${report.taskName}`,
+      severity: 'info',
+      target: 'Work Reports',
+      targetId: report.id,
+      actionLabel: 'Review Report',
+    });
+
     res.status(201).json({ message: "Report added successfully", id: report.id });
   } catch (error) {
     console.error("Error creating report:", error);
@@ -306,24 +323,48 @@ exports.createReport = async (req, res) => {
 
 exports.updateReport = async (req, res) => {
   const { id } = req.params;
-  const { date, taskName, workDescription, hoursWorked, department, status } =
+  const { date, taskName, workDescription, hoursWorked, department, status, feedback } =
     req.body;
 
   try {
+    const existing = await Report.findByPk(id);
+
+    const updateFields = {
+      date,
+      taskName,
+      workDescription,
+      hoursWorked,
+      department,
+      status,
+    };
+    if (feedback !== undefined) {
+      updateFields.feedback = feedback;
+    }
+
     const result = await Report.update(
-      {
-        date,
-        taskName,
-        workDescription,
-        hoursWorked,
-        department,
-        status,
-      },
+      updateFields,
       { where: { id } }
     );
 
     if (result[0] === 0) {
       return res.status(404).json({ error: "Report not found" });
+    }
+
+    if (existing && feedback && feedback !== existing.feedback && existing.employeeId !== req.user?.employeeId) {
+      dispatchNotification(req.app, {
+        recipientId: existing.employeeId,
+        senderId: req.user?.employeeId,
+        senderName: `${req.user?.firstName || ''} ${req.user?.lastName || ''}`.trim() || 'Reviewer',
+        companyName: existing.companyName,
+        category: 'report',
+        type: 'report_feedback',
+        title: `Feedback on Work Report (${existing.date})`,
+        message: `Your supervisor/admin left feedback: "${feedback}"`,
+        severity: 'info',
+        target: 'Work Reports',
+        targetId: existing.id,
+        actionLabel: 'View Report',
+      });
     }
 
     res.status(200).json({ message: "Report updated successfully" });

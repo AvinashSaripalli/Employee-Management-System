@@ -12,8 +12,10 @@ import {
   HiOutlineChevronDoubleLeft, HiOutlineChevronDoubleRight, HiOutlineEnvelope, HiOutlineIdentification,
   HiOutlineShieldCheck, HiOutlineCheck, HiOutlineClock, HiOutlineArrowRight,
   HiOutlineChatBubbleLeftRight, HiOutlineDocumentText, HiOutlineSparkles, HiOutlineXMark,
+  HiOutlineTrash,
 } from 'react-icons/hi2';
 import axios from '../../api/axios';
+import { getSocket } from '../../utils/socket';
 
 const OPEN_WIDTH = 256;
 const CLOSED_WIDTH = 82;
@@ -91,7 +93,9 @@ const AppShell = ({
 
   const persistReadNotificationIds = (ids) => {
     setReadNotificationIds(ids);
-    localStorage.setItem(readNotificationsKey, JSON.stringify(ids.slice(-100)));
+    try {
+      localStorage.setItem(readNotificationsKey, JSON.stringify(ids.slice(-100)));
+    } catch {}
   };
 
   const fetchNotifications = async () => {
@@ -115,6 +119,11 @@ const AppShell = ({
       });
       if (res.data?.notifications) {
         setNotifications(res.data.notifications);
+        // Sync server-read notifications into read IDs
+        const serverReadIds = res.data.notifications.filter((n) => n.isRead).map((n) => n.id);
+        if (serverReadIds.length > 0) {
+          setReadNotificationIds((prev) => [...new Set([...prev, ...serverReadIds])]);
+        }
       }
     } catch (error) {
       console.error('Error loading notifications:', error);
@@ -123,10 +132,60 @@ const AppShell = ({
     }
   };
 
+  // Socket listener for instant notification delivery
   React.useEffect(() => {
     fetchNotifications();
     const interval = window.setInterval(fetchNotifications, 60000);
-    return () => window.clearInterval(interval);
+
+    const socket = getSocket();
+    const handleNewNotification = (notif) => {
+      if (!notif) return;
+      const formatted = {
+        id: `db-${notif.id}`,
+        dbId: notif.id,
+        isPersistent: true,
+        isRead: false,
+        category: notif.category,
+        badge: (notif.type || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        severity: notif.severity || 'info',
+        actorName: notif.senderName || 'System',
+        subtitle: notif.category ? notif.category.toUpperCase() : 'NOTIFICATION',
+        title: notif.title,
+        detail: notif.message,
+        createdAt: notif.createdAt || new Date(),
+        target: notif.target,
+        targetId: notif.targetId,
+        actionLabel: notif.actionLabel || 'View',
+      };
+
+      setNotifications((prev) => [formatted, ...prev.filter((n) => n.id !== formatted.id)]);
+
+      // Audio notification chime
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
+          gain.gain.setValueAtTime(0.08, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.25);
+        }
+      } catch {}
+    };
+
+    socket.on('notification:new', handleNewNotification);
+
+    return () => {
+      window.clearInterval(interval);
+      socket.off('notification:new', handleNewNotification);
+    };
   }, []);
 
   const unreadNotifications = notifications.filter((notification) => !readNotificationIds.includes(notification.id));
@@ -309,23 +368,96 @@ const AppShell = ({
     return `${Math.floor(hours / 24)}d ago`;
   };
 
-  const handleNotificationClick = (notification) => {
-    persistReadNotificationIds([...new Set([...readNotificationIds, notification.id])]);
-    setNotificationAnchor(null);
-    if (notification.target && onNavigate) onNavigate(notification.target);
+  const normalizeNavTarget = (target) => {
+    const role = (localStorage.getItem('userRole') || '').toLowerCase();
+    const isAdmin = role === 'admin' || role === 'hr';
+
+    if (!target) return null;
+    const lower = String(target).toLowerCase();
+
+    if (lower.includes('task')) {
+      return isAdmin ? 'Tasks and Projects' : 'Tasks';
+    }
+    if (lower.includes('report')) {
+      return isAdmin ? 'Reports' : 'Work Reports';
+    }
+    if (lower.includes('attendance') || lower.includes('shift') || lower.includes('permission')) {
+      return isAdmin ? 'Attendance' : 'Time & Attendance';
+    }
+    if (lower.includes('leave')) {
+      return 'Manage Leaves';
+    }
+    if (lower.includes('message') || lower.includes('messenger') || lower.includes('chat')) {
+      return 'Messenger';
+    }
+    return target;
   };
 
-  const toggleNotificationRead = (id, e) => {
-    e.stopPropagation();
-    if (readNotificationIds.includes(id)) {
-      persistReadNotificationIds(readNotificationIds.filter((item) => item !== id));
-    } else {
-      persistReadNotificationIds([...readNotificationIds, id]);
+  const handleNotificationClick = async (notification) => {
+    const next = [...new Set([...readNotificationIds, notification.id])];
+    persistReadNotificationIds(next);
+    setNotifications((prev) => prev.map((n) => n.id === notification.id ? { ...n, isRead: true } : n));
+    try {
+      await axios.patch(`/notifications/${notification.id}/read`);
+    } catch {}
+    setNotificationAnchor(null);
+
+    const target = normalizeNavTarget(notification.target);
+    if (target && onNavigate) onNavigate(target);
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    const allIds = notifications.map((n) => n.id);
+    persistReadNotificationIds(allIds);
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    try {
+      const empId = localStorage.getItem('userEmployeeId');
+      const companyName = localStorage.getItem('companyName');
+      await axios.patch('/notifications/read-all', { employeeId: empId, companyName });
+    } catch (e) {
+      console.error('Error marking all notifications as read:', e);
     }
   };
 
-  const clearReadNotifications = () => {
-    setNotifications((prev) => prev.filter((n) => !readNotificationIds.includes(n.id)));
+  const toggleNotificationRead = async (id, e) => {
+    e.stopPropagation();
+    const isCurrentlyRead = readNotificationIds.includes(id);
+    let next;
+    if (isCurrentlyRead) {
+      next = readNotificationIds.filter((item) => item !== id);
+      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: false } : n));
+    } else {
+      next = [...readNotificationIds, id];
+      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
+      try {
+        await axios.patch(`/notifications/${id}/read`);
+      } catch (err) {
+        console.error('Error marking notification as read:', err);
+      }
+    }
+    persistReadNotificationIds(next);
+  };
+
+  const dismissNotification = async (id, e) => {
+    if (e) e.stopPropagation();
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    persistReadNotificationIds(readNotificationIds.filter((item) => item !== id));
+    try {
+      await axios.delete(`/notifications/${id}`);
+    } catch (err) {
+      console.error('Error dismissing notification:', err);
+    }
+  };
+
+  const clearReadNotifications = async () => {
+    setNotifications((prev) => prev.filter((n) => !readNotificationIds.includes(n.id) && !n.isRead));
+    try {
+      const empId = localStorage.getItem('userEmployeeId');
+      const companyName = localStorage.getItem('companyName');
+      await axios.delete('/notifications/clear-all', { data: { employeeId: empId, companyName } });
+    } catch (err) {
+      console.error('Error clearing read notifications:', err);
+    }
   };
 
   const drawerWidth = open ? OPEN_WIDTH : CLOSED_WIDTH;
@@ -506,7 +638,7 @@ const AppShell = ({
             onClick={(event) => { setNotificationAnchor(event.currentTarget); fetchNotifications(); }}
             sx={{
               color: 'text.primary',
-              display: { xs: 'none', sm: 'inline-flex' },
+              display: 'inline-flex',
               transition: 'all 0.15s ease',
               '&:hover': { bgcolor: '#EEF2FF', color: '#14286D' },
             }}
@@ -599,7 +731,7 @@ const AppShell = ({
                   <Tooltip title="Mark all as read">
                     <IconButton
                       size="small"
-                      onClick={() => persistReadNotificationIds(notifications.map((n) => n.id))}
+                      onClick={markAllNotificationsAsRead}
                       sx={{
                         color: '#64748B',
                         p: 0.7,
@@ -608,6 +740,22 @@ const AppShell = ({
                       }}
                     >
                       <HiOutlineCheckCircle size={18} />
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {notifications.some((n) => n.isRead || readNotificationIds.includes(n.id)) && (
+                  <Tooltip title="Clear read notifications">
+                    <IconButton
+                      size="small"
+                      onClick={clearReadNotifications}
+                      sx={{
+                        color: '#64748B',
+                        p: 0.7,
+                        borderRadius: '8px',
+                        '&:hover': { color: '#EF4444', bgcolor: '#FEF2F2' },
+                      }}
+                    >
+                      <HiOutlineTrash size={17} />
                     </IconButton>
                   </Tooltip>
                 )}
@@ -838,9 +986,9 @@ const AppShell = ({
                           {item.detail}
                         </Typography>
 
-                        {/* Action Button Row */}
-                        {item.actionLabel && (
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1 }}>
+                        {/* Action & Tools Row */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: item.actionLabel ? 'space-between' : 'flex-end', mt: 1 }}>
+                          {item.actionLabel && (
                             <Box
                               component="button"
                               onClick={(e) => {
@@ -872,22 +1020,40 @@ const AppShell = ({
                               <span>{item.actionLabel}</span>
                               <HiOutlineArrowRight size={12} />
                             </Box>
+                          )}
 
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <Tooltip title={!isUnread ? 'Mark as unread' : 'Mark as read'}>
                               <IconButton
                                 size="small"
                                 onClick={(e) => toggleNotificationRead(item.id, e)}
                                 sx={{
-                                  p: 0.4,
+                                  p: 0.45,
                                   color: !isUnread ? '#CBD5E1' : '#94A3B8',
+                                  borderRadius: '6px',
                                   '&:hover': { color: '#14286D', bgcolor: '#EEF2FF' },
                                 }}
                               >
                                 <HiOutlineCheck size={14} />
                               </IconButton>
                             </Tooltip>
+
+                            <Tooltip title="Dismiss notification">
+                              <IconButton
+                                size="small"
+                                onClick={(e) => dismissNotification(item.id, e)}
+                                sx={{
+                                  p: 0.45,
+                                  color: '#94A3B8',
+                                  borderRadius: '6px',
+                                  '&:hover': { color: '#EF4444', bgcolor: '#FEF2F2' },
+                                }}
+                              >
+                                <HiOutlineTrash size={14} />
+                              </IconButton>
+                            </Tooltip>
                           </Box>
-                        )}
+                        </Box>
                       </Box>
                     </Box>
                   );
