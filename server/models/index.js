@@ -19,6 +19,9 @@ const CrmContact = require("./CrmContact");
 const CrmProduct = require("./CrmProduct");
 const CrmQuote = require("./CrmQuote");
 const AttendancePermission = require("./AttendancePermission");
+const AttendanceRegularization = require("./AttendanceRegularization");
+const Asset = require("./Asset");
+const Resignation = require("./Resignation");
 const Notification = require("./Notification");
 const AuditLog = require("./AuditLog");
 
@@ -174,6 +177,9 @@ module.exports = {
   CrmProduct,
   CrmQuote,
   AttendancePermission,
+  AttendanceRegularization,
+  Asset,
+  Resignation,
   Notification,
   AuditLog,
 };

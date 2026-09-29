@@ -10,7 +10,8 @@ import AddEmployeeDialog from './AddEmployeeDialog';
 import DeleteDialog from './DeleteDialog';
 import ViewEmployeeDialog from './ViewEmployeeDialog';
 import InviteEmployeesDialog from './InviteEmployeesDialog';
-import { FiSearch, FiPlus, FiTrash2, FiEye, FiEdit2, FiUser, FiMoreHorizontal, FiChevronUp, FiChevronDown, FiMail } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiTrash2, FiEye, FiEdit2, FiUser, FiMoreHorizontal, FiChevronUp, FiChevronDown, FiMail, FiDownload } from 'react-icons/fi';
+import { downloadCSV } from '../../utils/reportUtils';
 
 const EmployeesList = ({ onClose }) => {
   const [openAddUser, setOpenAddUser] = useState(false);
@@ -181,6 +182,51 @@ const EmployeesList = ({ onClose }) => {
     (user.employeeId || "").toLowerCase().includes(searchValue.toLowerCase())
   );
 
+  const handleExportCSV = () => {
+    const listToExport = selectedUsers.length > 0
+      ? users.filter((u) => selectedUsers.includes(u.id))
+      : filteredUsers;
+
+    if (!listToExport.length) {
+      setSnackbar({ open: true, message: 'No employee records to export.', severity: 'info' });
+      return;
+    }
+
+    const headers = [
+      'Employee ID',
+      'First Name',
+      'Last Name',
+      'Email',
+      'Department',
+      'Designation',
+      'Role',
+      'Mobile Number',
+      'Status',
+      'Company Name',
+    ];
+
+    const dataRows = listToExport.map((u) => [
+      u.employeeId || '',
+      u.firstName || '',
+      u.lastName || '',
+      u.email || '',
+      u.department || '',
+      u.designation || '',
+      u.role || '',
+      u.mobileNumber || '',
+      u.exists === 1 || u.exists === true ? 'Active' : 'Inactive',
+      u.companyName || '',
+    ]);
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    downloadCSV(`Employee_Directory_${dateStr}.csv`, [headers, ...dataRows]);
+    setSnackbar({
+      open: true,
+      message: `Exported ${listToExport.length} employee records to CSV`,
+      severity: 'success',
+    });
+  };
+
   const handleEditDialogClose = () => {
     setEditDialogOpen(false);
     setSelectedUser(null);
@@ -278,6 +324,21 @@ const EmployeesList = ({ onClose }) => {
                 Delete ({selectedUsers.length})
               </Button>
             )}
+            <Button
+              variant="outlined"
+              onClick={handleExportCSV}
+              startIcon={<FiDownload size={18} />}
+              sx={{
+                borderColor: '#DDE4FF',
+                color: '#14286D',
+                bgcolor: '#FFFFFF',
+                fontWeight: 600,
+                textTransform: 'none',
+                '&:hover': { bgcolor: '#EEF2FF', borderColor: '#14286D' },
+              }}
+            >
+              Export CSV
+            </Button>
             <Button
               variant="outlined"
               onClick={() => setOpenInviteDialog(true)}

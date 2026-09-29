@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AppBar, Toolbar, Box, Drawer, Typography, List, ListItem,
   ListItemButton, ListItemIcon, IconButton, Menu, MenuItem, Divider,
@@ -48,6 +48,7 @@ const AppShell = ({
   userPhoto = '',
   userName = 'User',
   userRole = '',
+  departmentRole: propDepartmentRole,
   userCompany = '',
   onLogout,
   onProfile,
@@ -78,7 +79,31 @@ const AppShell = ({
 
   const userEmail = localStorage.getItem('userEmail') || '';
   const employeeId = localStorage.getItem('userEmployeeId') || '';
-  const departmentRole = localStorage.getItem('departmentRole') || 'Member';
+  const [departmentRole, setDepartmentRole] = useState(
+    () => propDepartmentRole || localStorage.getItem('departmentRole') || 'Member'
+  );
+
+  useEffect(() => {
+    if (propDepartmentRole) {
+      setDepartmentRole(propDepartmentRole);
+      localStorage.setItem('departmentRole', propDepartmentRole);
+    }
+  }, [propDepartmentRole]);
+
+  useEffect(() => {
+    const syncProfile = async () => {
+      try {
+        const res = await axios.get('/users/me');
+        if (res.data?.departmentRole) {
+          setDepartmentRole(res.data.departmentRole);
+          localStorage.setItem('departmentRole', res.data.departmentRole);
+        }
+      } catch (err) {
+        console.error('AppShell profile sync failed:', err);
+      }
+    };
+    syncProfile();
+  }, []);
 
   const handleCopyEmail = async () => {
     if (!userEmail || !navigator.clipboard) return;

@@ -11,6 +11,8 @@ import {
   HiOutlineChatBubbleLeftRight,
   HiOutlineBriefcase,
   HiOutlineClock,
+  HiOutlineCube,
+  HiOutlineArrowRightOnRectangle,
 } from 'react-icons/hi2';
 import axios from '../../api/axios';
 import AppShell from './AppShell';
@@ -25,6 +27,8 @@ import Attendance from '../attendance/Attendance';
 import UserProfile from '../profile/UserProfile';
 import Messenger from '../messenger/Messenger';
 import Crm from '../crm/Crm';
+import AssetManagementHub from '../assets/AssetManagementHub';
+import OffboardingHub from '../offboarding/OffboardingHub';
 
 const sanitizePhoto = (val) => {
   if (!val || val === 'null' || val === 'undefined') return '';
@@ -40,12 +44,14 @@ const Sidebar = () => {
     `${localStorage.getItem('userFirstName') || ''} ${localStorage.getItem('userLastName') || ''}`.trim() || 'User'
   );
   const [companyName, setCompanyName] = useState(() => localStorage.getItem('companyName') || '');
+  const [deptRole, setDeptRole] = useState(() => localStorage.getItem('departmentRole') || 'Member');
 
   useEffect(() => {
     // 1. Initial sync from local storage
     const currentStoredPhoto = sanitizePhoto(localStorage.getItem('userPhoto'));
     setUserPhoto(currentStoredPhoto);
     setCompanyName(localStorage.getItem('companyName') || '');
+    setDeptRole(localStorage.getItem('departmentRole') || 'Member');
     setUserName(
       `${localStorage.getItem('userFirstName') || ''} ${localStorage.getItem('userLastName') || ''}`.trim() || 'User'
     );
@@ -68,6 +74,10 @@ const Sidebar = () => {
           if (u.companyName) {
             setCompanyName(u.companyName);
             localStorage.setItem('companyName', u.companyName);
+          }
+          if (u.departmentRole) {
+            setDeptRole(u.departmentRole);
+            localStorage.setItem('departmentRole', u.departmentRole);
           }
           setUserName(`${u.firstName || ''} ${u.lastName || ''}`.trim() || 'User');
         }
@@ -131,6 +141,10 @@ const Sidebar = () => {
       case 'Attendance': return <Attendance />;
       case 'Work Reports':
       case 'Reports': return <Reports />;
+      case 'Asset Management':
+      case 'Assets': return <AssetManagementHub />;
+      case 'Resignation & Offboarding':
+      case 'Offboarding': return <OffboardingHub />;
       default: return <UserProfile />;
     }
   };
@@ -178,6 +192,14 @@ const Sidebar = () => {
       text: 'Manage Leaves',
       icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves')} />,
     },
+    {
+      text: 'Asset Management',
+      icon: <HiOutlineCube {...iconStyle(selectedComponent === 'Asset Management' || selectedComponent === 'Assets')} />,
+    },
+    {
+      text: 'Resignation & Offboarding',
+      icon: <HiOutlineArrowRightOnRectangle {...iconStyle(selectedComponent === 'Resignation & Offboarding' || selectedComponent === 'Offboarding')} />,
+    },
   ];
 
   return (
@@ -188,6 +210,7 @@ const Sidebar = () => {
       userPhoto={userPhoto}
       userName={userName}
       userRole={localStorage.getItem('userRole') || 'Member'}
+      departmentRole={deptRole}
       userCompany={companyName}
       onLogout={handleLogout}
       onProfile={() => handleListItemOnClick('Profile')}

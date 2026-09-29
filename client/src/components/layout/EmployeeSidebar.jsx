@@ -29,6 +29,8 @@ import {
   HiOutlineStop,
   HiOutlineCheckCircle,
   HiOutlineArrowPath,
+  HiOutlineCube,
+  HiOutlineArrowRightOnRectangle,
 } from 'react-icons/hi2';
 import AppShell from './AppShell';
 import ManageLeaves from '../leaves/ManageLeaves';
@@ -42,6 +44,8 @@ import Attendance from '../attendance/Attendance';
 import Reports from '../reports/Reports';
 import WorkReportFormDialog from '../reports/WorkReportFormDialog';
 import ApplyPermissionDialog from '../attendance/ApplyPermissionDialog';
+import AssetManagementHub from '../assets/AssetManagementHub';
+import OffboardingHub from '../offboarding/OffboardingHub';
 import axios from '../../api/axios';
 
 const Sidebar = () => {
@@ -390,6 +394,12 @@ const Sidebar = () => {
       case 'Apply Leave':
       case 'My Leaves':
       case 'Manage Leaves': return <ManageLeaves initialTab={selectedComponent} />;
+      case 'Asset Management':
+      case 'Assets':
+      case 'My Assets': return <AssetManagementHub />;
+      case 'Resignation & Offboarding':
+      case 'Offboarding':
+      case 'Resignation': return <OffboardingHub />;
       case 'Profile': return <UserProfile />;
       default: return <ManageLeaves />;
     }
@@ -731,6 +741,14 @@ const Sidebar = () => {
           icon: <HiOutlineBriefcase {...iconStyle(selectedComponent === 'CRM')} />,
         },
         {
+          text: 'Asset Management',
+          icon: <HiOutlineCube {...iconStyle(selectedComponent === 'Asset Management' || selectedComponent === 'Assets' || selectedComponent === 'My Assets')} />,
+        },
+        {
+          text: 'Resignation & Offboarding',
+          icon: <HiOutlineArrowRightOnRectangle {...iconStyle(selectedComponent === 'Resignation & Offboarding' || selectedComponent === 'Offboarding' || selectedComponent === 'Resignation')} />,
+        },
+        {
           text: 'Profile',
           icon: <HiOutlineUserCircle {...iconStyle(selectedComponent === 'Profile')} />,
         },
@@ -761,6 +779,14 @@ const Sidebar = () => {
           icon: <HiOutlineCalendarDays {...iconStyle(selectedComponent === 'Manage Leaves' || selectedComponent === 'My Leaves' || selectedComponent === 'Apply Leave')} />,
         },
         {
+          text: 'Asset Management',
+          icon: <HiOutlineCube {...iconStyle(selectedComponent === 'Asset Management' || selectedComponent === 'Assets' || selectedComponent === 'My Assets')} />,
+        },
+        {
+          text: 'Resignation & Offboarding',
+          icon: <HiOutlineArrowRightOnRectangle {...iconStyle(selectedComponent === 'Resignation & Offboarding' || selectedComponent === 'Offboarding' || selectedComponent === 'Resignation')} />,
+        },
+        {
           text: 'CRM',
           icon: <HiOutlineBriefcase {...iconStyle(selectedComponent === 'CRM')} />,
         },
@@ -779,6 +805,7 @@ const Sidebar = () => {
         userPhoto={userPhoto}
         userName={userName}
         userRole={departmentRole === 'Supervisor' ? `Supervisor (${localStorage.getItem('userDepartment') || 'Dept'})` : (localStorage.getItem('userRole') || 'Employee')}
+        departmentRole={departmentRole}
         userCompany={localStorage.getItem('companyName') || 'Not assigned'}
         onLogout={handleLogout}
         onProfile={() => handleListItemOnClick('Profile')}

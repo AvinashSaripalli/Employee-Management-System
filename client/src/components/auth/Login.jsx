@@ -36,6 +36,7 @@ function Login() {
 
         localStorage.setItem("token", token);
         localStorage.setItem("userRole", role);
+        localStorage.setItem("departmentRole", departmentRole || "Member");
         if (photo && photo !== 'null' && photo !== 'undefined') {
           localStorage.setItem("userPhoto", photo);
         } else {

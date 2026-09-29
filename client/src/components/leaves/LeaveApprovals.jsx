@@ -17,10 +17,12 @@ import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
+import DownloadIcon from '@mui/icons-material/Download';
 import axios from '../../api/axios';
 import dayjs from 'dayjs';
 import { FiSearch } from 'react-icons/fi';
 import { durationLabel, formatLeaveDate, LEAVE_TYPE_META, statusColor, leaveIdentityParams } from '../../utils/leaveConfig';
+import { downloadCSV } from '../../utils/reportUtils';
 import ApplyLeaveDialog from './ApplyLeaveDialog';
 
 const stageLabel = (stage) => {
@@ -311,6 +313,55 @@ const LeaveApprovals = ({ onOpenApplyLeave }) => {
     }
   };
 
+  const handleExportCSV = () => {
+    if (!visibleLeaves || visibleLeaves.length === 0) {
+      setSnackbar({ open: true, message: 'No leave records to export for this view.', severity: 'info' });
+      return;
+    }
+
+    const headers = [
+      'Leave ID',
+      'Employee ID',
+      'Employee Name',
+      'Department',
+      'Leave Type',
+      'Start Date',
+      'End Date',
+      'Duration',
+      'Reason',
+      'Status',
+      'Approval Stage',
+      'Reviewer',
+      'Reviewer Comment',
+      'Applied Date',
+    ];
+
+    const dataRows = visibleLeaves.map((l) => [
+      l.id || '',
+      l.employeeId || l.employee?.employeeId || '',
+      employeeName(l),
+      l.department || l.employee?.department || '',
+      l.leave_type || '',
+      l.start_date || '',
+      l.end_date || '',
+      l.days_count ? `${l.days_count} day(s)` : (l.duration ? `${l.duration} day(s)` : '1 day'),
+      l.reason || '',
+      l.status || '',
+      stageLabel(l.approval_stage),
+      l.reviewer_name || l.supervisor_name || '',
+      l.review_comment || l.supervisor_comment || '',
+      l.createdAt ? dayjs(l.createdAt).format('YYYY-MM-DD') : '',
+    ]);
+
+    const dateStr = dayjs().format('YYYY-MM-DD');
+    downloadCSV(`Leave_Records_${tab}_${dateStr}.csv`, [headers, ...dataRows]);
+    setSnackbar({
+      open: true,
+      message: `Exported ${visibleLeaves.length} leave records to CSV`,
+      severity: 'success',
+    });
+  };
+
   const typeOptions = ['All', ...Object.keys(policies.types || {})];
 
   return (
@@ -364,6 +415,27 @@ const LeaveApprovals = ({ onOpenApplyLeave }) => {
               }}
             >
               Apply Leave
+            </Button>
+
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon sx={{ fontSize: 18 }} />}
+              onClick={handleExportCSV}
+              sx={{
+                borderRadius: '8px',
+                borderColor: '#DDE4FF',
+                color: '#14286D',
+                bgcolor: '#ffffff',
+                fontWeight: 700,
+                fontSize: '13px',
+                textTransform: 'none',
+                height: 35,
+                px: 1.8,
+                boxShadow: '0 1px 3px rgba(20, 40, 109, 0.05)',
+                '&:hover': { bgcolor: '#EEF2FF', borderColor: '#14286D' },
+              }}
+            >
+              Export CSV
             </Button>
 
             {isAdmin && (
