@@ -24,9 +24,11 @@ import ViewListIcon from '@mui/icons-material/ViewList';
 import CloseIcon from '@mui/icons-material/Close';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import EventBusyIcon from '@mui/icons-material/EventBusy';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import dayjs from 'dayjs';
 import { downloadCSV, formatHours, formatDate } from '../../utils/reportUtils';
 import AttendancePermissionsHub from './AttendancePermissionsHub';
+import ShiftRosterHub from './ShiftRosterHub';
 
 const Attendance = () => {
   const [attendances, setAttendances] = useState([]);
@@ -550,6 +552,10 @@ const Attendance = () => {
               <AccessTimeIcon sx={{ fontSize: 16, mr: 0.5, color: viewMode === 'permissions' ? '#ffffff' : '#4F46E5' }} />
               Permissions & Regularization
             </ToggleButton>
+            <ToggleButton value="roster" sx={{ textTransform: 'none', fontWeight: 600, fontSize: '12px', px: 1.2 }}>
+              <CalendarMonthIcon sx={{ fontSize: 16, mr: 0.5, color: viewMode === 'roster' ? '#ffffff' : '#059669' }} />
+              Shift & Roster Planner
+            </ToggleButton>
           </ToggleButtonGroup>
 
           <Button
@@ -749,6 +755,16 @@ const Attendance = () => {
         {viewMode === 'permissions' ? (
           <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
             <AttendancePermissionsHub
+              isAdmin={isAdmin}
+              isSupervisor={isSupervisor}
+              isEmployee={isEmployee}
+              userDepartment={userDepartment}
+              userEmployeeId={userEmployeeId}
+            />
+          </Box>
+        ) : viewMode === 'roster' ? (
+          <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
+            <ShiftRosterHub
               isAdmin={isAdmin}
               isSupervisor={isSupervisor}
               isEmployee={isEmployee}

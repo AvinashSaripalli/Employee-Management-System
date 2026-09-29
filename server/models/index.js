@@ -22,6 +22,8 @@ const AttendancePermission = require("./AttendancePermission");
 const AttendanceRegularization = require("./AttendanceRegularization");
 const Asset = require("./Asset");
 const Resignation = require("./Resignation");
+const Shift = require("./Shift");
+const ShiftSchedule = require("./ShiftSchedule");
 const Notification = require("./Notification");
 const AuditLog = require("./AuditLog");
 
@@ -155,6 +157,17 @@ User.hasMany(Report, {
   constraints: false,
 });
 
+ShiftSchedule.belongsTo(Shift, {
+  foreignKey: "shiftId",
+  as: "shift",
+  constraints: false,
+});
+Shift.hasMany(ShiftSchedule, {
+  foreignKey: "shiftId",
+  as: "schedules",
+  constraints: false,
+});
+
 module.exports = {
   sequelize,
   User,
@@ -180,6 +193,8 @@ module.exports = {
   AttendanceRegularization,
   Asset,
   Resignation,
+  Shift,
+  ShiftSchedule,
   Notification,
   AuditLog,
 };
