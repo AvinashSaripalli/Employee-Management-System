@@ -130,6 +130,39 @@ const AppShell = ({
     } catch {}
   };
 
+  const [badgeCounts, setBadgeCounts] = useState({
+    leaves: 0,
+    attendance: 0,
+    offboarding: 0,
+    tasks: 0,
+  });
+
+  const fetchBadgeCounts = async () => {
+    const empId = localStorage.getItem('userEmployeeId') || localStorage.getItem('employeeId') || localStorage.getItem('userId');
+    const companyName = localStorage.getItem('companyName');
+    const role = localStorage.getItem('userRole');
+    const department = localStorage.getItem('userDepartment');
+    const deptRole = localStorage.getItem('departmentRole') || 'Member';
+    if (!companyName) return;
+
+    try {
+      const res = await axios.get('/notifications/badge-counts', {
+        params: {
+          employeeId: empId,
+          companyName,
+          role,
+          department,
+          departmentRole: deptRole,
+        },
+      });
+      if (res.data) {
+        setBadgeCounts(res.data);
+      }
+    } catch (err) {
+      console.error('Error loading badge counts in AppShell:', err);
+    }
+  };
+
   const fetchNotifications = async () => {
     const empId = localStorage.getItem('userEmployeeId') || localStorage.getItem('employeeId') || localStorage.getItem('userId');
     const companyName = localStorage.getItem('companyName');
@@ -164,14 +197,22 @@ const AppShell = ({
     }
   };
 
-  // Socket listener for instant notification delivery
+  // Socket listener & periodic sync for notifications and badge counts
   React.useEffect(() => {
     fetchNotifications();
-    const interval = window.setInterval(fetchNotifications, 60000);
+    fetchBadgeCounts();
+    const notifInterval = window.setInterval(fetchNotifications, 60000);
+    const badgeInterval = window.setInterval(fetchBadgeCounts, 25000);
+
+    const handleCountsUpdate = () => {
+      fetchBadgeCounts();
+    };
+    window.addEventListener('requestCountsUpdated', handleCountsUpdate);
 
     const socket = getSocket();
     const handleNewNotification = (notif) => {
       if (!notif) return;
+      fetchBadgeCounts();
       const formatted = {
         id: `db-${notif.id}`,
         dbId: notif.id,
@@ -215,7 +256,9 @@ const AppShell = ({
     socket.on('notification:new', handleNewNotification);
 
     return () => {
-      window.clearInterval(interval);
+      window.clearInterval(notifInterval);
+      window.clearInterval(badgeInterval);
+      window.removeEventListener('requestCountsUpdated', handleCountsUpdate);
       socket.off('notification:new', handleNewNotification);
     };
   }, []);
@@ -540,6 +583,20 @@ const AppShell = ({
         <List sx={{ px: open ? 1.2 : 0, pt: 1.5 }}>
           {navItems.map((item) => {
             const isActive = active === item.text;
+            let badgeValue = item.badge;
+            if (badgeValue === undefined || badgeValue === null) {
+              const lower = (item.text || '').toLowerCase();
+              if (lower.includes('leave')) {
+                badgeValue = badgeCounts.leaves;
+              } else if (lower.includes('attendance') || lower.includes('work time')) {
+                badgeValue = badgeCounts.attendance;
+              } else if (lower.includes('offboarding') || lower.includes('resignation')) {
+                badgeValue = badgeCounts.offboarding;
+              } else if (lower.includes('task')) {
+                badgeValue = badgeCounts.tasks;
+              }
+            }
+
             return (
               <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
                 <ListItemButton
@@ -577,22 +634,71 @@ const AppShell = ({
                       justifyContent: 'center',
                     }}
                   >
-                    {item.icon}
+                    {!open && badgeValue > 0 ? (
+                      <Badge
+                        badgeContent={badgeValue > 99 ? '99+' : badgeValue}
+                        color="error"
+                        sx={{
+                          '& .MuiBadge-badge': {
+                            fontSize: '9.5px',
+                            height: 16,
+                            minWidth: 16,
+                            px: 0.4,
+                            fontWeight: 800,
+                            right: -7,
+                            top: -2,
+                          },
+                        }}
+                      >
+                        {item.icon}
+                      </Badge>
+                    ) : (
+                      item.icon
+                    )}
                   </ListItemIcon>
                   <Box
                     sx={{
                       opacity: open ? 1 : 0,
-                      width: open ? 'auto' : 0,
+                      width: open ? '100%' : 0,
+                      display: open ? 'flex' : 'none',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                       overflow: 'hidden',
                       transition: 'opacity 200ms',
                       zIndex: 1,
-                      color: isActive ? '#FFFFFF' : '#344067',
-                      fontWeight: isActive ? 700 : 600,
-                      fontSize: '0.9rem',
-                      whiteSpace: 'nowrap',
+                      pr: 0.5,
                     }}
                   >
-                    {item.text}
+                    <Typography
+                      sx={{
+                        color: isActive ? '#FFFFFF' : '#344067',
+                        fontWeight: isActive ? 700 : 600,
+                        fontSize: '0.9rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {item.text}
+                    </Typography>
+                    {badgeValue > 0 && (
+                      <Chip
+                        size="small"
+                        label={badgeValue > 99 ? '99+' : badgeValue}
+                        sx={{
+                          height: 20,
+                          minWidth: 20,
+                          px: 0.6,
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          bgcolor: isActive ? 'rgba(255, 255, 255, 0.28)' : '#EF4444',
+                          color: '#FFFFFF',
+                          ml: 1,
+                          borderRadius: '10px',
+                          boxShadow: isActive ? 'none' : '0 1px 4px rgba(239, 68, 68, 0.35)',
+                        }}
+                      />
+                    )}
                   </Box>
                 </ListItemButton>
               </ListItem>

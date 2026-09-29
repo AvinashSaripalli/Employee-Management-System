@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Tabs, Tab, Paper } from '@mui/material';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Box, Tabs, Tab, Paper, Chip } from '@mui/material';
 import LeaveApprovals from './LeaveApprovals';
 import MyLeaves from './MyLeaves';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import DateRangeIcon from '@mui/icons-material/DateRange';
+import axios from '../../api/axios';
+import { leaveIdentityParams } from '../../utils/leaveConfig';
 
 const ManageLeaves = ({ initialTab }) => {
   const userRole = String(localStorage.getItem('userRole') || '').toLowerCase();
@@ -17,6 +19,25 @@ const ManageLeaves = ({ initialTab }) => {
   };
 
   const [activeTab, setActiveTab] = useState(() => computeActiveTab(initialTab));
+  const [pendingLeavesCount, setPendingLeavesCount] = useState(0);
+
+  const fetchCounts = useCallback(async () => {
+    if (!canReview) return;
+    try {
+      const res = await axios.get('/leaves/leave-counts', { params: leaveIdentityParams() });
+      if (res.data?.pending !== undefined) {
+        setPendingLeavesCount(res.data.pending);
+      }
+    } catch (err) {
+      console.error('Failed to load leave counts in ManageLeaves:', err);
+    }
+  }, [canReview]);
+
+  useEffect(() => {
+    fetchCounts();
+    window.addEventListener('requestCountsUpdated', fetchCounts);
+    return () => window.removeEventListener('requestCountsUpdated', fetchCounts);
+  }, [fetchCounts]);
 
   useEffect(() => {
     if (initialTab) {
@@ -68,7 +89,27 @@ const ManageLeaves = ({ initialTab }) => {
               <Tab
                 icon={<CheckCircleOutlineIcon sx={{ fontSize: 18 }} />}
                 iconPosition="start"
-                label="Leave Approvals & Records"
+                label={
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <span>Leave Approvals & Records</span>
+                    {pendingLeavesCount > 0 && (
+                      <Chip
+                        label={pendingLeavesCount}
+                        size="small"
+                        sx={{
+                          height: 20,
+                          minWidth: 20,
+                          px: 0.6,
+                          fontSize: '11px',
+                          fontWeight: 800,
+                          bgcolor: activeTab === 0 ? '#14286D' : '#EF4444',
+                          color: '#FFFFFF',
+                          borderRadius: '10px',
+                        }}
+                      />
+                    )}
+                  </Box>
+                }
               />
               <Tab
                 icon={<DateRangeIcon sx={{ fontSize: 18 }} />}

@@ -302,6 +302,7 @@ const LeaveApprovals = ({ onOpenApplyLeave }) => {
       });
       setReview(null);
       await fetchLeaves();
+      window.dispatchEvent(new CustomEvent('requestCountsUpdated'));
     } catch (error) {
       setSnackbar({
         open: true,

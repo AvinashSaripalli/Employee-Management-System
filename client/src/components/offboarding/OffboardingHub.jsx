@@ -73,6 +73,14 @@ const OffboardingHub = () => {
   // Filter
   const [statusFilter, setStatusFilter] = useState('ALL');
 
+  const filteredResignations = React.useMemo(() => {
+    if (statusFilter === 'ALL') return resignations;
+    if (statusFilter === 'PENDING') return resignations.filter((r) => ['Submitted', 'Under Review'].includes(r.status));
+    if (statusFilter === 'CLEARANCE') return resignations.filter((r) => ['Approved', 'Clearance in Progress'].includes(r.status));
+    if (statusFilter === 'COMPLETED') return resignations.filter((r) => r.status === 'Completed');
+    return resignations;
+  }, [resignations, statusFilter]);
+
   // Dialogs
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [managerReviewDialogOpen, setManagerReviewDialogOpen] = useState(false);
@@ -204,6 +212,7 @@ const OffboardingHub = () => {
       setSelectedRecord(null);
       fetchResignations();
       fetchMyResignation();
+      window.dispatchEvent(new CustomEvent('requestCountsUpdated'));
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to process manager review.');
     }
@@ -219,6 +228,7 @@ const OffboardingHub = () => {
       setSelectedRecord(null);
       fetchResignations();
       fetchMyResignation();
+      window.dispatchEvent(new CustomEvent('requestCountsUpdated'));
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to process HR review.');
     }
@@ -237,6 +247,7 @@ const OffboardingHub = () => {
       setSelectedRecord(res.data.resignation);
       fetchResignations();
       fetchMyResignation();
+      window.dispatchEvent(new CustomEvent('requestCountsUpdated'));
       alert(`Clearance updated for ${clearanceType.toUpperCase()}.`);
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to update clearance.');
@@ -326,7 +337,46 @@ const OffboardingHub = () => {
         }}
       >
         <Tab label="My Resignation & Clearance" />
-        {isPrivileged && <Tab label={`Offboarding Queue (${resignations.length})`} />}
+        {isPrivileged && (
+          <Tab
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <span>Offboarding Queue</span>
+                {metrics.pendingApproval > 0 ? (
+                  <Chip
+                    label={metrics.pendingApproval}
+                    size="small"
+                    sx={{
+                      height: 20,
+                      minWidth: 20,
+                      px: 0.6,
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      bgcolor: tabValue === 1 ? '#14286D' : '#EF4444',
+                      color: '#FFFFFF',
+                      borderRadius: '10px',
+                    }}
+                  />
+                ) : (
+                  <Chip
+                    label={resignations.length}
+                    size="small"
+                    sx={{
+                      height: 20,
+                      minWidth: 20,
+                      px: 0.6,
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      bgcolor: '#F1F5F9',
+                      color: '#475569',
+                      borderRadius: '10px',
+                    }}
+                  />
+                )}
+              </Box>
+            }
+          />
+        )}
       </Tabs>
 
       {/* TAB 0: Employee Self-Service */}
@@ -586,6 +636,43 @@ const OffboardingHub = () => {
             </Card>
           </Box>
 
+          {/* Status Filter Pills with Counts */}
+          <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {[
+              { key: 'ALL', label: `All (${metrics.total})` },
+              { key: 'PENDING', label: `Pending Approval (${metrics.pendingApproval})` },
+              { key: 'CLEARANCE', label: `Clearance In Progress (${metrics.clearanceInProgress})` },
+              { key: 'COMPLETED', label: `Completed (${metrics.completed})` },
+            ].map((pill) => {
+              const active = statusFilter === pill.key;
+              return (
+                <Button
+                  key={pill.key}
+                  size="small"
+                  onClick={() => setStatusFilter(pill.key)}
+                  sx={{
+                    borderRadius: '20px',
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    px: 1.6,
+                    py: 0.4,
+                    bgcolor: active ? '#14286D' : '#FFFFFF',
+                    color: active ? '#FFFFFF' : '#475569',
+                    border: '1px solid',
+                    borderColor: active ? '#14286D' : '#CBD5E1',
+                    boxShadow: active ? '0 1px 3px rgba(20, 40, 109, 0.2)' : 'none',
+                    '&:hover': {
+                      bgcolor: active ? '#0F1F58' : '#F1F5F9',
+                    },
+                  }}
+                >
+                  {pill.label}
+                </Button>
+              );
+            })}
+          </Box>
+
           {/* Table */}
           <Paper sx={{ borderRadius: '16px', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
             <TableContainer>
@@ -608,14 +695,14 @@ const OffboardingHub = () => {
                         <CircularProgress size={30} />
                       </TableCell>
                     </TableRow>
-                  ) : resignations.length === 0 ? (
+                  ) : filteredResignations.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} align="center" sx={{ py: 6, color: '#94a3b8' }}>
-                        No resignation records found in queue.
+                        No resignation records found in this view.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    resignations.map((r) => (
+                    filteredResignations.map((r) => (
                       <TableRow key={r.id} hover>
                         <TableCell>
                           <Typography sx={{ fontWeight: 700, fontSize: '13px', color: '#0f172a' }}>

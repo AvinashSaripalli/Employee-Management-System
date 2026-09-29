@@ -61,6 +61,31 @@ const Attendance = () => {
   const isSupervisor = !isAdmin && (departmentRole === 'Supervisor' || userRole === 'Manager');
   const isEmployee = !isAdmin && !isSupervisor;
 
+  const [pendingAttendanceCount, setPendingAttendanceCount] = useState(0);
+
+  const fetchAttendanceBadgeCount = useCallback(async () => {
+    try {
+      const res = await axios.get('/notifications/badge-counts', {
+        params: {
+          employeeId: userEmployeeId,
+          companyName: localStorage.getItem('companyName'),
+          role: userRole,
+          department: userDepartment,
+          departmentRole,
+        },
+      });
+      if (res.data?.attendance !== undefined) {
+        setPendingAttendanceCount(res.data.attendance);
+      }
+    } catch (_) {}
+  }, [userEmployeeId, userRole, userDepartment, departmentRole]);
+
+  useEffect(() => {
+    fetchAttendanceBadgeCount();
+    window.addEventListener('requestCountsUpdated', fetchAttendanceBadgeCount);
+    return () => window.removeEventListener('requestCountsUpdated', fetchAttendanceBadgeCount);
+  }, [fetchAttendanceBadgeCount]);
+
   const storedCompany = localStorage.getItem('companyName');
   const companyName =
     !storedCompany || storedCompany === 'null' || storedCompany === 'undefined'
@@ -551,6 +576,23 @@ const Attendance = () => {
             <ToggleButton value="permissions" sx={{ textTransform: 'none', fontWeight: 600, fontSize: '12px', px: 1.2 }}>
               <AccessTimeIcon sx={{ fontSize: 16, mr: 0.5, color: viewMode === 'permissions' ? '#ffffff' : '#4F46E5' }} />
               Permissions & Regularization
+              {pendingAttendanceCount > 0 && (
+                <Chip
+                  label={pendingAttendanceCount}
+                  size="small"
+                  sx={{
+                    ml: 0.8,
+                    height: 18,
+                    minWidth: 18,
+                    px: 0.4,
+                    fontSize: '10.5px',
+                    fontWeight: 800,
+                    bgcolor: viewMode === 'permissions' ? 'rgba(255, 255, 255, 0.28)' : '#EF4444',
+                    color: '#ffffff',
+                    borderRadius: '9px',
+                  }}
+                />
+              )}
             </ToggleButton>
             <ToggleButton value="roster" sx={{ textTransform: 'none', fontWeight: 600, fontSize: '12px', px: 1.2 }}>
               <CalendarMonthIcon sx={{ fontSize: 16, mr: 0.5, color: viewMode === 'roster' ? '#ffffff' : '#059669' }} />

@@ -205,6 +205,7 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
       });
       setReviewModalOpen(false);
       refreshAll();
+      window.dispatchEvent(new CustomEvent('requestCountsUpdated'));
     } catch (err) {
       console.error('Error reviewing request:', err);
       const errMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to review request';
@@ -424,6 +425,18 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
   const totalPendingReviews =
     permissionApprovals.filter((a) => a.status === 'Pending').length +
     regularizationApprovals.filter((a) => a.status === 'Pending').length;
+
+  const approvalCounts = React.useMemo(() => {
+    let p = 0, a = 0, r = 0;
+    const all = [...permissionApprovals, ...regularizationApprovals];
+    all.forEach((item) => {
+      const st = item.status;
+      if (st === 'Pending') p++;
+      else if (st === 'Approved') a++;
+      else if (st === 'Rejected') r++;
+    });
+    return { pending: p, approved: a, rejected: r, total: all.length };
+  }, [permissionApprovals, regularizationApprovals]);
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -1132,6 +1145,54 @@ const AttendancePermissionsHub = ({ isAdmin, isSupervisor, isEmployee, userDepar
                 }}
               />
             </Box>
+          </Box>
+
+          {/* Quick Status Filter Pills with Counts */}
+          <Box
+            sx={{
+              px: 2,
+              py: 1.2,
+              bgcolor: '#F8FAFC',
+              borderBottom: '1px solid #E2E8F0',
+              display: 'flex',
+              gap: 1,
+              flexWrap: 'wrap',
+              alignItems: 'center',
+            }}
+          >
+            {[
+              { key: 'Pending', label: `Pending (${approvalCounts.pending})` },
+              { key: 'Approved', label: `Approved (${approvalCounts.approved})` },
+              { key: 'Rejected', label: `Rejected (${approvalCounts.rejected})` },
+              { key: 'all', label: `All (${approvalCounts.total})` },
+            ].map((pill) => {
+              const active = statusFilter === pill.key;
+              return (
+                <Button
+                  key={pill.key}
+                  size="small"
+                  onClick={() => setStatusFilter(pill.key)}
+                  sx={{
+                    borderRadius: '20px',
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    fontSize: '12px',
+                    px: 1.5,
+                    py: 0.35,
+                    bgcolor: active ? '#14286D' : '#FFFFFF',
+                    color: active ? '#FFFFFF' : '#475569',
+                    border: '1px solid',
+                    borderColor: active ? '#14286D' : '#CBD5E1',
+                    boxShadow: active ? '0 1px 3px rgba(20, 40, 109, 0.2)' : 'none',
+                    '&:hover': {
+                      bgcolor: active ? '#0F1F58' : '#F1F5F9',
+                    },
+                  }}
+                >
+                  {pill.label}
+                </Button>
+              );
+            })}
           </Box>
 
           {loading ? (

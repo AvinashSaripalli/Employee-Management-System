@@ -1,4 +1,4 @@
-const { Task, Leave, Report, Attendance, Message, User, AttendancePermission, Notification } = require('../models');
+const { Task, Leave, Report, Attendance, Message, User, AttendancePermission, AttendanceRegularization, Resignation, Notification } = require('../models');
 const { Op } = require('sequelize');
 
 /**
@@ -384,6 +384,150 @@ exports.clearAllNotifications = async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Error clearing notifications:', err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * Get unified real-time request counts for sidebar badges and tabs
+ */
+exports.getBadgeCounts = async (req, res) => {
+  const employeeId = req.query.employeeId || req.user?.employeeId;
+  const companyName = req.query.companyName || req.user?.companyName;
+  const role = req.query.role || req.user?.role;
+  const department = req.query.department || req.user?.department;
+  const departmentRole = req.query.departmentRole || req.user?.departmentRole;
+
+  const rawCompany = String(companyName || '').trim();
+  const effectiveCompany =
+    !rawCompany || rawCompany === 'null' || rawCompany === 'undefined'
+      ? 'KN Advisors'
+      : rawCompany;
+
+  const normalizedRole = String(role || '').toLowerCase();
+  const isAdmin = normalizedRole === 'admin' || normalizedRole === 'hr';
+  const isSupervisor = !isAdmin && (departmentRole === 'Supervisor' || normalizedRole === 'manager');
+
+  try {
+    let pendingLeaves = 0;
+    let pendingRegularizations = 0;
+    let pendingPermissions = 0;
+    let pendingResignations = 0;
+    let pendingTasks = 0;
+
+    // 1. LEAVES
+    if (isAdmin) {
+      pendingLeaves = await Leave.count({
+        where: {
+          companyName: { [Op.iLike]: effectiveCompany },
+          status: { [Op.iLike]: 'Pending' },
+        },
+      });
+    } else if (isSupervisor && department) {
+      pendingLeaves = await Leave.count({
+        where: {
+          companyName: { [Op.iLike]: effectiveCompany },
+          status: { [Op.iLike]: 'Pending' },
+          department: { [Op.iLike]: String(department).trim() },
+        },
+      });
+    } else if (employeeId) {
+      pendingLeaves = await Leave.count({
+        where: {
+          employeeId,
+          companyName: { [Op.iLike]: effectiveCompany },
+          status: { [Op.iLike]: 'Pending' },
+        },
+      });
+    }
+
+    // 2. ATTENDANCE (Regularizations + Short Permissions)
+    if (isAdmin) {
+      pendingRegularizations = await AttendanceRegularization.count({
+        where: {
+          companyName: { [Op.iLike]: effectiveCompany },
+          status: 'Pending',
+        },
+      });
+      pendingPermissions = await AttendancePermission.count({
+        where: {
+          companyName: { [Op.iLike]: effectiveCompany },
+          status: 'Pending',
+        },
+      });
+    } else if (isSupervisor && department) {
+      pendingRegularizations = await AttendanceRegularization.count({
+        where: {
+          companyName: { [Op.iLike]: effectiveCompany },
+          department: { [Op.iLike]: String(department).trim() },
+          status: 'Pending',
+        },
+      });
+      pendingPermissions = await AttendancePermission.count({
+        where: {
+          companyName: { [Op.iLike]: effectiveCompany },
+          department: { [Op.iLike]: String(department).trim() },
+          status: 'Pending',
+        },
+      });
+    } else if (employeeId) {
+      pendingRegularizations = await AttendanceRegularization.count({
+        where: {
+          employeeId,
+          companyName: { [Op.iLike]: effectiveCompany },
+          status: 'Pending',
+        },
+      });
+      pendingPermissions = await AttendancePermission.count({
+        where: {
+          employeeId,
+          companyName: { [Op.iLike]: effectiveCompany },
+          status: 'Pending',
+        },
+      });
+    }
+
+    // 3. RESIGNATIONS / OFFBOARDING
+    if (isAdmin || isSupervisor) {
+      pendingResignations = await Resignation.count({
+        where: {
+          companyName: { [Op.iLike]: effectiveCompany },
+          status: { [Op.in]: ['Submitted', 'Under Review', 'Approved'] },
+        },
+      });
+    } else if (employeeId) {
+      pendingResignations = await Resignation.count({
+        where: {
+          employeeId,
+          companyName: { [Op.iLike]: effectiveCompany },
+          status: { [Op.in]: ['Submitted', 'Under Review', 'Approved'] },
+        },
+      });
+    }
+
+    // 4. TASKS
+    if (employeeId) {
+      pendingTasks = await Task.count({
+        where: {
+          companyName: { [Op.iLike]: effectiveCompany },
+          responsibleId: employeeId,
+          status: { [Op.in]: [1, 2, 3, 4] },
+        },
+      });
+    }
+
+    res.json({
+      leaves: pendingLeaves,
+      attendance: pendingRegularizations + pendingPermissions,
+      attendanceBreakdown: {
+        regularizations: pendingRegularizations,
+        permissions: pendingPermissions,
+      },
+      offboarding: pendingResignations,
+      tasks: pendingTasks,
+    });
+  } catch (err) {
+    console.error('Error fetching badge counts:', err);
     res.status(500).json({ error: err.message });
   }
 };
