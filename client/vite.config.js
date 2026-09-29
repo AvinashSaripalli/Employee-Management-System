@@ -24,7 +24,6 @@ export default defineConfig({
           react: ['react', 'react-dom', 'react-router-dom'],
           mui: ['@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled'],
           charts: ['recharts'],
-          antd: ['antd'],
           primereact: ['primereact/organizationchart'],
         },
       },

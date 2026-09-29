@@ -82,6 +82,18 @@ const Leave = sequelize.define(
     cancelled_at: {
       type: DataTypes.DATE,
     },
+    delegated_supervisor_id: {
+      type: DataTypes.INTEGER,
+    },
+    delegated_supervisor_name: {
+      type: DataTypes.STRING,
+    },
+    acting_reviewer_id: {
+      type: DataTypes.INTEGER,
+    },
+    acting_reviewer_name: {
+      type: DataTypes.STRING,
+    },
     companyName: {
       type: DataTypes.STRING,
     },

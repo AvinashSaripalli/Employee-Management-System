@@ -1,5 +1,6 @@
 const { Op } = require("sequelize");
 const { Department, User } = require("../models");
+const { logAuditEvent } = require("../utils/auditLogger");
 
 // Promote a selected user to department supervisor (head) and demote the
 // previous recorded supervisor so each department keeps exactly one head.
@@ -206,5 +207,52 @@ exports.removeMember = async (req, res) => {
   } catch (error) {
     console.error("Error removing department member:", error);
     return res.status(500).json({ error: "Failed to remove employee from department" });
+  }
+};
+
+exports.setDepartmentDelegation = async (req, res) => {
+  try {
+    const { delegatedSupervisorId } = req.body;
+    const department = await Department.findByPk(req.params.id);
+    if (!department) return res.status(404).json({ error: "Department not found" });
+
+    // Validate that requester is admin/hr or current supervisor of this department
+    const actorRole = String(req.user?.role || '').toLowerCase();
+    const isDeptSupervisor = Number(department.supervisorId) === Number(req.user?.id);
+    if (actorRole !== 'admin' && actorRole !== 'hr' && !isDeptSupervisor) {
+      return res.status(403).json({ error: "Only Admins, HR, or the department supervisor can set delegation" });
+    }
+
+    let delegateUser = null;
+    if (delegatedSupervisorId) {
+      delegateUser = await User.findByPk(delegatedSupervisorId);
+      if (!delegateUser || delegateUser.companyName !== department.companyName || delegateUser.exists !== 1) {
+        return res.status(400).json({ error: "Delegated supervisor must be an active employee of this company" });
+      }
+    }
+
+    const previousDelegatedSupervisorId = department.delegatedSupervisorId;
+    await department.update({ delegatedSupervisorId: delegatedSupervisorId ? Number(delegatedSupervisorId) : null });
+
+    await logAuditEvent({
+      req,
+      action: 'DEPARTMENT_DELEGATION_UPDATED',
+      targetType: 'Department',
+      targetId: String(department.id),
+      targetName: department.name,
+      previousValues: { delegatedSupervisorId: previousDelegatedSupervisorId },
+      newValues: { delegatedSupervisorId: department.delegatedSupervisorId },
+      details: delegatedSupervisorId
+        ? `Assigned acting supervisor (${delegateUser ? `${delegateUser.firstName} ${delegateUser.lastName}` : delegatedSupervisorId}) for department "${department.name}"`
+        : `Cleared supervisor delegation for department "${department.name}"`,
+    });
+
+    return res.json({
+      message: delegatedSupervisorId ? "Department supervisor delegation activated" : "Department delegation cleared",
+      department,
+    });
+  } catch (error) {
+    console.error("Error setting department delegation:", error);
+    return res.status(500).json({ error: "Failed to update department delegation" });
   }
 };

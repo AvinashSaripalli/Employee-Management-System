@@ -55,6 +55,9 @@ app.use('/api/crm', crmRoutes);
 const notificationRoutes = require('./routes/notificationRoutes');
 app.use('/api/notifications', verifyToken, notificationRoutes);
 
+const auditLogRoutes = require('./routes/auditLogRoutes');
+app.use('/api/audit-logs', verifyToken, auditLogRoutes);
+
 const distPath = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
@@ -67,6 +70,15 @@ if (fs.existsSync(distPath)) {
 }
 
 app.use((err, req, res, next) => {
+  if (err && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({ error: 'File size limit exceeded. Maximum allowed size is 10 MB.' });
+  }
+  if (err && err.name === 'MulterError') {
+    return res.status(400).json({ error: `Upload error: ${err.message}` });
+  }
+  if (err && err.message && err.message.includes('file type')) {
+    return res.status(400).json({ error: err.message });
+  }
   console.error('Unhandled error:', err);
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
@@ -125,7 +137,7 @@ io.on('connection', (socket) => {
 
 ensureLeaveSchema()
   .then(() => backfillCompanyMembership())
-  .then(() => require('./models').Department.sync())
+  .then(() => require('./models').Department.sync({ alter: true }))
   .then(() => require('./models').LeaveApprovalSetting.sync({ alter: true }))
   .then(() => require('./models').Report.sync({ alter: true }))
   .then(() => require('./models').Message.sync())
@@ -139,6 +151,7 @@ ensureLeaveSchema()
   .then(() => require('./models').CrmQuote.sync())
   .then(() => require('./models').AttendancePermission.sync({ alter: true }))
   .then(() => require('./models').Notification.sync({ alter: true }))
+  .then(() => require('./models').AuditLog.sync({ alter: true }))
   .then(() => require('./utils/seedCrm').seedCrm())
   .catch((err) => {
     console.error('Startup data sync failed:', err.message);

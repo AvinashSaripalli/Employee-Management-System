@@ -20,6 +20,7 @@ const CrmProduct = require("./CrmProduct");
 const CrmQuote = require("./CrmQuote");
 const AttendancePermission = require("./AttendancePermission");
 const Notification = require("./Notification");
+const AuditLog = require("./AuditLog");
 
 Notification.belongsTo(User, {
   foreignKey: "recipientId",
@@ -174,4 +175,5 @@ module.exports = {
   CrmQuote,
   AttendancePermission,
   Notification,
+  AuditLog,
 };

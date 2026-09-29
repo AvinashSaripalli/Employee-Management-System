@@ -36,8 +36,11 @@ function Login() {
 
         localStorage.setItem("token", token);
         localStorage.setItem("userRole", role);
-        localStorage.setItem("departmentRole", departmentRole || 'Member');
-        localStorage.setItem("userPhoto", photo);
+        if (photo && photo !== 'null' && photo !== 'undefined') {
+          localStorage.setItem("userPhoto", photo);
+        } else {
+          localStorage.removeItem("userPhoto");
+        }
         localStorage.setItem("companyName", companyName);
         localStorage.setItem("userDesignation", designation);
         localStorage.setItem("userJobLocation", jobLocation);

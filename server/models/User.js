@@ -70,6 +70,10 @@ const User = sequelize.define(
     confirmPassword: {
       type: DataTypes.STRING,
     },
+    delegatedToId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
     exists: {
       type: DataTypes.INTEGER,
       allowNull: false,

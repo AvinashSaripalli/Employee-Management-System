@@ -34,6 +34,28 @@ async function ensureLeaveSchema() {
   await addIfMissing("review_comment", { type: DataTypes.TEXT, allowNull: true });
   await addIfMissing("reviewed_at", { type: DataTypes.DATE, allowNull: true });
   await addIfMissing("cancelled_at", { type: DataTypes.DATE, allowNull: true });
+  await addIfMissing("delegated_supervisor_id", { type: DataTypes.INTEGER, allowNull: true });
+  await addIfMissing("delegated_supervisor_name", { type: DataTypes.STRING, allowNull: true });
+  await addIfMissing("acting_reviewer_id", { type: DataTypes.INTEGER, allowNull: true });
+  await addIfMissing("acting_reviewer_name", { type: DataTypes.STRING, allowNull: true });
+
+  try {
+    const deptCols = await qi.describeTable("departments");
+    if (!deptCols.delegated_supervisor_id) {
+      await qi.addColumn("departments", "delegated_supervisor_id", { type: DataTypes.INTEGER, allowNull: true });
+    }
+  } catch (err) {
+    console.warn("Could not alter departments table:", err.message);
+  }
+
+  try {
+    const userCols = await qi.describeTable("users");
+    if (!userCols.delegated_to_id) {
+      await qi.addColumn("users", "delegated_to_id", { type: DataTypes.INTEGER, allowNull: true });
+    }
+  } catch (err) {
+    console.warn("Could not alter users table:", err.message);
+  }
 }
 
 module.exports = { ensureLeaveSchema };

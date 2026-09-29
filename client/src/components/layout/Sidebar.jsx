@@ -12,6 +12,7 @@ import {
   HiOutlineBriefcase,
   HiOutlineClock,
 } from 'react-icons/hi2';
+import axios from '../../api/axios';
 import AppShell from './AppShell';
 import Dashboard from '../dashboard/Dashboard';
 import TasksProjects from '../tasks/TasksProjects';
@@ -25,20 +26,82 @@ import UserProfile from '../profile/UserProfile';
 import Messenger from '../messenger/Messenger';
 import Crm from '../crm/Crm';
 
+const sanitizePhoto = (val) => {
+  if (!val || val === 'null' || val === 'undefined') return '';
+  return String(val).trim();
+};
+
 const Sidebar = () => {
   const [selectedComponent, setSelectedComponent] = useState('Dashboard');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const [userPhoto, setUserPhoto] = useState('');
-  const [userName, setUserName] = useState('');
-  const [companyName, setCompanyName] = useState('');
+  const [userPhoto, setUserPhoto] = useState(() => sanitizePhoto(localStorage.getItem('userPhoto')));
+  const [userName, setUserName] = useState(() =>
+    `${localStorage.getItem('userFirstName') || ''} ${localStorage.getItem('userLastName') || ''}`.trim() || 'User'
+  );
+  const [companyName, setCompanyName] = useState(() => localStorage.getItem('companyName') || '');
 
   useEffect(() => {
-    setUserPhoto(localStorage.getItem('userPhoto') || '');
+    // 1. Initial sync from local storage
+    const currentStoredPhoto = sanitizePhoto(localStorage.getItem('userPhoto'));
+    setUserPhoto(currentStoredPhoto);
     setCompanyName(localStorage.getItem('companyName') || '');
     setUserName(
       `${localStorage.getItem('userFirstName') || ''} ${localStorage.getItem('userLastName') || ''}`.trim() || 'User'
     );
+
+    // 2. Fetch authoritative profile from /users/me so photo and identity always stay in sync
+    const fetchCurrentProfile = async () => {
+      try {
+        const res = await axios.get('/users/me');
+        if (res.data) {
+          const u = res.data;
+          const cleanPhoto = sanitizePhoto(u.photo);
+          setUserPhoto(cleanPhoto);
+          if (cleanPhoto) {
+            localStorage.setItem('userPhoto', cleanPhoto);
+          } else {
+            localStorage.removeItem('userPhoto');
+          }
+          if (u.firstName) localStorage.setItem('userFirstName', u.firstName);
+          if (u.lastName) localStorage.setItem('userLastName', u.lastName);
+          if (u.companyName) {
+            setCompanyName(u.companyName);
+            localStorage.setItem('companyName', u.companyName);
+          }
+          setUserName(`${u.firstName || ''} ${u.lastName || ''}`.trim() || 'User');
+        }
+      } catch (err) {
+        const email = localStorage.getItem('userEmail');
+        if (email) {
+          try {
+            const res = await axios.get('/users/by-email', { params: { email } });
+            if (res.data) {
+              const cleanPhoto = sanitizePhoto(res.data.photo);
+              setUserPhoto(cleanPhoto);
+              if (cleanPhoto) localStorage.setItem('userPhoto', cleanPhoto);
+            }
+          } catch (_) {}
+        }
+      }
+    };
+
+    fetchCurrentProfile();
+
+    // 3. Real-time sync on photo update
+    const handleProfileUpdate = (e) => {
+      const updatedPhoto = sanitizePhoto(e.detail?.photo || localStorage.getItem('userPhoto'));
+      setUserPhoto(updatedPhoto);
+      if (updatedPhoto) localStorage.setItem('userPhoto', updatedPhoto);
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+    window.addEventListener('storage', handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+      window.removeEventListener('storage', handleProfileUpdate);
+    };
   }, []);
 
   const handleLogout = () => {

@@ -8,6 +8,7 @@ const Department = sequelize.define(
     name: { type: DataTypes.STRING, allowNull: false },
     parentId: { type: DataTypes.INTEGER, allowNull: true },
     supervisorId: { type: DataTypes.INTEGER, allowNull: true },
+    delegatedSupervisorId: { type: DataTypes.INTEGER, allowNull: true },
     companyName: { type: DataTypes.STRING, allowNull: false },
   },
   {

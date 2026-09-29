@@ -2,6 +2,7 @@ const { Leave, User, Department, LeaveApprovalSetting } = require('../models');
 const { Op } = require('sequelize');
 const { ensureCompanyMembership, DEFAULT_COMPANY } = require('../utils/companyMembership');
 const { dispatchNotification, notifyAdminsAndSupervisors } = require('../utils/notificationDispatcher');
+const { logAuditEvent } = require('../utils/auditLogger');
 const {
   TOTAL_ANNUAL_LEAVE_QUOTA,
   LEAVE_TYPES,
@@ -47,21 +48,80 @@ async function getApprovalSetting(companyName) {
   return LeaveApprovalSetting.findOne({ where: { companyName } });
 }
 
-async function getDepartmentSupervisor(companyName, departmentName) {
-  if (!companyName || !departmentName) return null;
-  const department = await Department.findOne({ where: { companyName, name: String(departmentName).trim() } });
-  if (department?.supervisorId) {
-    const supervisor = await User.findOne({ where: { id: department.supervisorId, companyName, exists: 1 } });
-    if (supervisor) return supervisor;
+async function resolveSupervisorAndDelegation(companyName, departmentName) {
+  if (!companyName || !departmentName) {
+    return { supervisor: null, delegated: null, isOutOfOffice: false, effectiveSupervisor: null };
   }
-  return User.findOne({
+  const trimmedDept = String(departmentName).trim();
+  const department = await Department.findOne({ where: { companyName, name: trimmedDept } });
+
+  let supervisor = null;
+  if (department?.supervisorId) {
+    supervisor = await User.findOne({ where: { id: department.supervisorId, companyName, exists: 1 } });
+  }
+  if (!supervisor) {
+    supervisor = await User.findOne({
+      where: {
+        companyName,
+        department: trimmedDept,
+        departmentRole: 'Supervisor',
+        exists: 1,
+      },
+    });
+  }
+
+  if (!supervisor) {
+    // Check parent department
+    if (department?.parentId) {
+      const parentDept = await Department.findOne({ where: { id: department.parentId, companyName } });
+      if (parentDept) {
+        return resolveSupervisorAndDelegation(companyName, parentDept.name);
+      }
+    }
+    return { supervisor: null, delegated: null, isOutOfOffice: false, effectiveSupervisor: null };
+  }
+
+  // Check if supervisor is currently Out Of Office (active approved leave spanning today)
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const oooLeave = await Leave.findOne({
     where: {
+      employeeId: supervisor.employeeId,
       companyName,
-      department: String(departmentName).trim(),
-      departmentRole: 'Supervisor',
-      exists: 1,
+      status: 'Approved',
+      start_date: { [Op.lte]: todayStr },
+      end_date: { [Op.gte]: todayStr },
     },
   });
+
+  // Check for delegation: on User or Department
+  const delegateId = supervisor.delegatedToId || department?.delegatedSupervisorId;
+  let delegatedUser = null;
+  if (delegateId) {
+    delegatedUser = await User.findOne({ where: { id: delegateId, companyName, exists: 1 } });
+  }
+
+  // If supervisor is OOO and no explicit delegate is set, fallback to parent department supervisor
+  if (oooLeave && !delegatedUser && department?.parentId) {
+    const parentDept = await Department.findOne({ where: { id: department.parentId, companyName } });
+    if (parentDept?.supervisorId) {
+      delegatedUser = await User.findOne({ where: { id: parentDept.supervisorId, companyName, exists: 1 } });
+    }
+  }
+
+  const effectiveSupervisor = (oooLeave && delegatedUser) ? delegatedUser : supervisor;
+
+  return {
+    supervisor,
+    delegated: delegatedUser,
+    isOutOfOffice: Boolean(oooLeave),
+    oooLeave,
+    effectiveSupervisor,
+  };
+}
+
+async function getDepartmentSupervisor(companyName, departmentName) {
+  const result = await resolveSupervisorAndDelegation(companyName, departmentName);
+  return result.effectiveSupervisor || result.supervisor;
 }
 
 function isAdmin(actor, req) {
@@ -79,8 +139,13 @@ function canActOnStage(leave, actor, req) {
   const isSupervisorOfDept =
     (actor?.departmentRole === 'Supervisor' || req.query?.departmentRole === 'Supervisor' || req.body?.departmentRole === 'Supervisor') &&
     String(actor?.department || req.query?.department || req.body?.department || '').trim().toLowerCase() === String(leave.department || '').trim().toLowerCase();
+  
   if (leave.approval_stage === 'Supervisor') {
-    return (id && Number(leave.supervisor_id) === id) || isSupervisorOfDept;
+    if (id && Number(leave.supervisor_id) === id) return true;
+    if (id && Number(leave.delegated_supervisor_id) === id) return true;
+    if (isSupervisorOfDept) return true;
+    if (actor?.delegatedSupervisors?.has(Number(leave.supervisor_id))) return true;
+    if (actor?.delegatedDepartments?.has(String(leave.department || '').trim().toLowerCase())) return true;
   }
   if (leave.approval_stage === 'FinalApprover') return id && Number(leave.final_approver_id) === id;
   if (leave.approval_stage === 'Processor') return id && Number(leave.processor_id) === id;
@@ -112,6 +177,29 @@ async function resolveIdentity(req) {
       }
     }
   }
+
+  // Pre-load active delegations for this actor if available
+  if (actor?.id) {
+    try {
+      const delegatingUsers = await User.findAll({
+        where: { delegatedToId: actor.id, exists: 1 },
+        attributes: ['id'],
+      });
+      actor.delegatedSupervisors = new Set(delegatingUsers.map((u) => u.id));
+
+      const delegatingDepts = await Department.findAll({
+        where: { delegatedSupervisorId: actor.id },
+        attributes: ['name'],
+      });
+      actor.delegatedDepartments = new Set(
+        delegatingDepts.map((d) => String(d.name || '').trim().toLowerCase())
+      );
+    } catch (e) {
+      actor.delegatedSupervisors = new Set();
+      actor.delegatedDepartments = new Set();
+    }
+  }
+
   return {
     actor,
     employeeId: firstValue(
@@ -488,8 +576,11 @@ exports.leaveApply = async (req, res) => {
     }
 
     const setting = await getApprovalSetting(companyName);
-    const supervisor = await getDepartmentSupervisor(companyName, profile?.department || actor?.department);
-    const approvalStage = supervisor ? 'Supervisor' : 'FinalApprover';
+    const supInfo = await resolveSupervisorAndDelegation(companyName, profile?.department || actor?.department);
+    const supervisor = supInfo.supervisor;
+    const delegatedSupervisor = supInfo.delegated;
+    const effectiveSup = supInfo.effectiveSupervisor || supervisor;
+    const approvalStage = effectiveSup ? 'Supervisor' : 'FinalApprover';
 
     const leave = await Leave.create({
       employeeId,
@@ -508,6 +599,8 @@ exports.leaveApply = async (req, res) => {
       approval_stage: approvalStage,
       supervisor_id: supervisor?.id || null,
       supervisor_name: supervisor ? displayName(supervisor) : null,
+      delegated_supervisor_id: delegatedSupervisor?.id || null,
+      delegated_supervisor_name: delegatedSupervisor ? displayName(delegatedSupervisor) : null,
       final_approver_id: setting?.finalApproverId || null,
       processor_id: setting?.processorId || null,
       companyName,
@@ -529,6 +622,24 @@ exports.leaveApply = async (req, res) => {
       targetId: leave.id,
       actionLabel: 'Review Request',
     });
+
+    // If there is an active delegated supervisor, notify them specifically
+    if (delegatedSupervisor?.employeeId && delegatedSupervisor.employeeId !== employeeId) {
+      dispatchNotification(req.app, {
+        recipientId: delegatedSupervisor.employeeId,
+        senderId: employeeId,
+        senderName: leave.employee_name,
+        companyName,
+        category: 'leave',
+        type: 'leave_applied',
+        title: `[Delegated Review] Leave Request from ${leave.employee_name}`,
+        message: `${leave.employee_name} submitted a leave request. ${supInfo.isOutOfOffice ? `Primary supervisor ${displayName(supervisor)} is Out of Office. ` : ''}You are authorized as acting reviewer.`,
+        severity: 'action',
+        target: 'Manage Leaves',
+        targetId: leave.id,
+        actionLabel: 'Review Request',
+      });
+    }
 
     res.status(201).json({
       message: `Leave request submitted. Next step: ${stageLabel(approvalStage)}`,
@@ -784,6 +895,16 @@ exports.updateLeaveStatus = async (req, res) => {
         reviewed_at: new Date(),
       });
 
+      await logAuditEvent({
+        req,
+        action: 'LEAVE_REJECTED',
+        targetType: 'Leave',
+        targetId: String(leave.id),
+        targetEmployeeId: leave.employeeId,
+        targetName: leave.employee_name || displayName(leave.employee),
+        details: `Rejected ${leave.leave_type} request for ${leave.start_date}. Reason: ${comment || 'None specified'}`,
+      });
+
       dispatchNotification(req.app, {
         recipientId: leave.employeeId,
         senderId: employeeId,
@@ -810,6 +931,16 @@ exports.updateLeaveStatus = async (req, res) => {
       reviewed_at: now,
     };
 
+    const isDelegatedReview =
+      leave.approval_stage === 'Supervisor' &&
+      Number(actorId(actor, req)) !== Number(leave.supervisor_id) &&
+      !isAdmin(actor, req);
+
+    if (isDelegatedReview) {
+      updates.acting_reviewer_id = actorId(actor, req);
+      updates.acting_reviewer_name = reviewer;
+    }
+
     if (leave.approval_stage === 'Supervisor') {
       updates.supervisor_comment = comment ? String(comment).trim() : null;
       updates.supervisor_reviewed_at = now;
@@ -831,6 +962,16 @@ exports.updateLeaveStatus = async (req, res) => {
     }
 
     await leave.update(updates);
+
+    await logAuditEvent({
+      req,
+      action: updates.status === 'Approved' ? 'LEAVE_APPROVED' : 'LEAVE_STAGE_ADVANCED',
+      targetType: 'Leave',
+      targetId: String(leave.id),
+      targetEmployeeId: leave.employeeId,
+      targetName: leave.employee_name || displayName(leave.employee),
+      details: `${updates.status === 'Approved' ? 'Approved' : 'Advanced to ' + updates.approval_stage} ${leave.leave_type} request for ${leave.start_date} to ${leave.end_date}${isDelegatedReview ? ` by delegated reviewer ${reviewer}` : ''}`,
+    });
 
     if (updates.status === 'Approved') {
       dispatchNotification(req.app, {

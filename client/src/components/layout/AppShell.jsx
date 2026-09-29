@@ -34,6 +34,13 @@ const getInitials = (name = '') =>
     .join('')
     .toUpperCase();
 
+const sanitizeAvatarUrl = (photo) => {
+  if (!photo || typeof photo !== 'string') return undefined;
+  const trimmed = photo.trim();
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return undefined;
+  return trimmed;
+};
+
 const AppShell = ({
   navItems,
   active,
@@ -1135,7 +1142,7 @@ const AppShell = ({
           <Divider orientation="vertical" flexItem sx={{ my: 1.5, display: { xs: 'none', sm: 'block' } }} />
 
           <Chip
-            avatar={<Avatar alt={userName} src={userPhoto || undefined}>{getInitials(userName)}</Avatar>}
+            avatar={<Avatar alt={userName} src={sanitizeAvatarUrl(userPhoto)}>{getInitials(userName)}</Avatar>}
             label={
               <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.75 }}>
                 <Typography sx={{ fontWeight: 600, fontSize: 13 }}>{userName}</Typography>
@@ -1182,7 +1189,7 @@ const AppShell = ({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
                 <Avatar
                   alt={userName}
-                  src={userPhoto || undefined}
+                  src={sanitizeAvatarUrl(userPhoto)}
                   sx={{ width: 48, height: 48, bgcolor: '#FE8600', fontWeight: 800, border: '2px solid rgba(255,255,255,0.7)' }}
                 >
                   {getInitials(userName)}

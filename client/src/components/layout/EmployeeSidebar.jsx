@@ -83,25 +83,78 @@ const Sidebar = () => {
 
   const navigate = useNavigate();
 
+  const sanitizePhoto = (val) => {
+    if (!val || val === 'null' || val === 'undefined') return '';
+    return String(val).trim();
+  };
+
   useEffect(() => {
-    setUserPhoto(localStorage.getItem('userPhoto') || '');
+    const currentStoredPhoto = sanitizePhoto(localStorage.getItem('userPhoto'));
+    setUserPhoto(currentStoredPhoto);
     setUserName(
       `${localStorage.getItem('userFirstName') || ''} ${localStorage.getItem('userLastName') || ''}`.trim() || 'User'
     );
-    const email = localStorage.getItem('userEmail');
-    if (email) {
-      axios.get('/users/by-email', { params: { email } })
-        .then((res) => {
-          if (res.data?.departmentRole) {
-            localStorage.setItem('departmentRole', res.data.departmentRole);
-            setCurrentDeptRole(res.data.departmentRole);
+
+    const fetchCurrentProfile = async () => {
+      try {
+        const res = await axios.get('/users/me');
+        if (res.data) {
+          const u = res.data;
+          const cleanPhoto = sanitizePhoto(u.photo);
+          setUserPhoto(cleanPhoto);
+          if (cleanPhoto) {
+            localStorage.setItem('userPhoto', cleanPhoto);
+          } else {
+            localStorage.removeItem('userPhoto');
           }
-          if (res.data?.department) {
-            localStorage.setItem('userDepartment', res.data.department);
+          if (u.departmentRole) {
+            localStorage.setItem('departmentRole', u.departmentRole);
+            setCurrentDeptRole(u.departmentRole);
           }
-        })
-        .catch(() => {});
-    }
+          if (u.department) {
+            localStorage.setItem('userDepartment', u.department);
+          }
+          if (u.firstName) localStorage.setItem('userFirstName', u.firstName);
+          if (u.lastName) localStorage.setItem('userLastName', u.lastName);
+          setUserName(`${u.firstName || ''} ${u.lastName || ''}`.trim() || 'User');
+        }
+      } catch (err) {
+        const email = localStorage.getItem('userEmail');
+        if (email) {
+          try {
+            const res = await axios.get('/users/by-email', { params: { email } });
+            if (res.data) {
+              const cleanPhoto = sanitizePhoto(res.data.photo);
+              setUserPhoto(cleanPhoto);
+              if (cleanPhoto) localStorage.setItem('userPhoto', cleanPhoto);
+              if (res.data.departmentRole) {
+                localStorage.setItem('departmentRole', res.data.departmentRole);
+                setCurrentDeptRole(res.data.departmentRole);
+              }
+              if (res.data.department) {
+                localStorage.setItem('userDepartment', res.data.department);
+              }
+            }
+          } catch (_) {}
+        }
+      }
+    };
+
+    fetchCurrentProfile();
+
+    const handleProfileUpdate = (e) => {
+      const updatedPhoto = sanitizePhoto(e.detail?.photo || localStorage.getItem('userPhoto'));
+      setUserPhoto(updatedPhoto);
+      if (updatedPhoto) localStorage.setItem('userPhoto', updatedPhoto);
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+    window.addEventListener('storage', handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+      window.removeEventListener('storage', handleProfileUpdate);
+    };
   }, []);
 
   useEffect(() => {

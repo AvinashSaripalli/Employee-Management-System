@@ -6,9 +6,15 @@ const sequelize = require("../config/database");
 const { Op, fn, col, literal } = require("sequelize");
 const { DEFAULT_COMPANY, generateEmployeeId, ensureCompanyMembership } = require("../utils/companyMembership");
 const { sendInvitationEmail } = require("../utils/mailer");
+const { logAuditEvent } = require("../utils/auditLogger");
 require("dotenv").config();
 
 exports.registerUsers = async (req, res) => {
+  const actorRole = (req.user?.role || '').toLowerCase();
+  if (actorRole !== 'admin' && actorRole !== 'hr') {
+    return res.status(403).json({ error: "Access denied. Only Administrators and HR can register employees." });
+  }
+
   const {
     firstName, lastName, email, phoneNumber, password, companyName, role,
     designation, department, jobLocation, dateOfBirth, bloodGroup,
@@ -42,6 +48,16 @@ exports.registerUsers = async (req, res) => {
       firstName, lastName, email, phoneNumber, password: hashedPassword, companyName: effectiveCompany,
       role: role || "Employee", designation, department, jobLocation, dateOfBirth, bloodGroup,
       photo, technicalSkills, employeeId: assignedEmployeeId, gender,
+    });
+
+    await logAuditEvent({
+      req,
+      action: 'USER_CREATED',
+      targetType: 'User',
+      targetEmployeeId: assignedEmployeeId,
+      targetName: `${firstName} ${lastName}`.trim(),
+      newValues: { firstName, lastName, email, role: role || 'Employee', department, designation, employeeId: assignedEmployeeId },
+      details: `Created new employee account for ${firstName} ${lastName} (${assignedEmployeeId}) with role ${role || 'Employee'} in ${department || 'Unassigned'}`,
     });
 
     return res.status(201).json({ message: "User added successfully", employeeId: assignedEmployeeId, companyName: effectiveCompany });
@@ -116,6 +132,8 @@ exports.getUserByEmail = async (req, res) => {
       return res.status(404).json({ error: "No registered user found with this email" });
     }
 
+    const photoUrl = user.photo ? `${req.protocol}://${req.get("host")}${user.photo}` : null;
+
     return res.status(200).json({
       id: user.id,
       firstName: user.firstName,
@@ -127,10 +145,54 @@ exports.getUserByEmail = async (req, res) => {
       department: user.department,
       employeeId: user.employeeId,
       designation: user.designation,
+      photo: photoUrl,
+      phoneNumber: user.phoneNumber,
+      jobLocation: user.jobLocation,
+      dateOfBirth: user.dateOfBirth,
+      bloodGroup: user.bloodGroup,
+      gender: user.gender,
+      technicalSkills: user.technicalSkills,
     });
   } catch (error) {
     console.error("Error finding user by email:", error);
     return res.status(500).json({ error: "Server error", details: error.message });
+  }
+};
+
+exports.getCurrentUser = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const user = await User.findByPk(userId);
+    if (!user || user.exists !== 1) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const photoUrl = user.photo ? `${req.protocol}://${req.get("host")}${user.photo}` : null;
+    return res.json({
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      companyName: user.companyName,
+      role: user.role,
+      departmentRole: user.departmentRole || 'Member',
+      department: user.department,
+      employeeId: user.employeeId,
+      designation: user.designation,
+      photo: photoUrl,
+      phoneNumber: user.phoneNumber,
+      jobLocation: user.jobLocation,
+      dateOfBirth: user.dateOfBirth,
+      bloodGroup: user.bloodGroup,
+      gender: user.gender,
+      technicalSkills: user.technicalSkills,
+      delegatedToId: user.delegatedToId,
+    });
+  } catch (error) {
+    console.error("Error fetching current user:", error);
+    return res.status(500).json({ error: "Server error" });
   }
 };
 
@@ -215,17 +277,31 @@ exports.loginUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   const { id, designation, department, role, jobLocation, technicalSkills, phoneNumber, dateOfBirth, bloodGroup, gender } = req.body;
+  const actorRole = (req.user?.role || '').toLowerCase();
+  const isPrivileged = actorRole === 'admin' || actorRole === 'hr';
+  const targetId = Number(id || req.user?.id);
+  const isSelf = Number(req.user?.id) === targetId;
+
+  if (!isPrivileged && !isSelf) {
+    return res.status(403).json({ success: false, message: "Access denied. You do not have permission to modify this profile." });
+  }
+
   const skillsString = technicalSkills ? (Array.isArray(technicalSkills) ? technicalSkills.join(",") : technicalSkills) : null;
   const normalizedDateOfBirth = /^\d{4}-\d{2}-\d{2}$/.test(String(dateOfBirth || ''))
     ? dateOfBirth
     : null;
 
   try {
-    const updatePayload = { designation, department, jobLocation, phoneNumber, dateOfBirth: normalizedDateOfBirth, bloodGroup, gender };
+    const updatePayload = { designation, jobLocation, phoneNumber, dateOfBirth: normalizedDateOfBirth, bloodGroup, gender };
     if (skillsString !== null) updatePayload.technicalSkills = skillsString;
-    if (role) updatePayload.role = role;
 
-    const result = await User.update(updatePayload, { where: { id } });
+    // Only Admin/HR can modify role and department
+    if (isPrivileged) {
+      if (role) updatePayload.role = role;
+      if (department) updatePayload.department = department;
+    }
+
+    const result = await User.update(updatePayload, { where: { id: targetId } });
     if (result[0] === 0) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
@@ -424,10 +500,29 @@ exports.getUsersByDepartments = async (req, res) => {
 
 exports.updateUserDetails = async (req, res) => {
   const { id } = req.params;
+  const actorRole = (req.user?.role || '').toLowerCase();
+  const isPrivileged = actorRole === 'admin' || actorRole === 'hr';
+  const targetId = Number(id);
+  const isSelf = Number(req.user?.id) === targetId;
+
+  if (!isPrivileged && !isSelf) {
+    return res.status(403).json({ error: "Access denied. You do not have permission to modify this profile." });
+  }
+
   const { firstName, lastName, companyName, role, gender, designation, email, phoneNumber, department, bloodGroup, technicalSkills, dateOfBirth, jobLocation } = req.body;
   const photo = req.file ? `/uploads/${req.file.filename}` : null;
 
   try {
+    const targetUser = await User.findByPk(targetId);
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Tenant isolation check
+    if (req.user?.companyName && targetUser.companyName && targetUser.companyName.toLowerCase() !== req.user.companyName.toLowerCase()) {
+      return res.status(403).json({ error: "Access denied across company tenants." });
+    }
+
     const normalizedDob = dateOfBirth && /^\d{4}-\d{2}-\d{2}$/.test(String(dateOfBirth).trim())
       ? String(dateOfBirth).trim()
       : null;
@@ -442,13 +537,13 @@ exports.updateUserDetails = async (req, res) => {
     const values = {
       firstName: firstName ? String(firstName).trim() : undefined,
       lastName: lastName !== undefined ? String(lastName).trim() : undefined,
-      companyName: companyName !== undefined ? String(companyName).trim() : undefined,
-      role: role !== undefined ? role : undefined,
+      companyName: isPrivileged && companyName !== undefined ? String(companyName).trim() : undefined,
+      role: isPrivileged && role !== undefined ? role : undefined,
       gender: gender !== undefined ? gender : undefined,
       designation: designation !== undefined ? String(designation).trim() : undefined,
       email: email !== undefined ? String(email).trim() : undefined,
       phoneNumber: phoneNumber !== undefined ? String(phoneNumber).trim() : undefined,
-      department: department !== undefined ? department : undefined,
+      department: isPrivileged && department !== undefined ? department : undefined,
       bloodGroup: bloodGroup !== undefined ? bloodGroup : undefined,
       technicalSkills: skillsFormatted,
       dateOfBirth: normalizedDob,
@@ -462,10 +557,30 @@ exports.updateUserDetails = async (req, res) => {
       values.photo = photo;
     }
 
-    const result = await User.update(values, { where: { id } });
-    if (result[0] === 0) {
-      return res.status(404).json({ error: 'User not found' });
-    }
+    const previousSnapshot = {
+      firstName: targetUser.firstName,
+      lastName: targetUser.lastName,
+      role: targetUser.role,
+      department: targetUser.department,
+      designation: targetUser.designation,
+      jobLocation: targetUser.jobLocation,
+      phoneNumber: targetUser.phoneNumber,
+    };
+
+    await targetUser.update(values);
+
+    await logAuditEvent({
+      req,
+      action: 'USER_UPDATED',
+      targetType: 'User',
+      targetId: String(targetId),
+      targetEmployeeId: targetUser.employeeId,
+      targetName: `${targetUser.firstName} ${targetUser.lastName}`.trim(),
+      previousValues: previousSnapshot,
+      newValues: values,
+      details: `Updated employee profile for ${targetUser.firstName} ${targetUser.lastName} (${targetUser.employeeId})`,
+    });
+
     res.status(200).json({ message: 'User updated successfully!' });
   } catch (error) {
     console.error('Error updating user:', error);
@@ -475,6 +590,17 @@ exports.updateUserDetails = async (req, res) => {
 
 exports.toggleUserExists = async (req, res) => {
   const { id } = req.params;
+  const actorRole = (req.user?.role || '').toLowerCase();
+
+  // Only Admin and HR can activate/deactivate accounts
+  if (actorRole !== 'admin' && actorRole !== 'hr') {
+    return res.status(403).json({ success: false, message: "Access denied. Only Administrators and HR can modify account status." });
+  }
+
+  // Prevent users from deactivating their own account
+  if (Number(req.user?.id) === Number(id)) {
+    return res.status(400).json({ success: false, message: "You cannot deactivate your own administrative account." });
+  }
 
   try {
     const user = await User.findByPk(id);
@@ -482,7 +608,27 @@ exports.toggleUserExists = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    await user.update({ exists: user.exists ? 0 : 1 });
+    // Tenant isolation check
+    if (req.user?.companyName && user.companyName && user.companyName.toLowerCase() !== req.user.companyName.toLowerCase()) {
+      return res.status(403).json({ success: false, message: "Access denied across company tenants." });
+    }
+
+    const previousExists = user.exists;
+    const nextExists = previousExists ? 0 : 1;
+    await user.update({ exists: nextExists });
+
+    await logAuditEvent({
+      req,
+      action: nextExists === 1 ? 'USER_ACTIVATED' : 'USER_DEACTIVATED',
+      targetType: 'User',
+      targetId: String(id),
+      targetEmployeeId: user.employeeId,
+      targetName: `${user.firstName} ${user.lastName}`.trim(),
+      previousValues: { exists: previousExists },
+      newValues: { exists: nextExists },
+      details: `${nextExists === 1 ? 'Activated' : 'Deactivated'} employee account for ${user.firstName} ${user.lastName} (${user.employeeId})`,
+    });
+
     res.json({ success: true, message: 'User status updated successfully' });
   } catch (error) {
     console.error('Error toggling user:', error);
@@ -813,3 +959,55 @@ exports.bulkSendInvites = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to send bulk invites", error: error.message });
   }
 };
+
+exports.setUserDelegation = async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+    const { delegatedToId } = req.body;
+    const actorId = req.user?.id;
+    const actorRole = String(req.user?.role || '').toLowerCase();
+
+    // User can set their own delegation (e.g. going on leave), or Admin/HR can set it
+    if (Number(targetUserId) !== Number(actorId) && actorRole !== 'admin' && actorRole !== 'hr') {
+      return res.status(403).json({ error: "You can only configure your own approval delegation" });
+    }
+
+    const user = await User.findByPk(targetUserId);
+    if (!user || user.exists !== 1) return res.status(404).json({ error: "User not found" });
+
+    if (delegatedToId) {
+      if (Number(delegatedToId) === Number(targetUserId)) {
+        return res.status(400).json({ error: "Cannot delegate approval authority to yourself" });
+      }
+      const delegate = await User.findByPk(delegatedToId);
+      if (!delegate || delegate.companyName !== user.companyName || delegate.exists !== 1) {
+        return res.status(400).json({ error: "Delegated user must be an active employee in your company" });
+      }
+    }
+
+    const previousDelegatedToId = user.delegatedToId;
+    await user.update({ delegatedToId: delegatedToId ? Number(delegatedToId) : null });
+
+    await logAuditEvent({
+      req,
+      action: 'USER_DELEGATION_UPDATED',
+      targetType: 'User',
+      targetId: String(targetUserId),
+      targetEmployeeId: user.employeeId,
+      targetName: `${user.firstName} ${user.lastName}`.trim(),
+      previousValues: { delegatedToId: previousDelegatedToId },
+      newValues: { delegatedToId: user.delegatedToId },
+      details: delegatedToId
+        ? `Delegated approval duties for ${user.firstName} ${user.lastName} to employee ID ${delegatedToId}`
+        : `Cleared approval delegation for ${user.firstName} ${user.lastName}`,
+    });
+
+    return res.json({
+      message: delegatedToId ? "Supervisor delegation assigned successfully" : "Supervisor delegation cleared",
+      delegatedToId: user.delegatedToId,
+    });
+  } catch (error) {
+    console.error("Error updating user delegation:", error);
+    return res.status(500).json({ error: "Failed to configure supervisor delegation" });
+  }
+};

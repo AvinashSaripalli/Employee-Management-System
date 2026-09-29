@@ -1,6 +1,7 @@
-const { AttendancePermission, User } = require('../models');
+const { AttendancePermission, User, Department } = require('../models');
 const { Op } = require('sequelize');
 const { dispatchNotification, notifyAdminsAndSupervisors } = require('../utils/notificationDispatcher');
+const { logAuditEvent } = require('../utils/auditLogger');
 
 // Helper to determine start and end dates of a month
 const getMonthRange = (monthStr) => {
@@ -260,6 +261,33 @@ exports.reviewPermission = async (req, res) => {
       });
     }
 
+    // Reviewer authorization check
+    const actorRole = String(req.user?.role || reviewerRole || '').toLowerCase();
+    const actorId = req.user?.id ? Number(req.user.id) : (reviewerId ? Number(reviewerId) : null);
+    
+    // Check if reviewer is Admin/HR, Department supervisor, or delegated supervisor
+    const isPrivileged = actorRole === 'admin' || actorRole === 'hr';
+    let isDelegatedReview = false;
+    if (!isPrivileged && actorId) {
+      const dept = await Department.findOne({
+        where: { name: permission.department, companyName: permission.companyName },
+      });
+      const isDeptSupervisor = dept && Number(dept.supervisorId) === actorId;
+      const isDeptDelegated = dept && Number(dept.delegatedSupervisorId) === actorId;
+      
+      let isSupervisorDelegate = false;
+      if (dept?.supervisorId) {
+        const sup = await User.findByPk(dept.supervisorId);
+        if (sup && Number(sup.delegatedToId) === actorId) isSupervisorDelegate = true;
+      }
+
+      if (isDeptDelegated || isSupervisorDelegate) {
+        isDelegatedReview = true;
+      } else if (!isDeptSupervisor) {
+        return res.status(403).json({ error: 'You are not authorized to review attendance permissions for this department.' });
+      }
+    }
+
     const newStatus = action === 'approve' ? 'Approved' : 'Rejected';
 
     await permission.update({
@@ -269,6 +297,16 @@ exports.reviewPermission = async (req, res) => {
       reviewerRole: reviewerRole || 'Supervisor',
       reviewerComment: reviewerComment ? String(reviewerComment).trim() : null,
       reviewedAt: new Date(),
+    });
+
+    await logAuditEvent({
+      req,
+      action: newStatus === 'Approved' ? 'PERMISSION_APPROVED' : 'PERMISSION_REJECTED',
+      targetType: 'AttendancePermission',
+      targetId: String(permission.id),
+      targetEmployeeId: permission.employeeId,
+      targetName: permission.employeeName,
+      details: `${newStatus} ${permission.permissionType} for ${permission.employeeName} (${permission.employeeId}) on ${permission.date}${isDelegatedReview ? ` [Reviewed by acting/delegated reviewer: ${reviewerName}]` : ''}${reviewerComment ? '. Comment: ' + reviewerComment : ''}`,
     });
 
     dispatchNotification(req.app, {

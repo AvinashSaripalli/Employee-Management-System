@@ -100,6 +100,34 @@ async function notifyAdminsAndSupervisors(appOrIo, {
       }
     }
 
+    // Automatically include acting/delegated supervisors for this department
+    if (department) {
+      try {
+        const { Department } = require('../models');
+        const dept = await Department.findOne({
+          where: { name: department, companyName },
+          attributes: ['supervisorId', 'delegatedSupervisorId'],
+        });
+        if (dept?.delegatedSupervisorId) {
+          const delUser = await User.findByPk(dept.delegatedSupervisorId, { attributes: ['employeeId'] });
+          if (delUser?.employeeId && delUser.employeeId !== excludeEmployeeId) {
+            uniqueRecipients.add(delUser.employeeId);
+          }
+        }
+        if (dept?.supervisorId) {
+          const sup = await User.findByPk(dept.supervisorId, { attributes: ['delegatedToId'] });
+          if (sup?.delegatedToId) {
+            const delUser = await User.findByPk(sup.delegatedToId, { attributes: ['employeeId'] });
+            if (delUser?.employeeId && delUser.employeeId !== excludeEmployeeId) {
+              uniqueRecipients.add(delUser.employeeId);
+            }
+          }
+        }
+      } catch (deptErr) {
+        console.warn('Delegation lookup warning in notifyAdminsAndSupervisors:', deptErr.message);
+      }
+    }
+
     const promises = Array.from(uniqueRecipients).map((empId) =>
       dispatchNotification(appOrIo, {
         recipientId: empId,

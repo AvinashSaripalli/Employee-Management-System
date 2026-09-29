@@ -58,21 +58,30 @@ exports.getAttendanceStatus = async (req, res) => {
 
 exports.clockIn = async (req, res) => {
   const {
-    companyName, department, firstName, lastName, email, employeeId, designation, clockInDate, clockInTime, action
+    companyName, department, firstName, lastName, email, employeeId, designation, action
   } = req.body;
 
   if (!employeeId) {
     return res.status(400).json({ error: 'employeeId is required' });
   }
 
-  const rawCompany = String(companyName || '').trim();
+  // Prevent regular employees from clocking in on behalf of others
+  const actorRole = (req.user?.role || '').toLowerCase();
+  const isPrivileged = actorRole === 'admin' || actorRole === 'hr';
+  if (!isPrivileged && req.user?.employeeId && req.user.employeeId !== employeeId) {
+    return res.status(403).json({ error: 'Access denied. You cannot clock in for another employee.' });
+  }
+
+  const rawCompany = String(companyName || req.user?.companyName || '').trim();
   const effectiveCompany =
     !rawCompany || rawCompany === 'null' || rawCompany === 'undefined'
       ? 'KN Advisors'
       : rawCompany;
 
-  const targetDate = clockInDate || new Date().toISOString().slice(0, 10);
-  const targetTime = clockInTime || new Date().toTimeString().split(' ')[0];
+  // Authoritative server timestamp (reject client-supplied time)
+  const now = new Date();
+  const targetDate = now.toISOString().slice(0, 10);
+  const targetTime = now.toTimeString().split(' ')[0];
 
   try {
     // Auto-clockout any stale previous-day shifts before clocking in
@@ -157,19 +166,28 @@ exports.clockIn = async (req, res) => {
 };
 
 exports.clockOut = async (req, res) => {
-  const { employeeId, companyName, clockOutTime, workedTime } = req.body;
+  const { employeeId, companyName } = req.body;
 
   if (!employeeId) {
     return res.status(400).json({ error: 'employeeId is required for clock-out.' });
   }
 
-  const rawCompany = String(companyName || '').trim();
+  // Prevent regular employees from clocking out other employees
+  const actorRole = (req.user?.role || '').toLowerCase();
+  const isPrivileged = actorRole === 'admin' || actorRole === 'hr';
+  if (!isPrivileged && req.user?.employeeId && req.user.employeeId !== employeeId) {
+    return res.status(403).json({ error: 'Access denied. You cannot clock out for another employee.' });
+  }
+
+  const rawCompany = String(companyName || req.user?.companyName || '').trim();
   const effectiveCompany =
     !rawCompany || rawCompany === 'null' || rawCompany === 'undefined'
       ? 'KN Advisors'
       : rawCompany;
 
-  const nowTime = clockOutTime || new Date().toTimeString().split(' ')[0];
+  // Authoritative server timestamp (reject client-supplied time)
+  const now = new Date();
+  const nowTime = now.toTimeString().split(' ')[0];
 
   try {
     const activeRecord = await Attendance.findOne({
@@ -185,14 +203,20 @@ exports.clockOut = async (req, res) => {
       return res.status(404).json({ error: 'No active clock-in found for this user.' });
     }
 
-    // Calculate worked time accurately
-    let finalWorkedTime = workedTime;
-    if (!finalWorkedTime && activeRecord.clockInTime) {
-      const [ih, im, is] = activeRecord.clockInTime.split(':').map(Number);
-      const [oh, om, os] = nowTime.split(':').map(Number);
-      const inSec = (ih || 0) * 3600 + (im || 0) * 60 + (is || 0);
-      const outSec = (oh || 0) * 3600 + (om || 0) * 60 + (os || 0);
-      const diffSec = Math.max(0, outSec - inSec);
+    // Authoritative calculation of worked time from server clock
+    let finalWorkedTime = '00:00:00';
+    if (activeRecord.clockInDate && activeRecord.clockInTime) {
+      const inDateTime = new Date(`${activeRecord.clockInDate}T${activeRecord.clockInTime}`);
+      let diffSec = 0;
+      if (!isNaN(inDateTime.getTime())) {
+        diffSec = Math.max(0, Math.floor((now.getTime() - inDateTime.getTime()) / 1000));
+      } else {
+        const [ih, im, is] = activeRecord.clockInTime.split(':').map(Number);
+        const [oh, om, os] = nowTime.split(':').map(Number);
+        const inSec = (ih || 0) * 3600 + (im || 0) * 60 + (is || 0);
+        const outSec = (oh || 0) * 3600 + (om || 0) * 60 + (os || 0);
+        diffSec = Math.max(0, outSec - inSec);
+      }
       const hrs = String(Math.floor(diffSec / 3600)).padStart(2, '0');
       const mins = String(Math.floor((diffSec % 3600) / 60)).padStart(2, '0');
       const secs = String(diffSec % 60).padStart(2, '0');
@@ -200,7 +224,7 @@ exports.clockOut = async (req, res) => {
     }
 
     await Attendance.update(
-      { clockOutTime: nowTime, workedTime: finalWorkedTime || '00:00:00' },
+      { clockOutTime: nowTime, workedTime: finalWorkedTime },
       { where: { id: activeRecord.id } }
     );
 

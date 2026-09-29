@@ -305,6 +305,7 @@ const EmployeeProfile = () => {
           const photoURL = response.data.photoUrl;
           setUserData((prevState) => ({ ...prevState, userPhoto: photoURL }));
           localStorage.setItem("userPhoto", photoURL);
+          window.dispatchEvent(new CustomEvent('profileUpdated', { detail: { photo: photoURL } }));
           alert("Successfully Updated Photo");
         } else {
           alert("Failed to update photo.");
