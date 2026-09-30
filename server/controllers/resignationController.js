@@ -326,6 +326,28 @@ exports.updateClearance = async (req, res) => {
       record.relievingLetterIssued = !!status;
     }
 
+    // Automated Asset Return: If IT clearance is marked 'Cleared', return all assigned assets to inventory
+    if (clearanceType === "it" && status === "Cleared") {
+      try {
+        await Asset.update(
+          {
+            status: "Available",
+            assignedToEmployeeId: null,
+            assignedToName: null,
+            assignedDate: null,
+          },
+          {
+            where: {
+              assignedToEmployeeId: record.employeeId,
+              companyName: record.companyName,
+            },
+          }
+        );
+      } catch (assetErr) {
+        console.warn("Could not auto-release employee assets upon IT clearance:", assetErr.message);
+      }
+    }
+
     // Auto-complete check: if IT, Finance, Admin are Cleared
     if (
       record.itClearance === "Cleared" &&
@@ -334,6 +356,21 @@ exports.updateClearance = async (req, res) => {
       record.status === "Clearance in Progress"
     ) {
       record.status = "Completed";
+
+      // Automated User Deactivation: Deactivate user account upon offboarding completion
+      try {
+        await User.update(
+          { status: "Inactive", exists: 0 },
+          {
+            where: {
+              employeeId: record.employeeId,
+              companyName: record.companyName,
+            },
+          }
+        );
+      } catch (userErr) {
+        console.warn("Could not deactivate employee user upon offboarding completion:", userErr.message);
+      }
     }
 
     await record.save();

@@ -294,6 +294,37 @@ async function getTotalUsedAndPending(employeeId, companyName, range) {
   };
 }
 
+async function calculateAllocatedQuota(employeeId, companyName, range) {
+  let totalAllocated = TOTAL_ANNUAL_LEAVE_QUOTA || 12;
+  try {
+    const user = await User.findOne({
+      where: { employeeId, companyName },
+      attributes: ['id', 'createdAt', 'created_at'],
+    });
+    const rawJoinDate = user?.createdAt || user?.created_at;
+    if (rawJoinDate) {
+      const joinDate = new Date(rawJoinDate);
+      const cycleStart = new Date(range.startDate);
+      const cycleEnd = new Date(range.endDate);
+
+      // If user joined during the current leave cycle (after cycle start date and on/before cycle end date)
+      if (joinDate > cycleStart && joinDate <= cycleEnd) {
+        const joinYear = joinDate.getFullYear();
+        const joinMonth = joinDate.getMonth(); // 0-11
+        const endYear = cycleEnd.getFullYear();
+        const endMonth = cycleEnd.getMonth(); // 0-11
+        // Remaining calendar months in leave cycle inclusive of the joining month
+        const remainingMonths = (endYear - joinYear) * 12 + (endMonth - joinMonth) + 1;
+        const proRated = Math.max(1, Math.round(((TOTAL_ANNUAL_LEAVE_QUOTA || 12) / 12) * remainingMonths));
+        totalAllocated = Math.min(TOTAL_ANNUAL_LEAVE_QUOTA || 12, proRated);
+      }
+    }
+  } catch (err) {
+    console.error('Error calculating pro-rated quota:', err);
+  }
+  return totalAllocated;
+}
+
 async function buildBalance(employeeId, companyName, gender) {
   const range = getLeaveYearRange(todayDate());
   const types = Object.keys(LEAVE_TYPES).filter((name) => {
@@ -304,7 +335,7 @@ async function buildBalance(employeeId, companyName, gender) {
   });
 
   const { totalUsed, totalPending } = await getTotalUsedAndPending(employeeId, companyName, range);
-  const totalAllocated = TOTAL_ANNUAL_LEAVE_QUOTA || 12;
+  const totalAllocated = await calculateAllocatedQuota(employeeId, companyName, range);
   const totalAvailable = Math.max(0, Number((totalAllocated - totalUsed - totalPending).toFixed(1)));
 
   const breakdown = [];
@@ -542,39 +573,7 @@ exports.leaveApply = async (req, res) => {
       return res.status(400).json({ error: 'Selected range has no working days. Weekends and holidays are excluded.' });
     }
 
-    const overlaps = await findOverlaps({
-      employeeId,
-      companyName,
-      startDate,
-      endDate,
-      halfDay: !!halfDay,
-      halfDaySession: halfDay ? (halfDaySession || 'AM') : null,
-    });
-    if (overlaps.length) {
-      return res.status(409).json({
-        error: 'This request overlaps an existing pending or approved leave',
-        overlaps: overlaps.map((row) => ({
-          id: row.id,
-          leave_type: row.leave_type,
-          start_date: row.start_date,
-          end_date: row.end_date,
-          status: row.status,
-        })),
-      });
-    }
-
     const range = getLeaveYearRange(start);
-    if (policy.paid !== false) {
-      const { totalUsed, totalPending } = await getTotalUsedAndPending(employeeId, companyName, range);
-      const totalAllocated = TOTAL_ANNUAL_LEAVE_QUOTA || 12;
-      const remaining = Math.max(0, totalAllocated - totalUsed - totalPending);
-      if (days > remaining) {
-        return res.status(400).json({
-          error: `Insufficient leave balance. You have ${Number(remaining.toFixed(1))} day(s) available from your annual 12-day quota (${range.label}), requested: ${days} day(s)`,
-        });
-      }
-    }
-
     const setting = await getApprovalSetting(companyName);
     const supInfo = await resolveSupervisorAndDelegation(companyName, profile?.department || actor?.department);
     const supervisor = supInfo.supervisor;
@@ -582,28 +581,107 @@ exports.leaveApply = async (req, res) => {
     const effectiveSup = supInfo.effectiveSupervisor || supervisor;
     const approvalStage = effectiveSup ? 'Supervisor' : 'FinalApprover';
 
-    const leave = await Leave.create({
-      employeeId,
-      employee_name: displayName(profile || actor),
-      department: profile?.department || actor?.department,
-      leave_type: leaveType,
-      start_date: startDate,
-      end_date: endDate,
-      days,
-      reason: String(reason).trim(),
-      only_tomorrow: !!onlyTomorrow,
-      half_day: !!halfDay,
-      half_day_session: halfDay ? (halfDaySession || 'AM') : null,
-      contact_phone: contactPhone || profile?.phoneNumber || actor?.phoneNumber || null,
-      status: 'Pending',
-      approval_stage: approvalStage,
-      supervisor_id: supervisor?.id || null,
-      supervisor_name: supervisor ? displayName(supervisor) : null,
-      delegated_supervisor_id: delegatedSupervisor?.id || null,
-      delegated_supervisor_name: delegatedSupervisor ? displayName(delegatedSupervisor) : null,
-      final_approver_id: setting?.finalApproverId || null,
-      processor_id: setting?.processorId || null,
-      companyName,
+    // Managed Sequelize transaction with row-level locking to prevent quota race conditions
+    const leave = await Leave.sequelize.transaction(async (t) => {
+      // Re-verify overlaps within transaction lock
+      const overlapsInTx = await Leave.findAll({
+        where: {
+          employeeId,
+          companyName,
+          status: { [Op.in]: ACTIVE_STATUSES },
+          start_date: { [Op.lte]: endDate },
+          end_date: { [Op.gte]: startDate },
+        },
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+
+      const conflicting = overlapsInTx.filter((row) =>
+        sessionsConflict(
+          {
+            start_date: startDate,
+            end_date: endDate,
+            half_day: !!halfDay,
+            half_day_session: halfDay ? (halfDaySession || 'AM') : null,
+          },
+          row
+        )
+      );
+
+      if (conflicting.length > 0) {
+        const conflictErr = new Error('This request overlaps an existing pending or approved leave');
+        conflictErr.statusCode = 409;
+        conflictErr.overlaps = conflicting.map((row) => ({
+          id: row.id,
+          leave_type: row.leave_type,
+          start_date: row.start_date,
+          end_date: row.end_date,
+          status: row.status,
+        }));
+        throw conflictErr;
+      }
+
+      if (policy.paid !== false) {
+        // Query active leaves within the leave year under transaction lock
+        const activeLeaves = await Leave.findAll({
+          where: {
+            employeeId,
+            companyName,
+            status: { [Op.in]: ACTIVE_STATUSES },
+            start_date: { [Op.gte]: range.startDate, [Op.lte]: range.endDate },
+          },
+          transaction: t,
+          lock: t.LOCK.UPDATE,
+        });
+
+        let totalUsedInTx = 0;
+        let totalPendingInTx = 0;
+        for (const row of activeLeaves) {
+          const typeDef = LEAVE_TYPES[row.leave_type];
+          if (typeDef && typeDef.paid === false) continue;
+          const status = normalizeStatus(row.status);
+          const daysNum = Number(row.days) || 0;
+          if (status === 'Approved') totalUsedInTx += daysNum;
+          else if (status === 'Pending') totalPendingInTx += daysNum;
+        }
+
+        const totalAllocated = await calculateAllocatedQuota(employeeId, companyName, range);
+        const remaining = Math.max(0, totalAllocated - totalUsedInTx - totalPendingInTx);
+        if (days > remaining) {
+          const balanceErr = new Error(
+            `Insufficient leave balance. You have ${Number(remaining.toFixed(1))} day(s) available from your annual quota of ${totalAllocated} day(s) (${range.label}), requested: ${days} day(s)`
+          );
+          balanceErr.statusCode = 400;
+          throw balanceErr;
+        }
+      }
+
+      return await Leave.create(
+        {
+          employeeId,
+          employee_name: displayName(profile || actor),
+          department: profile?.department || actor?.department,
+          leave_type: leaveType,
+          start_date: startDate,
+          end_date: endDate,
+          days,
+          reason: String(reason).trim(),
+          only_tomorrow: !!onlyTomorrow,
+          half_day: !!halfDay,
+          half_day_session: halfDay ? (halfDaySession || 'AM') : null,
+          contact_phone: contactPhone || profile?.phoneNumber || actor?.phoneNumber || null,
+          status: 'Pending',
+          approval_stage: approvalStage,
+          supervisor_id: supervisor?.id || null,
+          supervisor_name: supervisor ? displayName(supervisor) : null,
+          delegated_supervisor_id: delegatedSupervisor?.id || null,
+          delegated_supervisor_name: delegatedSupervisor ? displayName(delegatedSupervisor) : null,
+          final_approver_id: setting?.finalApproverId || null,
+          processor_id: setting?.processorId || null,
+          companyName,
+        },
+        { transaction: t }
+      );
     });
 
     // Notify Department Supervisors and Admins
@@ -647,6 +725,12 @@ exports.leaveApply = async (req, res) => {
     });
   } catch (error) {
     console.error('Error applying leave:', error);
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        error: error.message,
+        overlaps: error.overlaps || undefined,
+      });
+    }
     res.status(500).json({ error: 'Database error', details: error.message });
   }
 };

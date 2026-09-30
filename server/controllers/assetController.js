@@ -87,13 +87,13 @@ exports.getAssets = async (req, res) => {
 
     if (search) {
       where[Op.or] = [
-        { assetTag: { [Op.like]: `%${search}%` } },
-        { name: { [Op.like]: `%${search}%` } },
-        { brand: { [Op.like]: `%${search}%` } },
-        { model: { [Op.like]: `%${search}%` } },
-        { serialNumber: { [Op.like]: `%${search}%` } },
-        { assignedToName: { [Op.like]: `%${search}%` } },
-        { assignedToEmployeeId: { [Op.like]: `%${search}%` } },
+        { assetTag: { [Op.iLike]: `%${search}%` } },
+        { name: { [Op.iLike]: `%${search}%` } },
+        { brand: { [Op.iLike]: `%${search}%` } },
+        { model: { [Op.iLike]: `%${search}%` } },
+        { serialNumber: { [Op.iLike]: `%${search}%` } },
+        { assignedToName: { [Op.iLike]: `%${search}%` } },
+        { assignedToEmployeeId: { [Op.iLike]: `%${search}%` } },
       ];
     }
 

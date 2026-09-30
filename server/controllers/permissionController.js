@@ -1,4 +1,4 @@
-const { AttendancePermission, User, Department } = require('../models');
+const { AttendancePermission, Attendance, User, Department } = require('../models');
 const { Op } = require('sequelize');
 const { dispatchNotification, notifyAdminsAndSupervisors } = require('../utils/notificationDispatcher');
 const { logAuditEvent } = require('../utils/auditLogger');
@@ -298,6 +298,26 @@ exports.reviewPermission = async (req, res) => {
       reviewerComment: reviewerComment ? String(reviewerComment).trim() : null,
       reviewedAt: new Date(),
     });
+
+    // If Approved, acknowledge the permission on the attendance record
+    if (newStatus === 'Approved') {
+      try {
+        const existingAtt = await Attendance.findOne({
+          where: {
+            employeeId: permission.employeeId,
+            clockInDate: permission.date,
+          },
+        });
+        if (existingAtt) {
+          // If Late Sign-In approved and no clock-in recorded yet, set clock-in to the expected time
+          if (!existingAtt.clockInTime && permission.permissionType === 'Late Sign-In' && permission.expectedTime) {
+            await existingAtt.update({ clockInTime: permission.expectedTime });
+          }
+        }
+      } catch (attSyncErr) {
+        console.warn('Could not sync approved permission to attendance record:', attSyncErr.message);
+      }
+    }
 
     await logAuditEvent({
       req,

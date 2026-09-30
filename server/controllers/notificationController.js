@@ -96,11 +96,13 @@ exports.getNotifications = async (req, res) => {
       });
     }
 
-    // B. Check for unsubmitted work reports (overdue from yesterday or due today)
+    // B. Check for unsubmitted work reports (rolling 14-day window to avoid historical bloat)
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const attendances = await Attendance.findAll({
       where: {
         employeeId,
         companyName: { [Op.iLike]: effectiveCompany },
+        clockInDate: { [Op.gte]: fourteenDaysAgo },
       },
       order: [['clockInDate', 'ASC']],
     });
@@ -109,6 +111,7 @@ exports.getNotifications = async (req, res) => {
       where: {
         employeeId,
         companyName: { [Op.iLike]: effectiveCompany },
+        date: { [Op.gte]: fourteenDaysAgo },
       },
       attributes: ['date'],
     });

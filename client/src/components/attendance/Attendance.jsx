@@ -110,6 +110,8 @@ const Attendance = () => {
 
       const from = selectedMonth.startOf('month').format('YYYY-MM-DD');
       const to = selectedMonth.endOf('month').format('YYYY-MM-DD');
+      params.from = from;
+      params.to = to;
 
       const [attRes, usersRes, reportsRes, leavesRes] = await Promise.all([
         axios.get('/attendance', { params }).catch((err) => {

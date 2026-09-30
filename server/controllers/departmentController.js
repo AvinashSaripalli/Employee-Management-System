@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-const { Department, User } = require("../models");
+const { Department, User, Leave, Attendance, Report, AttendanceRegularization, AttendancePermission } = require("../models");
 const { logAuditEvent } = require("../utils/auditLogger");
 
 // Promote a selected user to department supervisor (head) and demote the
@@ -132,9 +132,14 @@ exports.updateDepartment = async (req, res) => {
 
     await department.update({ name: trimmedName, parentId: parentId || null, supervisorId: supervisorId || null });
 
-    // Keep employees in sync when the department is renamed
+    // Keep employees and all historical/pending records in sync when the department is renamed
     if (prevName !== trimmedName) {
       await User.update({ department: trimmedName }, { where: { companyName: department.companyName, department: prevName } });
+      await Leave.update({ department: trimmedName }, { where: { companyName: department.companyName, department: prevName } });
+      await Attendance.update({ department: trimmedName }, { where: { companyName: department.companyName, department: prevName } });
+      await Report.update({ department: trimmedName }, { where: { companyName: department.companyName, department: prevName } });
+      await AttendanceRegularization.update({ department: trimmedName }, { where: { companyName: department.companyName, department: prevName } });
+      await AttendancePermission.update({ department: trimmedName }, { where: { companyName: department.companyName, department: prevName } });
     }
 
     // Single-supervisor consistency (promote new head, demote previous one)

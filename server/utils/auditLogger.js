@@ -61,7 +61,7 @@ async function logAuditEvent({
       targetName: targetName || null,
       previousValues: previousValues ? JSON.stringify(previousValues) : null,
       newValues: newValues ? JSON.stringify(newValues) : null,
-      details: details || null,
+      details: typeof details === 'object' && details !== null ? JSON.stringify(details) : (details ? String(details) : null),
       ipAddress: ipAddress ? String(ipAddress).slice(0, 45) : null,
     });
   } catch (error) {

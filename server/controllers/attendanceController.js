@@ -1,6 +1,6 @@
 const { Attendance, User } = require('../models');
 const { Op, fn, literal } = require('sequelize');
-const { autoClockOutStaleRecords } = require('../utils/autoClockOut');
+const { autoClockOutStaleRecords, getLocalDateString, getLocalTimeString } = require('../utils/autoClockOut');
 
 exports.getAttendanceStatus = async (req, res) => {
   const { employeeId, companyName, date } = req.query;
@@ -15,7 +15,7 @@ exports.getAttendanceStatus = async (req, res) => {
       ? 'KN Advisors'
       : rawCompany;
 
-  const targetDate = date || new Date().toISOString().slice(0, 10);
+  const targetDate = date || getLocalDateString();
 
   try {
     // Auto-clockout any stale previous-day shifts before querying status
@@ -79,9 +79,8 @@ exports.clockIn = async (req, res) => {
       : rawCompany;
 
   // Authoritative server timestamp (reject client-supplied time)
-  const now = new Date();
-  const targetDate = now.toISOString().slice(0, 10);
-  const targetTime = now.toTimeString().split(' ')[0];
+  const targetDate = getLocalDateString();
+  const targetTime = getLocalTimeString();
 
   try {
     // Auto-clockout any stale previous-day shifts before clocking in
@@ -187,7 +186,7 @@ exports.clockOut = async (req, res) => {
 
   // Authoritative server timestamp (reject client-supplied time)
   const now = new Date();
-  const nowTime = now.toTimeString().split(' ')[0];
+  const nowTime = getLocalTimeString();
 
   try {
     const activeRecord = await Attendance.findOne({
@@ -242,7 +241,17 @@ exports.clockOut = async (req, res) => {
 };
 
 exports.getAllAttendances = async (req, res) => {
-  const { companyName, department, role, supervisorDepartment, employeeId, departmentRole } = req.query;
+  const {
+    companyName,
+    department,
+    role,
+    supervisorDepartment,
+    employeeId,
+    departmentRole,
+    from,
+    to,
+    date,
+  } = req.query;
 
   const rawCompany = String(companyName || '').trim();
   const effectiveCompany =
@@ -257,6 +266,17 @@ exports.getAllAttendances = async (req, res) => {
     const where = {};
     if (effectiveCompany) {
       where.companyName = { [Op.iLike]: effectiveCompany };
+    }
+
+    // Date range windowing
+    if (date) {
+      where.clockInDate = date;
+    } else if (from && to) {
+      where.clockInDate = { [Op.between]: [from, to] };
+    } else if (from) {
+      where.clockInDate = { [Op.gte]: from };
+    } else if (to) {
+      where.clockInDate = { [Op.lte]: to };
     }
 
     const normalizedRole = String(role || '').toLowerCase();

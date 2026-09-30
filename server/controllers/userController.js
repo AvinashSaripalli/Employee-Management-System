@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
-const { User } = require("../models");
+const { User, Department } = require("../models");
 const sequelize = require("../config/database");
 const { Op, fn, col, literal } = require("sequelize");
 const { DEFAULT_COMPANY, generateEmployeeId, ensureCompanyMembership } = require("../utils/companyMembership");
@@ -298,7 +298,27 @@ exports.updateUser = async (req, res) => {
     // Only Admin/HR can modify role and department
     if (isPrivileged) {
       if (role) updatePayload.role = role;
-      if (department) updatePayload.department = department;
+      if (department) {
+        // Reconcile department supervisor if employee is being transferred to a different department
+        const currentUser = await User.findByPk(targetId);
+        if (currentUser && currentUser.department && currentUser.department !== department) {
+          try {
+            const oldDept = await Department.findOne({
+              where: {
+                name: currentUser.department,
+                companyName: currentUser.companyName,
+                supervisorId: targetId,
+              },
+            });
+            if (oldDept) {
+              await oldDept.update({ supervisorId: null });
+            }
+          } catch (deptErr) {
+            console.warn("Could not reconcile previous department supervisor:", deptErr.message);
+          }
+        }
+        updatePayload.department = department;
+      }
     }
 
     const result = await User.update(updatePayload, { where: { id: targetId } });

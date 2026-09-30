@@ -17,7 +17,11 @@ function computeWorkedTime(inTime, outTime) {
 
   const inSec = parseTime(inTime);
   const outSec = parseTime(outTime);
-  const diffSec = Math.max(0, outSec - inSec);
+  // Support cross-midnight / night-shift duration (e.g., 22:00 to 06:00)
+  let diffSec = outSec - inSec;
+  if (diffSec < 0) {
+    diffSec += 86400; // rollover 24 hours
+  }
 
   const hours = Math.floor(diffSec / 3600);
   const minutes = Math.floor((diffSec % 3600) / 60);
