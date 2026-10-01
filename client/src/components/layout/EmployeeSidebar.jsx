@@ -31,6 +31,7 @@ import {
   HiOutlineArrowPath,
   HiOutlineCube,
   HiOutlineArrowRightOnRectangle,
+  HiOutlineLifebuoy,
 } from 'react-icons/hi2';
 import AppShell from './AppShell';
 import ManageLeaves from '../leaves/ManageLeaves';
@@ -46,10 +47,13 @@ import WorkReportFormDialog from '../reports/WorkReportFormDialog';
 import ApplyPermissionDialog from '../attendance/ApplyPermissionDialog';
 import AssetManagementHub from '../assets/AssetManagementHub';
 import OffboardingHub from '../offboarding/OffboardingHub';
+import HelpdeskHub from '../helpdesk/HelpdeskHub';
 import axios from '../../api/axios';
+import { useAuth } from '../../redux/hooks';
 
 const Sidebar = () => {
-  const storedCompany = localStorage.getItem('companyName');
+  const { user, role, departmentRole: authDeptRole, companyName, employeeId: authEmployeeId, logout: reduxLogout, updateUser } = useAuth();
+  const storedCompany = companyName || localStorage.getItem('companyName');
   const companyAssigned = !!storedCompany && storedCompany !== 'null' && storedCompany !== 'undefined';
   const [selectedComponent, setSelectedComponent] = useState(companyAssigned ? 'Tasks' : 'Profile');
   const [loading, setLoading] = useState(false);
@@ -104,39 +108,25 @@ const Sidebar = () => {
         const res = await axios.get('/users/me');
         if (res.data) {
           const u = res.data;
+          updateUser(u);
           const cleanPhoto = sanitizePhoto(u.photo);
           setUserPhoto(cleanPhoto);
-          if (cleanPhoto) {
-            localStorage.setItem('userPhoto', cleanPhoto);
-          } else {
-            localStorage.removeItem('userPhoto');
-          }
           if (u.departmentRole) {
-            localStorage.setItem('departmentRole', u.departmentRole);
             setCurrentDeptRole(u.departmentRole);
           }
-          if (u.department) {
-            localStorage.setItem('userDepartment', u.department);
-          }
-          if (u.firstName) localStorage.setItem('userFirstName', u.firstName);
-          if (u.lastName) localStorage.setItem('userLastName', u.lastName);
           setUserName(`${u.firstName || ''} ${u.lastName || ''}`.trim() || 'User');
         }
       } catch (err) {
-        const email = localStorage.getItem('userEmail');
+        const email = user?.email || localStorage.getItem('userEmail');
         if (email) {
           try {
             const res = await axios.get('/users/by-email', { params: { email } });
             if (res.data) {
               const cleanPhoto = sanitizePhoto(res.data.photo);
               setUserPhoto(cleanPhoto);
-              if (cleanPhoto) localStorage.setItem('userPhoto', cleanPhoto);
+              updateUser({ photo: cleanPhoto });
               if (res.data.departmentRole) {
-                localStorage.setItem('departmentRole', res.data.departmentRole);
                 setCurrentDeptRole(res.data.departmentRole);
-              }
-              if (res.data.department) {
-                localStorage.setItem('userDepartment', res.data.department);
               }
             }
           } catch (_) {}
@@ -360,7 +350,7 @@ const Sidebar = () => {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    reduxLogout();
     navigate('/login');
   };
 
@@ -372,8 +362,8 @@ const Sidebar = () => {
     }, 350);
   };
 
-  const userRole = localStorage.getItem('userRole') || 'Employee';
-  const departmentRole = currentDeptRole || localStorage.getItem('departmentRole') || 'Member';
+  const userRole = role || user?.role || localStorage.getItem('userRole') || 'Employee';
+  const departmentRole = currentDeptRole || authDeptRole || user?.departmentRole || localStorage.getItem('departmentRole') || 'Member';
   const isSupervisor = departmentRole === 'Supervisor' || userRole === 'Manager';
 
   const renderComponent = () => {
@@ -397,6 +387,8 @@ const Sidebar = () => {
       case 'Asset Management':
       case 'Assets':
       case 'My Assets': return <AssetManagementHub />;
+      case 'Helpdesk & Requests':
+      case 'Helpdesk': return <HelpdeskHub />;
       case 'Resignation & Offboarding':
       case 'Offboarding':
       case 'Resignation': return <OffboardingHub />;
@@ -745,6 +737,10 @@ const Sidebar = () => {
           icon: <HiOutlineCube {...iconStyle(selectedComponent === 'Asset Management' || selectedComponent === 'Assets' || selectedComponent === 'My Assets')} />,
         },
         {
+          text: 'Helpdesk & Requests',
+          icon: <HiOutlineLifebuoy {...iconStyle(selectedComponent === 'Helpdesk & Requests' || selectedComponent === 'Helpdesk')} />,
+        },
+        {
           text: 'Resignation & Offboarding',
           icon: <HiOutlineArrowRightOnRectangle {...iconStyle(selectedComponent === 'Resignation & Offboarding' || selectedComponent === 'Offboarding' || selectedComponent === 'Resignation')} />,
         },
@@ -783,6 +779,10 @@ const Sidebar = () => {
           icon: <HiOutlineCube {...iconStyle(selectedComponent === 'Asset Management' || selectedComponent === 'Assets' || selectedComponent === 'My Assets')} />,
         },
         {
+          text: 'Helpdesk & Requests',
+          icon: <HiOutlineLifebuoy {...iconStyle(selectedComponent === 'Helpdesk & Requests' || selectedComponent === 'Helpdesk')} />,
+        },
+        {
           text: 'Resignation & Offboarding',
           icon: <HiOutlineArrowRightOnRectangle {...iconStyle(selectedComponent === 'Resignation & Offboarding' || selectedComponent === 'Offboarding' || selectedComponent === 'Resignation')} />,
         },
@@ -802,11 +802,11 @@ const Sidebar = () => {
         navItems={navItems}
         active={selectedComponent}
         onNavigate={handleListItemOnClick}
-        userPhoto={userPhoto}
-        userName={userName}
-        userRole={departmentRole === 'Supervisor' ? `Supervisor (${localStorage.getItem('userDepartment') || 'Dept'})` : (localStorage.getItem('userRole') || 'Employee')}
-        departmentRole={departmentRole}
-        userCompany={localStorage.getItem('companyName') || 'Not assigned'}
+        userPhoto={user?.photo || userPhoto}
+        userName={user?.name || userName}
+        userRole={currentDeptRole === 'Supervisor' ? `Supervisor (${user?.department || localStorage.getItem('userDepartment') || 'Dept'})` : (role || 'Employee')}
+        departmentRole={currentDeptRole || departmentRole}
+        userCompany={companyName || user?.companyName || 'Not assigned'}
         onLogout={handleLogout}
         onProfile={() => handleListItemOnClick('Profile')}
         topbarRight={clockWidget}

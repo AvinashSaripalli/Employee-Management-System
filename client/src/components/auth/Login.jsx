@@ -6,12 +6,14 @@ import {
 import { FiClipboard, FiUsers, FiActivity, FiUser, FiArrowRight, FiLock, FiMail, FiEye, FiEyeOff } from "react-icons/fi";
 import axios from "../../api/axios";
 import { useNavigate, Link } from "react-router-dom";
+import { useAuth } from "../../redux/hooks";
 
 function Login() {
   const [loginValues, setLoginValues] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "info" });
 
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
@@ -28,34 +30,11 @@ function Login() {
     try {
       const response = await axios.post("/login", loginValues);
       if (response.data.success) {
-        const {
-          token, role, departmentRole, photo, companyName, designation, email, firstName,
-          jobLocation, lastName, phoneNumber, department, id, employeeId,
-          technicalSkills, dateOfBirth, bloodGroup, gender
-        } = response.data;
+        const { token, role } = response.data;
+        // Redux action stores credentials in store and syncs persistence seamlessly
+        login(token, response.data);
 
-        localStorage.setItem("token", token);
-        localStorage.setItem("userRole", role);
-        localStorage.setItem("departmentRole", departmentRole || "Member");
-        if (photo && photo !== 'null' && photo !== 'undefined') {
-          localStorage.setItem("userPhoto", photo);
-        } else {
-          localStorage.removeItem("userPhoto");
-        }
-        localStorage.setItem("companyName", companyName);
-        localStorage.setItem("userDesignation", designation);
-        localStorage.setItem("userJobLocation", jobLocation);
-        localStorage.setItem("userEmail", email);
-        localStorage.setItem("userFirstName", firstName);
-        localStorage.setItem("userLastName", lastName);
-        localStorage.setItem("userPhoneNumber", phoneNumber);
-        localStorage.setItem("userDepartment", department);
-        localStorage.setItem("userId", id);
-        localStorage.setItem("userEmployeeId", employeeId);
-        localStorage.setItem("userTechnicalSkills", technicalSkills);
-        localStorage.setItem("userDateofBirth", dateOfBirth);
-        localStorage.setItem("userBloodGroup", bloodGroup);
-        localStorage.setItem("userGender", gender);
+        setSnackbar({ open: true, message: "Login successful!", severity: "success" });
 
         setSnackbar({ open: true, message: "Login successful!", severity: "success" });
 

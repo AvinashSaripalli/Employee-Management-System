@@ -243,6 +243,9 @@ exports.loginUser = async (req, res) => {
         companyName: user.companyName,
         department: user.department,
         employeeId: user.employeeId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
       },
       process.env.JWT_SECRET,
       { expiresIn: "8h" }
@@ -370,8 +373,9 @@ exports.getUsers = async (req, res) => {
     if (effectiveCompany) {
       where.companyName = { [Op.iLike]: effectiveCompany };
     }
-    if (role !== 'Manager') {
-      where.role = { [Op.in]: ['Employee', 'Manager', 'Admin'] };
+    // Only filter by role if an explicit roleFilter was requested
+    if (req.query.roleFilter && req.query.roleFilter !== 'all') {
+      where.role = req.query.roleFilter;
     }
 
     const results = await User.findAll({ where, order: [['id', 'ASC']] });

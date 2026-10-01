@@ -13,8 +13,10 @@ import {
   HiOutlineClock,
   HiOutlineCube,
   HiOutlineArrowRightOnRectangle,
+  HiOutlineLifebuoy,
 } from 'react-icons/hi2';
 import axios from '../../api/axios';
+import { useAuth } from '../../redux/hooks';
 import AppShell from './AppShell';
 import Dashboard from '../dashboard/Dashboard';
 import TasksProjects from '../tasks/TasksProjects';
@@ -29,6 +31,7 @@ import Messenger from '../messenger/Messenger';
 import Crm from '../crm/Crm';
 import AssetManagementHub from '../assets/AssetManagementHub';
 import OffboardingHub from '../offboarding/OffboardingHub';
+import HelpdeskHub from '../helpdesk/HelpdeskHub';
 
 const sanitizePhoto = (val) => {
   if (!val || val === 'null' || val === 'undefined') return '';
@@ -39,22 +42,21 @@ const Sidebar = () => {
   const [selectedComponent, setSelectedComponent] = useState('Dashboard');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const [userPhoto, setUserPhoto] = useState(() => sanitizePhoto(localStorage.getItem('userPhoto')));
-  const [userName, setUserName] = useState(() =>
-    `${localStorage.getItem('userFirstName') || ''} ${localStorage.getItem('userLastName') || ''}`.trim() || 'User'
-  );
-  const [companyName, setCompanyName] = useState(() => localStorage.getItem('companyName') || '');
-  const [deptRole, setDeptRole] = useState(() => localStorage.getItem('departmentRole') || 'Member');
+  const { user, role, departmentRole, companyName, logout: reduxLogout, updateUser } = useAuth();
+  
+  const [userPhoto, setUserPhoto] = useState(() => sanitizePhoto(user?.photo || localStorage.getItem('userPhoto')));
+  const [userName, setUserName] = useState(() => user?.name || `${localStorage.getItem('userFirstName') || ''} ${localStorage.getItem('userLastName') || ''}`.trim() || 'User');
+  const [currentCompany, setCurrentCompany] = useState(() => companyName || localStorage.getItem('companyName') || '');
+  const [deptRole, setDeptRole] = useState(() => departmentRole || localStorage.getItem('departmentRole') || 'Member');
 
   useEffect(() => {
-    // 1. Initial sync from local storage
-    const currentStoredPhoto = sanitizePhoto(localStorage.getItem('userPhoto'));
-    setUserPhoto(currentStoredPhoto);
-    setCompanyName(localStorage.getItem('companyName') || '');
-    setDeptRole(localStorage.getItem('departmentRole') || 'Member');
-    setUserName(
-      `${localStorage.getItem('userFirstName') || ''} ${localStorage.getItem('userLastName') || ''}`.trim() || 'User'
-    );
+    // 1. Initial sync from Redux user state
+    if (user) {
+      setUserPhoto(sanitizePhoto(user.photo));
+      setCurrentCompany(user.companyName || '');
+      setDeptRole(user.departmentRole || 'Member');
+      setUserName(user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User');
+    }
 
     // 2. Fetch authoritative profile from /users/me so photo and identity always stay in sync
     const fetchCurrentProfile = async () => {
@@ -62,34 +64,22 @@ const Sidebar = () => {
         const res = await axios.get('/users/me');
         if (res.data) {
           const u = res.data;
+          updateUser(u);
           const cleanPhoto = sanitizePhoto(u.photo);
           setUserPhoto(cleanPhoto);
-          if (cleanPhoto) {
-            localStorage.setItem('userPhoto', cleanPhoto);
-          } else {
-            localStorage.removeItem('userPhoto');
-          }
-          if (u.firstName) localStorage.setItem('userFirstName', u.firstName);
-          if (u.lastName) localStorage.setItem('userLastName', u.lastName);
-          if (u.companyName) {
-            setCompanyName(u.companyName);
-            localStorage.setItem('companyName', u.companyName);
-          }
-          if (u.departmentRole) {
-            setDeptRole(u.departmentRole);
-            localStorage.setItem('departmentRole', u.departmentRole);
-          }
+          if (u.companyName) setCurrentCompany(u.companyName);
+          if (u.departmentRole) setDeptRole(u.departmentRole);
           setUserName(`${u.firstName || ''} ${u.lastName || ''}`.trim() || 'User');
         }
       } catch (err) {
-        const email = localStorage.getItem('userEmail');
+        const email = user?.email || localStorage.getItem('userEmail');
         if (email) {
           try {
             const res = await axios.get('/users/by-email', { params: { email } });
             if (res.data) {
               const cleanPhoto = sanitizePhoto(res.data.photo);
               setUserPhoto(cleanPhoto);
-              if (cleanPhoto) localStorage.setItem('userPhoto', cleanPhoto);
+              updateUser({ photo: cleanPhoto });
             }
           } catch (_) {}
         }
@@ -102,7 +92,7 @@ const Sidebar = () => {
     const handleProfileUpdate = (e) => {
       const updatedPhoto = sanitizePhoto(e.detail?.photo || localStorage.getItem('userPhoto'));
       setUserPhoto(updatedPhoto);
-      if (updatedPhoto) localStorage.setItem('userPhoto', updatedPhoto);
+      updateUser({ photo: updatedPhoto });
     };
 
     window.addEventListener('profileUpdated', handleProfileUpdate);
@@ -112,10 +102,10 @@ const Sidebar = () => {
       window.removeEventListener('profileUpdated', handleProfileUpdate);
       window.removeEventListener('storage', handleProfileUpdate);
     };
-  }, []);
+  }, [user, updateUser]);
 
   const handleLogout = () => {
-    localStorage.clear();
+    reduxLogout();
     navigate('/login');
   };
 
@@ -143,6 +133,8 @@ const Sidebar = () => {
       case 'Reports': return <Reports />;
       case 'Asset Management':
       case 'Assets': return <AssetManagementHub />;
+      case 'Helpdesk & Requests':
+      case 'Helpdesk': return <HelpdeskHub />;
       case 'Resignation & Offboarding':
       case 'Offboarding': return <OffboardingHub />;
       default: return <UserProfile />;
@@ -197,6 +189,10 @@ const Sidebar = () => {
       icon: <HiOutlineCube {...iconStyle(selectedComponent === 'Asset Management' || selectedComponent === 'Assets')} />,
     },
     {
+      text: 'Helpdesk & Requests',
+      icon: <HiOutlineLifebuoy {...iconStyle(selectedComponent === 'Helpdesk & Requests' || selectedComponent === 'Helpdesk')} />,
+    },
+    {
       text: 'Resignation & Offboarding',
       icon: <HiOutlineArrowRightOnRectangle {...iconStyle(selectedComponent === 'Resignation & Offboarding' || selectedComponent === 'Offboarding')} />,
     },
@@ -207,11 +203,11 @@ const Sidebar = () => {
       navItems={navItems}
       active={selectedComponent}
       onNavigate={handleListItemOnClick}
-      userPhoto={userPhoto}
-      userName={userName}
-      userRole={localStorage.getItem('userRole') || 'Member'}
+      userPhoto={user?.photo || userPhoto}
+      userName={user?.name || userName}
+      userRole={role || 'Member'}
       departmentRole={deptRole}
-      userCompany={companyName}
+      userCompany={currentCompany || companyName}
       onLogout={handleLogout}
       onProfile={() => handleListItemOnClick('Profile')}
       loading={loading}

@@ -97,7 +97,7 @@ const EmployeesList = ({ onClose }) => {
     const role = localStorage.getItem('userRole');
     try {
       const response = await axios.get('/users', {
-        params: { companyName, role },
+        params: { companyName },
         headers: { Authorization: `Bearer ${token}` },
       });
       setUsers(response.data.filter(user => user.exists === 1));

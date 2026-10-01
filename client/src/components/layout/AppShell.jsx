@@ -16,6 +16,7 @@ import {
 } from 'react-icons/hi2';
 import axios from '../../api/axios';
 import { getSocket } from '../../utils/socket';
+import { useAuth, useUI } from '../../redux/hooks';
 
 const OPEN_WIDTH = 256;
 const CLOSED_WIDTH = 82;
@@ -74,13 +75,16 @@ const AppShell = ({
     }
   });
 
+  const { user, role: reduxRole, departmentRole: reduxDeptRole, companyName: reduxCompanyName, employeeId: reduxEmployeeId, userId: reduxUserId } = useAuth();
+  const { badgeCounts, updateBadges } = useUI();
+
   const handleMenu = (e) => setAnchorEl(e.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
 
-  const userEmail = localStorage.getItem('userEmail') || '';
-  const employeeId = localStorage.getItem('userEmployeeId') || '';
+  const userEmail = user?.email || localStorage.getItem('userEmail') || '';
+  const employeeId = reduxEmployeeId || user?.employeeId || localStorage.getItem('userEmployeeId') || '';
   const [departmentRole, setDepartmentRole] = useState(
-    () => propDepartmentRole || localStorage.getItem('departmentRole') || 'Member'
+    () => propDepartmentRole || reduxDeptRole || localStorage.getItem('departmentRole') || 'Member'
   );
 
   useEffect(() => {
@@ -121,7 +125,8 @@ const AppShell = ({
     onLogout?.();
   };
 
-  const readNotificationsKey = `readNotifications:${localStorage.getItem('userId') || 'guest'}`;
+  const currentUserId = reduxUserId || user?.id || localStorage.getItem('userId') || 'guest';
+  const readNotificationsKey = `readNotifications:${currentUserId}`;
 
   const persistReadNotificationIds = (ids) => {
     setReadNotificationIds(ids);
@@ -130,19 +135,12 @@ const AppShell = ({
     } catch {}
   };
 
-  const [badgeCounts, setBadgeCounts] = useState({
-    leaves: 0,
-    attendance: 0,
-    offboarding: 0,
-    tasks: 0,
-  });
-
   const fetchBadgeCounts = async () => {
-    const empId = localStorage.getItem('userEmployeeId') || localStorage.getItem('employeeId') || localStorage.getItem('userId');
-    const companyName = localStorage.getItem('companyName');
-    const role = localStorage.getItem('userRole');
-    const department = localStorage.getItem('userDepartment');
-    const deptRole = localStorage.getItem('departmentRole') || 'Member';
+    const empId = reduxEmployeeId || user?.employeeId || localStorage.getItem('userEmployeeId') || localStorage.getItem('employeeId') || localStorage.getItem('userId');
+    const companyName = reduxCompanyName || user?.companyName || localStorage.getItem('companyName');
+    const role = reduxRole || user?.role || localStorage.getItem('userRole');
+    const department = user?.department || localStorage.getItem('userDepartment');
+    const deptRole = reduxDeptRole || user?.departmentRole || departmentRole || 'Member';
     if (!companyName) return;
 
     try {
@@ -156,7 +154,7 @@ const AppShell = ({
         },
       });
       if (res.data) {
-        setBadgeCounts(res.data);
+        updateBadges(res.data);
       }
     } catch (err) {
       console.error('Error loading badge counts in AppShell:', err);
@@ -594,6 +592,8 @@ const AppShell = ({
                 badgeValue = badgeCounts.offboarding;
               } else if (lower.includes('task')) {
                 badgeValue = badgeCounts.tasks;
+              } else if (lower.includes('helpdesk') || lower.includes('ticket') || lower.includes('request')) {
+                badgeValue = badgeCounts.helpdesk;
               }
             }
 

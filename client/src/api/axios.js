@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { store } from '../redux/store';
+import { logout } from '../redux/slices/authSlice';
 
 const api = axios.create({
   baseURL: '/api',
@@ -6,7 +8,8 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    // Read directly from Redux store with fallback to storage
+    const token = store.getState()?.auth?.token || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -21,7 +24,7 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const isLoginPage = window.location.pathname.includes('/login');
     if (status === 401 && !isLoginPage) {
-      localStorage.clear();
+      store.dispatch(logout());
       window.location.href = '/login';
     }
     return Promise.reject(error);

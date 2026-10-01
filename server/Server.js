@@ -67,6 +67,9 @@ app.use('/api/resignations', verifyToken, resignationRoutes);
 const shiftRoutes = require('./routes/shiftRoutes');
 app.use('/api/shifts', verifyToken, shiftRoutes);
 
+const supportTicketRoutes = require('./routes/supportTicketRoutes');
+app.use('/api/support-tickets', verifyToken, supportTicketRoutes);
+
 const distPath = path.join(__dirname, '..', 'client', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
@@ -166,6 +169,8 @@ ensureLeaveSchema()
   .then(() => require('./models').Resignation.sync({ alter: true }))
   .then(() => require('./models').Shift.sync({ alter: true }))
   .then(() => require('./models').ShiftSchedule.sync({ alter: true }))
+  .then(() => require('./models').SupportTicket.sync({ alter: true }))
+  .then(() => require('./models').HelpdeskSetting.sync({ alter: true }))
   .then(() => require('./utils/seedCrm').seedCrm())
   .catch((err) => {
     console.error('Startup data sync failed:', err.message);

@@ -1,4 +1,4 @@
-const { Task, Leave, Report, Attendance, Message, User, AttendancePermission, AttendanceRegularization, Resignation, Notification } = require('../models');
+const { Task, Leave, Report, Attendance, Message, User, AttendancePermission, AttendanceRegularization, Resignation, Notification, SupportTicket } = require('../models');
 const { Op } = require('sequelize');
 
 /**
@@ -519,6 +519,33 @@ exports.getBadgeCounts = async (req, res) => {
       });
     }
 
+    // 5. HELPDESK & SERVICE REQUESTS
+    let pendingTickets = 0;
+    if (isAdmin) {
+      pendingTickets = await SupportTicket.count({
+        where: {
+          companyName: { [Op.iLike]: effectiveCompany },
+          status: { [Op.in]: ['Open', 'In Progress', 'Waiting on Employee'] },
+        },
+      });
+    } else if (isSupervisor && department) {
+      pendingTickets = await SupportTicket.count({
+        where: {
+          companyName: { [Op.iLike]: effectiveCompany },
+          department: { [Op.iLike]: String(department).trim() },
+          status: { [Op.in]: ['Open', 'In Progress', 'Waiting on Employee'] },
+        },
+      });
+    } else if (employeeId) {
+      pendingTickets = await SupportTicket.count({
+        where: {
+          employeeId,
+          companyName: { [Op.iLike]: effectiveCompany },
+          status: { [Op.in]: ['Open', 'In Progress', 'Waiting on Employee'] },
+        },
+      });
+    }
+
     res.json({
       leaves: pendingLeaves,
       attendance: pendingRegularizations + pendingPermissions,
@@ -528,6 +555,7 @@ exports.getBadgeCounts = async (req, res) => {
       },
       offboarding: pendingResignations,
       tasks: pendingTasks,
+      helpdesk: pendingTickets,
     });
   } catch (err) {
     console.error('Error fetching badge counts:', err);

@@ -26,6 +26,7 @@ const Shift = require("./Shift");
 const ShiftSchedule = require("./ShiftSchedule");
 const Notification = require("./Notification");
 const AuditLog = require("./AuditLog");
+const SupportTicket = require("./SupportTicket");
 
 Notification.belongsTo(User, {
   foreignKey: "recipientId",
@@ -168,6 +169,40 @@ Shift.hasMany(ShiftSchedule, {
   constraints: false,
 });
 
+SupportTicket.belongsTo(Asset, {
+  foreignKey: "allocatedAssetId",
+  as: "allocatedAsset",
+  constraints: false,
+});
+SupportTicket.belongsTo(User, {
+  foreignKey: "assignedToId",
+  as: "assignee",
+  constraints: false,
+});
+
+const HelpdeskSetting = require("./HelpdeskSetting");
+
+HelpdeskSetting.belongsTo(User, {
+  foreignKey: "itApproverId",
+  as: "itApprover",
+  constraints: false,
+});
+HelpdeskSetting.belongsTo(User, {
+  foreignKey: "assetApproverId",
+  as: "assetApprover",
+  constraints: false,
+});
+HelpdeskSetting.belongsTo(User, {
+  foreignKey: "hrApproverId",
+  as: "hrApprover",
+  constraints: false,
+});
+HelpdeskSetting.belongsTo(User, {
+  foreignKey: "facilityApproverId",
+  as: "facilityApprover",
+  constraints: false,
+});
+
 module.exports = {
   sequelize,
   User,
@@ -197,4 +232,6 @@ module.exports = {
   ShiftSchedule,
   Notification,
   AuditLog,
+  SupportTicket,
+  HelpdeskSetting,
 };
