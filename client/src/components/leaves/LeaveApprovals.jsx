@@ -266,10 +266,13 @@ const LeaveApprovals = ({ onOpenApplyLeave }) => {
   };
 
   const canReview = (leave) => {
-    if (leave.status !== 'Pending') return false;
+    if (!leave || leave.status !== 'Pending') return false;
     const currentEmpId = localStorage.getItem('userEmployeeId');
     if (currentEmpId && leave.employeeId === currentEmpId) return false;
-    if (isAdmin || !leave.approval_stage) return true;
+    // Backend authoritative check if available
+    if (typeof leave.canAct === 'boolean') return leave.canAct;
+    
+    // Strict approver check: user must be assigned to the current approval stage
     if (leave.approval_stage === 'Supervisor') {
       const userDept = String(localStorage.getItem('userDepartment') || '').trim().toLowerCase();
       const leaveDept = String(leave.employee?.department || leave.department || '').trim().toLowerCase();
@@ -1046,31 +1049,39 @@ const LeaveApprovals = ({ onOpenApplyLeave }) => {
                         ) : (
                           <Box
                             sx={{
-                              p: 1.5,
+                              p: 1.8,
                               borderRadius: '10px',
-                              bgcolor: activeLeave.status === 'Approved' ? '#F0FDF4' : activeLeave.status === 'Rejected' ? '#FEF2F2' : '#F8FAFC',
-                              border: `1px solid ${activeLeave.status === 'Approved' ? '#BBF7D0' : activeLeave.status === 'Rejected' ? '#FECACA' : '#E2E8F0'}`,
+                              bgcolor: activeLeave.status === 'Approved' ? '#F0FDF4' : activeLeave.status === 'Rejected' ? '#FEF2F2' : (isAdmin ? '#F0F9FF' : '#F8FAFC'),
+                              border: `1px solid ${activeLeave.status === 'Approved' ? '#BBF7D0' : activeLeave.status === 'Rejected' ? '#FECACA' : (isAdmin ? '#BAE6FD' : '#E2E8F0')}`,
                               display: 'flex',
-                              alignItems: 'center',
-                              gap: 1,
+                              flexDirection: 'column',
+                              gap: 0.75,
                             }}
                           >
-                            {activeLeave.status === 'Approved' ? (
-                              <CheckCircleIcon sx={{ fontSize: 18, color: '#10B981' }} />
-                            ) : activeLeave.status === 'Rejected' ? (
-                              <CancelIcon sx={{ fontSize: 18, color: '#DC2626' }} />
-                            ) : (
-                              <ScheduleIcon sx={{ fontSize: 18, color: '#64748B' }} />
-                            )}
-                            <Typography variant="body2" sx={{ fontSize: '12.5px', color: '#334155' }}>
-                              {activeLeave.status === 'Pending' ? (
-                                <>Waiting for review by <strong>{stageLabel(activeLeave.approval_stage)}</strong></>
-                              ) : activeLeave.status === 'Approved' ? (
-                                <>Leave fully approved & processed {activeLeave.reviewer_name ? `by ${activeLeave.reviewer_name}` : ''}{activeLeave.reviewed_at ? ` on ${dayjs(activeLeave.reviewed_at).format('DD MMM YYYY, hh:mm A')}` : ''}</>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              {activeLeave.status === 'Approved' ? (
+                                <CheckCircleIcon sx={{ fontSize: 18, color: '#10B981' }} />
+                              ) : activeLeave.status === 'Rejected' ? (
+                                <CancelIcon sx={{ fontSize: 18, color: '#DC2626' }} />
                               ) : (
-                                <>Leave request rejected {activeLeave.reviewer_name ? `by ${activeLeave.reviewer_name}` : ''}{activeLeave.reviewed_at ? ` on ${dayjs(activeLeave.reviewed_at).format('DD MMM YYYY, hh:mm A')}` : ''}</>
+                                <ScheduleIcon sx={{ fontSize: 18, color: isAdmin ? '#0284C7' : '#64748B' }} />
                               )}
-                            </Typography>
+                              <Typography variant="body2" sx={{ fontSize: '13px', fontWeight: 600, color: '#1E293B' }}>
+                                {activeLeave.status === 'Pending' ? (
+                                  <>Waiting for approval by <strong>{stageLabel(activeLeave.approval_stage)}</strong></>
+                                ) : activeLeave.status === 'Approved' ? (
+                                  <>Leave fully approved & processed {activeLeave.reviewer_name ? `by ${activeLeave.reviewer_name}` : ''}{activeLeave.reviewed_at ? ` on ${dayjs(activeLeave.reviewed_at).format('DD MMM YYYY, hh:mm A')}` : ''}</>
+                                ) : (
+                                  <>Leave request rejected {activeLeave.reviewer_name ? `by ${activeLeave.reviewer_name}` : ''}{activeLeave.reviewed_at ? ` on ${dayjs(activeLeave.reviewed_at).format('DD MMM YYYY, hh:mm A')}` : ''}</>
+                                )}
+                              </Typography>
+                            </Box>
+
+                            {activeLeave.status === 'Pending' && isAdmin && (
+                              <Typography variant="caption" sx={{ color: '#0369A1', fontSize: '11.5px', pl: 3.2, lineHeight: 1.4 }}>
+                                🛡️ <strong>Administrative Oversight View:</strong> You have full visibility to monitor this request, but operational sign-off is restricted to the assigned stage reviewer.
+                              </Typography>
+                            )}
                           </Box>
                         )}
                       </Paper>

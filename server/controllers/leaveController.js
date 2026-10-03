@@ -135,7 +135,7 @@ function actorId(actor, req) {
 
 function canActOnStage(leave, actor, req) {
   const id = actorId(actor, req);
-  if (isAdmin(actor, req)) return true;
+  // Separation of Duties: Admin/HR oversight is view-only unless explicitly assigned as stage approver
   const isSupervisorOfDept =
     (actor?.departmentRole === 'Supervisor' || req.query?.departmentRole === 'Supervisor' || req.body?.departmentRole === 'Supervisor') &&
     String(actor?.department || req.query?.department || req.body?.department || '').trim().toLowerCase() === String(leave.department || '').trim().toLowerCase();
@@ -820,7 +820,15 @@ exports.getAllLeaves = async (req, res) => {
       return rank(a.status) - rank(b.status);
     });
 
-    res.json(filtered);
+    const serialized = filtered.map((row) => {
+      const plain = row.toJSON ? row.toJSON() : row;
+      return {
+        ...plain,
+        canAct: canActOnStage(plain, actor, req),
+      };
+    });
+
+    res.json(serialized);
   } catch (error) {
     console.error('Error fetching leave records:', error);
     res.status(500).json({ error: 'Database error', details: error.message });

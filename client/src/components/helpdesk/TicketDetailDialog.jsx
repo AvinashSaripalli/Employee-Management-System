@@ -31,6 +31,7 @@ import {
   HiOutlineUser,
   HiOutlineCalendar,
   HiOutlineWrenchScrewdriver,
+  HiOutlineShieldCheck,
 } from 'react-icons/hi2';
 import axios from '../../api/axios';
 
@@ -61,6 +62,11 @@ const TicketDetailDialog = ({ open, ticket, onClose, onUpdated, isStaff }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const currentUserId = Number(localStorage.getItem('userId')) || 0;
+  const canApprove = ticket?.canApprove !== undefined
+    ? Boolean(ticket.canApprove)
+    : (ticket?.assignedToId && Number(ticket.assignedToId) === currentUserId);
+
   useEffect(() => {
     if (ticket) {
       setStatus(ticket.status || 'Open');
@@ -70,12 +76,12 @@ const TicketDetailDialog = ({ open, ticket, onClose, onUpdated, isStaff }) => {
       setError('');
       setSuccess('');
 
-      // If it's an asset request and staff is viewing, fetch available unassigned assets
-      if (ticket.category === 'ASSET_REQUEST' && isStaff && ticket.status !== 'Resolved' && ticket.status !== 'Closed') {
+      // If it's an asset request and user has approval authority, fetch available unassigned assets
+      if (ticket.category === 'ASSET_REQUEST' && canApprove && ticket.status !== 'Resolved' && ticket.status !== 'Closed') {
         fetchAvailableAssets();
       }
     }
-  }, [ticket, isStaff]);
+  }, [ticket, isStaff, canApprove]);
 
   const fetchAvailableAssets = async () => {
     setAssetLoading(true);
@@ -216,6 +222,32 @@ const TicketDetailDialog = ({ open, ticket, onClose, onUpdated, isStaff }) => {
           </Alert>
         )}
 
+        {/* Administrative Oversight / View-Only Banner */}
+        {isStaff && !canApprove && (
+          <Box
+            sx={{
+              p: 1.8,
+              mb: 2.5,
+              borderRadius: '10px',
+              bgcolor: '#f0f9ff',
+              border: '1.5px solid #bae6fd',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+            }}
+          >
+            <HiOutlineShieldCheck size={26} color="#0284c7" style={{ flexShrink: 0 }} />
+            <Box>
+              <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0369a1' }}>
+                Administrative Oversight Mode (View-Only)
+              </Typography>
+              <Typography sx={{ fontSize: '12px', color: '#0284c7', mt: 0.2 }}>
+                You have company-wide audit visibility to inspect this request. Approval, status changes, and asset allocations are assigned to: <strong>{ticket.assignedToName || 'Designated Approver'}</strong>.
+              </Typography>
+            </Box>
+          </Box>
+        )}
+
         {/* 1. Header Information Grid */}
         <Box
           sx={{
@@ -318,7 +350,7 @@ const TicketDetailDialog = ({ open, ticket, onClose, onUpdated, isStaff }) => {
         )}
 
         {/* 4. Staff Actions: Asset Allocation Workflow */}
-        {isStaff && ticket.category === 'ASSET_REQUEST' && !ticket.allocatedAsset && ticket.status !== 'Closed' && (
+        {canApprove && ticket.category === 'ASSET_REQUEST' && !ticket.allocatedAsset && ticket.status !== 'Closed' && (
           <Paper
             elevation={0}
             sx={{
@@ -382,6 +414,33 @@ const TicketDetailDialog = ({ open, ticket, onClose, onUpdated, isStaff }) => {
           </Paper>
         )}
 
+        {/* View-Only Note for Requisition when User is Not the Designated Approver */}
+        {!canApprove && ticket.category === 'ASSET_REQUEST' && !ticket.allocatedAsset && (
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              bgcolor: '#f8fafc',
+              border: '1px dashed #cbd5e1',
+              borderRadius: '12px',
+              mb: 3,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+            }}
+          >
+            <HiOutlineCube size={22} color="#64748b" style={{ flexShrink: 0 }} />
+            <Box>
+              <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#334155' }}>
+                Asset Requisition Pending Fulfillment
+              </Typography>
+              <Typography sx={{ fontSize: '12px', color: '#64748b' }}>
+                Awaiting review and device allocation by designated asset/IT approvers.
+              </Typography>
+            </Box>
+          </Paper>
+        )}
+
         {/* 5. Resolution Notes & Staff Actions */}
         <Box sx={{ mb: 2 }}>
           <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#334155', mb: 1 }}>
@@ -393,18 +452,18 @@ const TicketDetailDialog = ({ open, ticket, onClose, onUpdated, isStaff }) => {
             rows={2.5}
             size="small"
             placeholder={
-              isStaff
+              canApprove
                 ? 'Enter diagnostic findings, fix applied, or handover notes for the employee...'
                 : 'No resolution notes logged yet.'
             }
             value={resolutionNotes}
             onChange={(e) => setResolutionNotes(e.target.value)}
-            disabled={!isStaff && ticket.status === 'Closed'}
+            disabled={!canApprove}
           />
         </Box>
 
-        {/* Quick Transition Action Bar for Staff / Admin */}
-        {isStaff && (
+        {/* Quick Transition Action Bar for Designated Approvers Only */}
+        {canApprove && (
           <Box sx={{ mt: 2, pt: 2, borderTop: '1px dashed #cbd5e1' }}>
             <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#64748b', mb: 1.2 }}>
               Quick Status Transitions:
@@ -476,7 +535,7 @@ const TicketDetailDialog = ({ open, ticket, onClose, onUpdated, isStaff }) => {
         <Button onClick={onClose} sx={{ textTransform: 'none', color: '#64748b', fontWeight: 600 }}>
           Close
         </Button>
-        {isStaff && (
+        {canApprove && (
           <Button
             variant="contained"
             onClick={() => handleStatusUpdate()}

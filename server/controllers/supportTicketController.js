@@ -36,6 +36,52 @@ const generateTicketNumber = async () => {
   return candidate;
 };
 
+// Helper to determine if an actor has operational approval/action authority on a ticket
+const canUserApproveTicketSync = (ticket, actor, setting) => {
+  if (!actor || !ticket) return false;
+  const actorId = Number(actor.id);
+  const actorRole = String(actor.role || "").toLowerCase();
+  const actorDeptRole = String(actor.departmentRole || "").toLowerCase();
+
+  // 1. If explicitly assigned to this actor as lead technician or approver
+  if (ticket.assignedToId && Number(ticket.assignedToId) === actorId) {
+    return true;
+  }
+
+  // 2. Check HelpdeskSetting for category-configured approver
+  if (setting) {
+    if (ticket.category === "IT_SUPPORT" && setting.itApproverId && Number(setting.itApproverId) === actorId) return true;
+    if (ticket.category === "ASSET_REQUEST" && setting.assetApproverId && Number(setting.assetApproverId) === actorId) return true;
+    if (ticket.category === "HR_REQUEST" && setting.hrApproverId && Number(setting.hrApproverId) === actorId) return true;
+    if (ticket.category === "FACILITY" && setting.facilityApproverId && Number(setting.facilityApproverId) === actorId) return true;
+
+    // Check if requester's department supervisor is allowed when requireSupervisorApproval is on
+    if (setting.requireSupervisorApproval) {
+      const isSupervisor = (
+        (actorDeptRole === "supervisor" || actorRole === "manager") &&
+        String(actor.department || "").trim().toLowerCase() === String(ticket.department || "").trim().toLowerCase()
+      );
+      if (isSupervisor) return true;
+    }
+  }
+
+  // 3. Fallback only if NO category approver has been configured in setting yet:
+  const hasCategoryApprover = setting && (
+    (ticket.category === "IT_SUPPORT" && setting.itApproverId) ||
+    (ticket.category === "ASSET_REQUEST" && setting.assetApproverId) ||
+    (ticket.category === "HR_REQUEST" && setting.hrApproverId) ||
+    (ticket.category === "FACILITY" && setting.facilityApproverId)
+  );
+
+  if (!hasCategoryApprover) {
+    const actorDept = String(actor.department || "").toLowerCase();
+    const isIT = actorDept.includes("it") || actorDept.includes("tech");
+    if (isIT && (ticket.category === "IT_SUPPORT" || ticket.category === "ASSET_REQUEST")) return true;
+  }
+
+  return false;
+};
+
 // 1. Submit a new support ticket / service request
 exports.createTicket = async (req, res) => {
   try {
@@ -305,7 +351,19 @@ exports.getTickets = async (req, res) => {
       ],
     });
 
-    return res.status(200).json({ tickets });
+    const setting = await HelpdeskSetting.findOne({
+      where: { companyName: { [Op.iLike]: effectiveCompany } },
+    });
+
+    const serializedTickets = tickets.map((t) => {
+      const plain = t.toJSON ? t.toJSON() : t;
+      return {
+        ...plain,
+        canApprove: canUserApproveTicketSync(plain, actor, setting),
+      };
+    });
+
+    return res.status(200).json({ tickets: serializedTickets });
   } catch (error) {
     console.error("Error fetching tickets:", error);
     return res.status(500).json({ error: "Failed to fetch tickets.", details: error.message });
@@ -337,7 +395,13 @@ exports.getTicketById = async (req, res) => {
       return res.status(404).json({ error: "Ticket not found." });
     }
 
-    return res.status(200).json({ ticket });
+    const setting = await HelpdeskSetting.findOne({
+      where: { companyName: { [Op.iLike]: ticket.companyName || "KN Advisors" } },
+    });
+    const plain = ticket.toJSON ? ticket.toJSON() : ticket;
+    const canApprove = canUserApproveTicketSync(plain, req.user, setting);
+
+    return res.status(200).json({ ticket: { ...plain, canApprove } });
   } catch (error) {
     console.error("Error fetching ticket:", error);
     return res.status(500).json({ error: "Failed to load ticket details." });
@@ -353,6 +417,18 @@ exports.updateTicket = async (req, res) => {
     const ticket = await SupportTicket.findByPk(id);
     if (!ticket) {
       return res.status(404).json({ error: "Ticket not found." });
+    }
+
+    const setting = await HelpdeskSetting.findOne({
+      where: { companyName: { [Op.iLike]: ticket.companyName || "KN Advisors" } },
+    });
+    const canAct = canUserApproveTicketSync(ticket, req.user, setting);
+
+    // If changing status or assigning technicians, actor must be designated approver
+    if ((status || assignedToId !== undefined) && !canAct) {
+      return res.status(403).json({
+        error: "Access Denied: You are not an assigned approver for this request category. Admin oversight is view-only.",
+      });
     }
 
     const updates = {};
@@ -440,6 +516,16 @@ exports.approveAssetAllocation = async (req, res) => {
     const ticket = await SupportTicket.findByPk(id);
     if (!ticket) {
       return res.status(404).json({ error: "Request not found." });
+    }
+
+    const setting = await HelpdeskSetting.findOne({
+      where: { companyName: { [Op.iLike]: ticket.companyName || "KN Advisors" } },
+    });
+    const canApprove = canUserApproveTicketSync(ticket, req.user, setting);
+    if (!canApprove) {
+      return res.status(403).json({
+        error: "Access Denied: Only designated approvers can approve asset allocation. Admin oversight is view-only.",
+      });
     }
 
     if (ticket.category !== "ASSET_REQUEST") {
